@@ -1,0 +1,32 @@
+# 1. SECURITE ET RISQUES COMMERCIAUX
+*.jks
+*.keystore
+*.pem
+*.key
+.env
+
+# 2. SECRETS FLUTTER / ANDROID (CRITIQUE)
+aegis_app/android/local.properties
+aegis_app/android/key.properties
+aegis_app/android/.gradle/
+
+# 3. BINAIRES COMMERCIAUX (Ce que vous vendez)
+*.apk
+*.aab
+*.idsig
+*.so
+**/*.so
+
+# 4. DOSSIERS DE COMPILATION & CACHES
+aegis-core/target/
+aegis_app/build/
+aegis_app/.dart_tool/
+.idea/
+.vscode/
+
+# 5. CACHES PYTHON ET SYSTEME
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+Thumbs.db
