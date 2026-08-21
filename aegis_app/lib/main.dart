@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_windowmanager_plus/flutter_windowmanager_plus.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
 import 'models/session_vault.dart';
 
@@ -573,7 +574,6 @@ class _LockScreenState extends State<LockScreen> {
       );
     }
 
-    // --- CORRECTION ICI : APPEL AU DICTIONNAIRE ---
     String displayHint = _isVaultInitialized!
         ? AppTranslations.get(context, 'pin_hint') 
         : AppTranslations.get(context, 'create_pin_hint');
@@ -881,11 +881,37 @@ class _MainDashboardState extends State<MainDashboard> {
     );
   }
 
-  void _scanPeerQrCode() {
-    setState(() {
-      _peerAddressController.text = "aegis_pk_3b5c7d9e1f2a4b6c8d0e2f4a6b8c0d2e4f6a8b0c";
-    });
-    _connectPeer();
+  Future<void> _scanPeerQrCode() async {
+    // 1. Ouvre la vue caméra et attend le résultat en RAM
+    final String? scannedKey = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const QRScannerScreen()),
+    );
+
+    // 2. Si un résultat revient, on applique le pare-feu (Sanitization)
+    if (scannedKey != null && scannedKey.isNotEmpty) {
+      // REGEX OPSEC : N'accepte QUE le format exact "aegis_pk_" + 48 caractères hexadécimaux
+      final strictAegisFormat = RegExp(r'^aegis_pk_[a-f0-9]{48}$');
+
+      if (strictAegisFormat.hasMatch(scannedKey)) {
+        // La clé est stérile et validée. On l'injecte.
+        setState(() {
+          _peerAddressController.text = scannedKey;
+        });
+        _connectPeer();
+      } else {
+        // Le QR Code scanné est invalide ou malveillant. On rejette silencieusement.
+        debugPrint("OPSEC WARNING : QR Code rejeté. Format non conforme.");
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Alerte Sécurité : Le QR Code scanné n'est pas une clé AEGIS valide."),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
   }
 
   void _showChangePinDialog() {
@@ -1311,6 +1337,69 @@ class _MainDashboardState extends State<MainDashboard> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// CORRECTION CRITIQUE (TRIPLE CHECK) :
+// Le Scanner est maintenant un StatefulWidget pour bloquer le flux
+// après la première détection. Cela évite un bug connu où la caméra 
+// ferme toute l'application en effectuant 10 `Navigator.pop` par seconde.
+class QRScannerScreen extends StatefulWidget {
+  const QRScannerScreen({super.key});
+
+  @override
+  State<QRScannerScreen> createState() => _QRScannerScreenState();
+}
+
+class _QRScannerScreenState extends State<QRScannerScreen> {
+  // Verrou de sécurité (évite les détections multiples simultanées)
+  bool _isScanned = false;
+
+  @override
+  Widget build(BuildContext context) {
+    const Color brandYellow = Color(0xFFFCBE0B);
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF141416),
+        iconTheme: const IconThemeData(color: brandYellow),
+        title: const Text(
+          'SCAN OPSEC',
+          style: TextStyle(color: brandYellow, fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+      ),
+      body: Stack(
+        children: [
+          MobileScanner(
+            onDetect: (capture) {
+              if (_isScanned) return; // Si déjà lu, on ignore les frames suivantes
+
+              final List<Barcode> barcodes = capture.barcodes;
+              for (final barcode in barcodes) {
+                if (barcode.rawValue != null) {
+                  _isScanned = true; // On verrouille immédiatement
+                  // Détruit la vue caméra et renvoie la donnée en RAM au dashboard
+                  Navigator.pop(context, barcode.rawValue);
+                  return;
+                }
+              }
+            },
+          ),
+          // Interface de ciblage (Esthétique militaire)
+          Center(
+            child: Container(
+              width: 250,
+              height: 250,
+              decoration: BoxDecoration(
+                border: Border.all(color: brandYellow.withValues(alpha: 0.5), width: 2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
