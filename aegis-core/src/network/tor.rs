@@ -28,7 +28,7 @@ impl AegisTorClient {
             .cache_dir(CfgPath::new(cache_dir.display().to_string()));
 
         let config = config_builder.build()?;
-        let runtime = TokioRustlsRuntime::create()?;
+        let runtime = TokioRustlsRuntime::current()?;
 
         let client = TorClient::with_runtime(runtime)
             .config(config)
@@ -53,12 +53,15 @@ impl Drop for AegisTorClient {
         if let Some(temp_dir) = self.ram_fs.take() {
             let path = temp_dir.path().to_path_buf();
             secure_wipe_dir(&path);
-            drop(temp_dir);
+            let _ = temp_dir.close();
         }
     }
 }
 
-fn secure_wipe_dir(path: &Path) {
+pub fn secure_wipe_dir(path: &Path) {
+    if !path.exists() {
+        return;
+    }
     if let Ok(entries) = fs::read_dir(path) {
         for entry in entries.flatten() {
             let entry_path = entry.path();
@@ -74,10 +77,10 @@ fn secure_wipe_dir(path: &Path) {
                 let _ = fs::remove_file(&entry_path);
             } else if entry_path.is_dir() {
                 secure_wipe_dir(&entry_path);
-                let _ = fs::remove_dir(&entry_path);
             }
         }
     }
+    let _ = fs::remove_dir(path);
 }
 
 #[cfg(test)]
@@ -94,6 +97,15 @@ mod tests {
         assert!(path_copy.exists(), "Le dossier temporaire doit exister");
 
         drop(client);
+
+        // Attente asynchrone pour permettre à Tokio de libérer les handles d'E/S sous Windows
+        for _ in 0..20 {
+            if !path_copy.exists() {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+            secure_wipe_dir(&path_copy);
+        }
 
         assert!(
             !path_copy.exists(),

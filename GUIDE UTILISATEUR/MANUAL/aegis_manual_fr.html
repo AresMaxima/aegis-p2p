@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AEGIS P2P — Guide d'Opération & Manuel OpSec</title>
+    <style>
+        :root { --primary: #fcbe0b; --bg-dark: #0d0d0e; --card-bg: #141416; --text-color: #e0e0e0; --text-muted: #a0a0a0; --border-color: #26262a; --alert-color: #ff5555; }
+        * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-dark) !important; color: var(--text-color) !important; line-height: 1.4; margin: 0; padding: 15px; text-align: justify; }
+        .container { max-width: 800px; margin: 0 auto; }
+        header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid var(--primary); padding-bottom: 10px; margin-bottom: 15px; gap: 15px; }
+        .header-title { flex: 1; }
+        .logo { height: 50px; width: auto; max-width: 180px; object-fit: contain; }
+        h1 { color: var(--primary) !important; margin: 0 0 3px 0; font-size: 1.8em; text-transform: uppercase; letter-spacing: 1px; }
+        .subtitle { color: var(--text-muted) !important; font-size: 0.85em; margin: 0; text-transform: uppercase; }
+        section { background: var(--card-bg) !important; border: 1px solid var(--border-color); border-radius: 6px; padding: 14px; margin-bottom: 12px; break-inside: avoid; }
+        h2 { color: var(--primary) !important; border-bottom: 1px solid var(--border-color); padding-bottom: 4px; margin-top: 0; margin-bottom: 8px; font-size: 1.1em; text-transform: uppercase; }
+        p { margin-top: 0; margin-bottom: 8px; font-size: 0.9em; }
+        ul { list-style-type: none; padding-left: 0; margin: 0; }
+        li { margin-bottom: 6px; position: relative; padding-left: 18px; font-size: 0.88em; }
+        li::before { content: "•"; color: var(--primary) !important; font-weight: bold; position: absolute; left: 0; }
+        .badge-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 10px 0; }
+        .badge { background: #1a1a1e !important; border-left: 3px solid var(--primary); padding: 8px; border-radius: 4px; }
+        .badge.alert { border-left-color: var(--alert-color); }
+        .badge-title { font-weight: bold; display: block; margin-bottom: 2px; font-size: 0.8em; color: #ffffff !important; }
+        .code-inline { background: #26262a !important; color: var(--primary) !important; padding: 1px 5px; border-radius: 3px; font-family: monospace; font-weight: bold; font-size: 0.88em; }
+        .cta-container { text-align: center; margin-top: 15px; padding: 12px; background: var(--card-bg) !important; border: 1px solid var(--primary); border-radius: 6px; }
+        .btn-cta { display: inline-block; background-color: var(--primary) !important; color: #000000 !important; font-weight: bold; text-decoration: none !important; padding: 10px 20px; border-radius: 4px; text-transform: uppercase; font-size: 0.88em; }
+        .link-url { display: block; margin-top: 8px; color: var(--primary) !important; font-size: 0.82em; text-decoration: underline !important; word-break: break-all; }
+        @page { size: A4; margin: 10mm; }
+        @media print { .page-break { page-break-before: always !important; break-before: page !important; height: 0; display: block; } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <div class="header-title">
+            <h1>AEGIS P2P</h1>
+            <p class="subtitle">Guide d'Opération & Manuel OpSec — Architecture Zero-Persistence</p>
+        </div>
+        <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima Logo" class="logo">
+    </header>
+
+    <section>
+        <h2>SECTION 1 : Principes de Sécurité & Démarrage à Froid</h2>
+        <p><strong>Architecture Zero-Persistence :</strong> AEGIS fonctionne exclusivement en mémoire vive (RAM). Aucune clé, aucun historique et aucun cache ne sont écrits sur le disque. Dès la fermeture de l'application ou l'extinction de l'appareil, les données sont définitivement détruites.</p>
+        
+        <p><strong>Mécanisme de Déverrouillage & PIN Dynamique :</strong></p>
+        <div class="badge-list">
+            <div class="badge">
+                <span class="badge-title">Clef Principale (Accès Réel)</span>
+                <span class="code-inline">Code PIN dynamique de session défini par l'opérateur.</span>
+            </div>
+            <div class="badge">
+                <span class="badge-title">Code de Contrainte (PIN Leurre)</span>
+                <span class="code-inline">N'IMPORTE QUEL autre PIN valide redirige vers un tableau leurre ("Notes").</span>
+            </div>
+            <div class="badge alert">
+                <span class="badge-title">Code de Panique (Kill Switch)</span>
+                <span class="code-inline">0000 (ou erreurs répétées) — Efface la RAM et stoppe le processus.</span>
+            </div>
+        </div>
+
+        <ul>
+            <li><strong>Protection Anti-Capture (FLAG_SECURE) :</strong> Bloque matériellement les captures d'écran, les enregistrements vidéo et masque l'aperçu dans le sélecteur d'applications Android.</li>
+            <li><strong>Minuteur d'Inactivité :</strong> Après 3 minutes sans interaction, la mémoire RAM est purgée et l'application se ferme automatiquement.</li>
+        </ul>
+    </section>
+
+    <section>
+        <h2>SECTION 2 : Échange de Clés & Connexion P2P</h2>
+        <p><strong>Identité Éphémère :</strong> Votre identité réseau est représentée par votre Clé Publique (Ed25519/X25519) générée en RAM.</p>
+        <p><strong>Établir une connexion :</strong></p>
+        <ul>
+            <li><strong>En face-à-face :</strong> Appuyez sur <span class="code-inline">MON QR CODE</span>. Votre correspondant appuie sur <span class="code-inline">SCANNER UN QR CODE</span> pour initialiser la poignée de main E2EE.</li>
+            <li><strong>À distance :</strong> Appuyez sur <span class="code-inline">COPIER MA CLÉ</span> et transmettez-la via un canal secondaire. Le destinataire la colle dans le champ "Clé Publique du destinataire" puis clique sur <span class="code-inline">CONNECTER LE PAIR</span>.</li>
+        </ul>
+    </section>
+
+    <div class="page-break"></div>
+
+    <section style="margin-top: 10px;">
+        <h2>SECTION 3 : Commutateur de Transport Réseau (Transport Switch)</h2>
+        <ul>
+            <li><strong>Tor v3 Embarqué (Anonymat Max) :</strong> Lance un service masqué .onion local. Masque l'adresse IP et traverse les pare-feux stricts.</li>
+            <li><strong>Direct WAN (P2P / DHT Rapide) :</strong> Connexion directe inter-appareils via Kademlia DHT/STUN pour un débit maximal.</li>
+            <li><strong>Hors-Ligne / Local (LAN / Bluetooth) :</strong> Fonctionne sans réseau Internet via Wi-Fi local ou Bluetooth Mesh pour les réunions physiques.</li>
+            <li><strong>Hybride / Auto (Saut de Fréquence) :</strong> Basculement dynamique entre les transports avec détection de la censure et activation automatique des ponts Snowflake / WebRTC.</li>
+        </ul>
+    </section>
+
+    <section>
+        <h2>SECTION 4 : Module Stéganographique & Urgence</h2>
+        <ul>
+            <li><strong>Noyer une clé dans un texte :</strong> Saisissez une clé ou une phrase dans le module Stéganographie et cliquez sur <span class="code-inline">NOYER LA CLÉ DANS UN POÈME</span>.</li>
+            <li><strong>Extraire une clé :</strong> Collez le texte stéganographique reçu et cliquez sur <span class="code-inline">EXTRAIRE LA CLÉ DU TEXTE</span> pour charger le destinataire.</li>
+            <li><strong>Destruction Immédiate :</strong> Dans le panneau d'urgence, cliquez sur <span class="code-inline">DESTRUCTION IMMÉDIATE DE LA RAM (KILL SWITCH)</span> pour purger la mémoire sans laisser de trace.</li>
+        </ul>
+    </section>
+
+    <div class="cta-container">
+        <a href="https://aresmaxima.com/aegis-p2p/" class="btn-cta" target="_blank" rel="noopener">Découvrir AEGIS-P2P (FR)</a>
+        <a href="https://aresmaxima.com/aegis-p2p/" class="link-url" target="_blank" rel="noopener">https://aresmaxima.com/aegis-p2p/</a>
+    </div>
+</div>
+</body>
+</html>

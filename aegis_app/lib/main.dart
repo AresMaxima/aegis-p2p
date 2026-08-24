@@ -10,6 +10,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_windowmanager_plus/flutter_windowmanager_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'views/blind_viewer.dart';
 
 import 'models/session_vault.dart';
 
@@ -95,8 +96,30 @@ class AegisApp extends StatefulWidget {
   State<AegisApp> createState() => _AegisAppState();
 }
 
-class _AegisAppState extends State<AegisApp> {
+class _AegisAppState extends State<AegisApp> with WidgetsBindingObserver {
   Locale? _locale;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // COUPE-CIRCUIT : Extinction immédiate (exit 137) au moindre changement d'état / perte de focus
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      exit(137);
+    }
+  }
 
   void setLocale(Locale locale) {
     setState(() {
@@ -161,6 +184,7 @@ class _UserInactivityWrapperState extends State<UserInactivityWrapper> {
     _inactivityTimer = Timer(const Duration(minutes: 3), () {
       activeRamPin = "";
       SystemNavigator.pop();
+      exit(137);
     });
   }
 
@@ -222,6 +246,9 @@ class AppTranslations {
       'scan_qr': 'SCANNER UN QR CODE',
       'copy_key': 'COPIER MA CLÉ',
       'fake_dashboard_title': 'NOTES PERSONNELLES',
+      'heavy_files_title': 'INGESTION FICHIERS LOURDS & BLIND VIEWER',
+      'heavy_files_desc': 'Dépuration EXIF/GPS, Padding RAM & Rendu VRAM Zero-Disk',
+      'open_blind_viewer': 'OUVRIR LE BLIND VIEWER (ZERO-DISK)',
     },
     'en': {
       'subtitle': 'Volatile RAM Session - Zero Trace',
@@ -257,6 +284,9 @@ class AppTranslations {
       'scan_qr': 'SCAN QR CODE',
       'copy_key': 'COPY MY KEY',
       'fake_dashboard_title': 'PERSONAL NOTES',
+      'heavy_files_title': 'HEAVY FILE INGESTION & BLIND VIEWER',
+      'heavy_files_desc': 'EXIF/GPS Stripping, RAM Padding & VRAM Zero-Disk Rendering',
+      'open_blind_viewer': 'OPEN BLIND VIEWER (ZERO-DISK)',
     },
     'es': {
       'subtitle': 'Sesión RAM Volátil - Huella Cero',
@@ -292,6 +322,9 @@ class AppTranslations {
       'scan_qr': 'ESCANEAR CÓDIGO QR',
       'copy_key': 'COPIAR MI CLAVE',
       'fake_dashboard_title': 'NOTAS PERSONALES',
+      'heavy_files_title': 'INGESTIÓN DE ARCHIVOS PESADOS Y BLIND VIEWER',
+      'heavy_files_desc': 'Depuración EXIF/GPS, Padding RAM y Renders VRAM Zero-Disk',
+      'open_blind_viewer': 'ABRIR BLIND VIEWER (ZERO-DISK)',
     },
     'it': {
       'subtitle': 'Sessione RAM Volatile - Traccia Zero',
@@ -327,6 +360,9 @@ class AppTranslations {
       'scan_qr': 'SCANSIONA CODICE QR',
       'copy_key': 'COPIA LA MIA CHIAVE',
       'fake_dashboard_title': 'APPUNTI PERSONALI',
+      'heavy_files_title': 'INGESTIONE FILE PESANTI E BLIND VIEWER',
+      'heavy_files_desc': 'Pulizia EXIF/GPS, Padding RAM e Rendering VRAM Zero-Disk',
+      'open_blind_viewer': 'APRI BLIND VIEWER (ZERO-DISK)',
     },
     'pl': {
       'subtitle': 'Ulotna Sesja RAM - Zerowy Ślad',
@@ -362,6 +398,9 @@ class AppTranslations {
       'scan_qr': 'SKANUJ KOD QR',
       'copy_key': 'KOPIUJ MÓJ KLUCZ',
       'fake_dashboard_title': 'NOTATKI OSOBISTE',
+      'heavy_files_title': 'INSYGNIACJA CIĘŻKICH PLIKÓW I BLIND VIEWER',
+      'heavy_files_desc': 'Czyszczenie EXIF/GPS, Padding RAM i Renderowanie VRAM Zero-Disk',
+      'open_blind_viewer': 'OTWÓRZ BLIND VIEWER (ZERO-DISK)',
     },
     'uk': {
       'subtitle': 'Летка Сесія RAM - Нульовий Слід',
@@ -397,6 +436,9 @@ class AppTranslations {
       'scan_qr': 'СКАНУВАТИ QR-КОД',
       'copy_key': 'СКОПІЮВАТИ МІЙ КЛЮЧ',
       'fake_dashboard_title': 'ОСОБИСТІ НОТАТКИ',
+      'heavy_files_title': 'ІМПОРТ ВАЖКИХ ФАЙЛІВ ТА BLIND VIEWER',
+      'heavy_files_desc': 'Очищення EXIF/GPS, Падинг RAM та Рендеринг VRAM Zero-Disk',
+      'open_blind_viewer': 'ВІДКРИТИ BLIND VIEWER (ZERO-DISK)',
     },
     'ar': {
       'subtitle': 'جلسة RAM متطايرة - بصمة صفر',
@@ -432,6 +474,9 @@ class AppTranslations {
       'scan_qr': 'مسح رمز الاستجابة السريعة',
       'copy_key': 'نسخ مفتاحي',
       'fake_dashboard_title': 'ملاحظات شخصية',
+      'heavy_files_title': 'استيعاب الملفات الثقيلة و BLIND VIEWER',
+      'heavy_files_desc': 'تطهير EXIF/GPS ، حشو RAM وتقديم VRAM Zero-Disk',
+      'open_blind_viewer': 'افتح BLIND VIEWER (ZERO-DISK)',
     },
   };
 
@@ -453,7 +498,6 @@ class _LockScreenState extends State<LockScreen> {
   final TextEditingController _pinController = TextEditingController();
   final SessionVault _vault = SessionVault();
   bool _isLoading = false;
-  
   bool? _isVaultInitialized; 
 
   @override
@@ -526,9 +570,7 @@ class _LockScreenState extends State<LockScreen> {
 
     if (_isVaultInitialized == false) {
       final success = await _vault.initializeMasterPin(pin);
-      
       if (!mounted) return;
-      
       _pinController.clear();
       setState(() { _isLoading = false; });
 
@@ -543,7 +585,6 @@ class _LockScreenState extends State<LockScreen> {
     }
 
     final session = await _vault.unlockSession(pin);
-    
     if (!mounted) return;
 
     _pinController.clear();
@@ -783,7 +824,10 @@ class FakeDashboard extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.close),
-            onPressed: () => SystemNavigator.pop(),
+            onPressed: () {
+              SystemNavigator.pop();
+              exit(137);
+            },
           )
         ],
       ),
@@ -837,6 +881,12 @@ class _MainDashboardState extends State<MainDashboard> {
     super.dispose();
   }
 
+  void _openBlindViewer() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => const BlindViewerScreen()),
+    );
+  }
+
   void _connectPeer() {
     final peer = _peerAddressController.text.trim();
     if (peer.isNotEmpty) {
@@ -882,25 +932,20 @@ class _MainDashboardState extends State<MainDashboard> {
   }
 
   Future<void> _scanPeerQrCode() async {
-    // 1. Ouvre la vue caméra et attend le résultat en RAM
     final String? scannedKey = await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const QRScannerScreen()),
     );
 
-    // 2. Si un résultat revient, on applique le pare-feu (Sanitization)
     if (scannedKey != null && scannedKey.isNotEmpty) {
-      // REGEX OPSEC : N'accepte QUE le format exact "aegis_pk_" + 48 caractères hexadécimaux
       final strictAegisFormat = RegExp(r'^aegis_pk_[a-f0-9]{48}$');
 
       if (strictAegisFormat.hasMatch(scannedKey)) {
-        // La clé est stérile et validée. On l'injecte.
         setState(() {
           _peerAddressController.text = scannedKey;
         });
         _connectPeer();
       } else {
-        // Le QR Code scanné est invalide ou malveillant. On rejette silencieusement.
         debugPrint("OPSEC WARNING : QR Code rejeté. Format non conforme.");
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -977,9 +1022,9 @@ class _MainDashboardState extends State<MainDashboard> {
     _chatController.clear();
     _steganoController.clear();
     SystemNavigator.pop();
+    exit(137);
   }
 
-  // Traductions des textes de stéganographie
   List<String> _getLocalizedPoems(String langCode) {
     switch (langCode) {
       case 'fr':
@@ -1046,6 +1091,11 @@ class _MainDashboardState extends State<MainDashboard> {
         title: Text(AppTranslations.get(context, 'dashboard_title'), style: const TextStyle(color: brandYellow, fontWeight: FontWeight.bold, fontSize: 15)),
         actions: [
           IconButton(
+            tooltip: "Blind Viewer (Zero-Disk)",
+            icon: const Icon(Icons.folder_special, color: brandYellow),
+            onPressed: _openBlindViewer,
+          ),
+          IconButton(
             icon: const Icon(Icons.power_settings_new, color: Colors.redAccent),
             onPressed: _triggerPanicPurge,
           )
@@ -1058,6 +1108,53 @@ class _MainDashboardState extends State<MainDashboard> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // CARTE D'ACTION : INGESTION FICHIERS LOURDS & BLIND VIEWER
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: brandYellow.withValues(alpha: 0.1),
+                  border: Border.all(color: brandYellow, width: 1.5),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.shield, color: brandYellow, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            AppTranslations.get(context, 'heavy_files_title'),
+                            style: const TextStyle(color: brandYellow, fontWeight: FontWeight.bold, fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      AppTranslations.get(context, 'heavy_files_desc'),
+                      style: const TextStyle(color: Colors.white70, fontSize: 10),
+                    ),
+                    const SizedBox(height: 10),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: brandYellow,
+                        foregroundColor: Colors.black,
+                        minimumSize: const Size(double.infinity, 38),
+                      ),
+                      onPressed: _openBlindViewer,
+                      icon: const Icon(Icons.remove_red_eye, size: 16),
+                      label: Text(
+                        AppTranslations.get(context, 'open_blind_viewer'),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
               Text(AppTranslations.get(context, 'my_address'), style: const TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold)),
               const SizedBox(height: 4),
               SelectableText(_myPublicKey, style: const TextStyle(color: brandYellow, fontWeight: FontWeight.bold, fontSize: 11)),
@@ -1214,7 +1311,6 @@ class _MainDashboardState extends State<MainDashboard> {
                           final binary = bytes.map((b) => b.toRadixString(2).padLeft(8, '0')).join();
                           final hiddenStr = binary.replaceAll('0', '\u200C').replaceAll('1', '\u200D');
 
-                          // Utilisation dynamique de la langue pour la stéganographie
                           final langCode = Localizations.localeOf(context).languageCode;
                           final List<String> poems = _getLocalizedPoems(langCode);
                           final randomPoem = poems[Random().nextInt(poems.length)];
@@ -1342,10 +1438,6 @@ class _MainDashboardState extends State<MainDashboard> {
   }
 }
 
-// CORRECTION CRITIQUE (TRIPLE CHECK) :
-// Le Scanner est maintenant un StatefulWidget pour bloquer le flux
-// après la première détection. Cela évite un bug connu où la caméra 
-// ferme toute l'application en effectuant 10 `Navigator.pop` par seconde.
 class QRScannerScreen extends StatefulWidget {
   const QRScannerScreen({super.key});
 
@@ -1354,7 +1446,6 @@ class QRScannerScreen extends StatefulWidget {
 }
 
 class _QRScannerScreenState extends State<QRScannerScreen> {
-  // Verrou de sécurité (évite les détections multiples simultanées)
   bool _isScanned = false;
 
   @override
@@ -1375,20 +1466,18 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
         children: [
           MobileScanner(
             onDetect: (capture) {
-              if (_isScanned) return; // Si déjà lu, on ignore les frames suivantes
+              if (_isScanned) return;
 
               final List<Barcode> barcodes = capture.barcodes;
               for (final barcode in barcodes) {
                 if (barcode.rawValue != null) {
-                  _isScanned = true; // On verrouille immédiatement
-                  // Détruit la vue caméra et renvoie la donnée en RAM au dashboard
+                  _isScanned = true;
                   Navigator.pop(context, barcode.rawValue);
                   return;
                 }
               }
             },
           ),
-          // Interface de ciblage (Esthétique militaire)
           Center(
             child: Container(
               width: 250,

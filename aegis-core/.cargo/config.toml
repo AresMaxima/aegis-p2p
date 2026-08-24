@@ -1,0 +1,4 @@
+﻿[target.aarch64-linux-android]
+linker = "D:/Android/Sdk/ndk/26.3.11579264/toolchains/llvm/prebuilt/windows-x86_64/bin/clang.exe"
+ar = "D:/Android/Sdk/ndk/26.3.11579264/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-ar.exe"
+rustflags = ["-C", "link-arg=--target=aarch64-linux-android27"]

@@ -1,18 +1,35 @@
+//! aegis-core/src/signals.rs
+//! Interception des signaux OS & Injection de leurres mémoire (Cold Boot Attack)
+
 use crate::secure_buffer::SecureBuffer;
 use rand::RngCore;
-use signal_hook::{consts::signal::*, iterator::Signals};
+
+#[cfg(unix)]
 use std::{process, thread};
+
+#[cfg(unix)]
+use signal_hook::{consts::signal::*, iterator::Signals};
 
 /// Intercepte SIGINT / SIGTERM pour couper immédiatement le processus
 /// et purger la RAM avant extraction forensique à chaud.
 pub fn setup_signal_handler() {
-    let mut signals = Signals::new(&[SIGINT, SIGTERM]).expect("Échec d'attachement des signaux OS");
-    thread::spawn(move || {
-        for sig in signals.forever() {
-            eprintln!("[ALERT] Signal {} détecté. Interruption d'urgence.", sig);
-            process::exit(137);
-        }
-    });
+    #[cfg(unix)]
+    {
+        let mut signals = Signals::new(&[SIGINT, SIGTERM]).expect("Échec d'attachement des signaux OS");
+        thread::spawn(move || {
+            for sig in signals.forever() {
+                eprintln!("[ALERT] Signal {} détecté. Interruption d'urgence.", sig);
+                process::exit(137);
+            }
+        });
+    }
+
+    #[cfg(windows)]
+    {
+        // Fallback minimal pour que la compilation passe sous Windows lors des tests locaux.
+        // L'interception de signaux agressifs est déléguée à l'OS cible (Android/Linux).
+        eprintln!("[INFO] Handlers de signaux POSIX ignorés (Cible Windows détectée).");
+    }
 }
 
 /// Injecte N tampons leurres remplis d'entropie dans la RAM

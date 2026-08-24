@@ -1,125 +1,81 @@
-use rusqlite::{params, Connection, Result};
+//! aegis-core/src/storage/db.rs
+//! Gestionnaire de Base de Données Chiffrée SQLCipher & Destruction Forensique
 
-/// Structure gérant la base de données temporaire en mémoire RAM.
-pub struct TemporaryStorage {
+use crate::secure_buffer::SecureBuffer;
+use rusqlite::{Connection, OpenFlags};
+use thiserror::Error;
+use zeroize::Zeroizing;
+
+#[derive(Error, Debug)]
+pub enum DbError {
+    #[error("Échec de connexion ou d'opération SQLCipher: {0}")]
+    SqliteError(#[from] rusqlite::Error),
+    #[error("Clé de chiffrement invalide ou manquante")]
+    InvalidKey,
+    #[error("Tentative d'injection SQL ou nom de table non sécurisé")]
+    InvalidIdentifier,
+}
+
+pub struct AegisDatabase {
     conn: Connection,
 }
 
-#[derive(Debug, PartialEq)]
-pub struct PendingMessage {
-    pub id: i64,
-    pub recipient_hash: String,
-    pub payload: Vec<u8>,
-    pub timestamp: i64,
-}
-
-impl TemporaryStorage {
-    /// Initialise une base de données SQLite volatile 100% en RAM (`:memory:`).
-    pub fn open_in_memory() -> Result<Self> {
-        let conn = Connection::open_in_memory()?;
-        
-        // CORRECTION OPSEC : Verrouillage strict de SQLite en RAM
-        // temp_store = MEMORY : Interdit l'usage du disque pour les tris et tables temporaires.
-        // secure_delete = ON  : Écrase avec des zéros la mémoire vive libérée.
-        // journal_mode = OFF  : Désactive la journalisation inutile en mémoire volatile.
-        conn.execute_batch(
-            "PRAGMA temp_store = MEMORY;
-             PRAGMA secure_delete = ON;
-             PRAGMA journal_mode = OFF;"
-        )?;
-        
-        // CORRECTION SYNTAXE : Utilisation de () au lieu de []
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS pending_messages (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                recipient_hash TEXT NOT NULL,
-                payload BLOB NOT NULL,
-                timestamp INTEGER NOT NULL
-            )",
-            (),
-        )?;
-
-        Ok(Self { conn })
-    }
-
-    /// Insère un message chiffré en attente dans la file éphémère.
-    pub fn store_message(&self, recipient_hash: &str, payload: &[u8]) -> Result<i64> {
-        let timestamp = chrono_like_timestamp();
-        self.conn.execute(
-            "INSERT INTO pending_messages (recipient_hash, payload, timestamp) VALUES (?1, ?2, ?3)",
-            params![recipient_hash, payload, timestamp],
-        )?;
-        Ok(self.conn.last_insert_rowid())
-    }
-
-    /// Récupère tous les messages en attente pour un destinataire donné.
-    pub fn get_messages_for(&self, recipient_hash: &str) -> Result<Vec<PendingMessage>> {
-        let mut stmt = self.conn.prepare(
-            "SELECT id, recipient_hash, payload, timestamp FROM pending_messages WHERE recipient_hash = ?1",
-        )?;
-
-        let message_iter = stmt.query_map(params![recipient_hash], |row| {
-            Ok(PendingMessage {
-                id: row.get(0)?,
-                recipient_hash: row.get(1)?,
-                payload: row.get(2)?,
-                timestamp: row.get(3)?,
-            })
-        })?;
-
-        let mut messages = Vec::new();
-        for msg in message_iter {
-            messages.push(msg?);
+impl AegisDatabase {
+    /// Ouvre ou crée une base de données chiffrée avec durcissement PRAGMA strict
+    pub fn open_encrypted(db_path: &str, master_key: &SecureBuffer) -> Result<Self, DbError> {
+        if master_key.is_empty() {
+            return Err(DbError::InvalidKey);
         }
 
-        Ok(messages)
+        let conn = Connection::open_with_flags(
+            db_path,
+            OpenFlags::SQLITE_OPEN_READ_WRITE
+                | OpenFlags::SQLITE_OPEN_CREATE
+                | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )?;
+
+        // Clé brute 256-bit SQLCipher (format x'HEX') emballée dans Zeroizing
+        let hex_key = Zeroizing::new(hex::encode(master_key.as_slice()));
+        let key_pragma = Zeroizing::new(format!("PRAGMA key = \"x'{}'\";", *hex_key));
+
+        // Injection directe du PRAGMA pour éviter l'échappement texte de pragma_update
+        conn.execute_batch(&key_pragma)?;
+
+        // Configuration du moteur cryptographique SQLCipher
+        conn.pragma_update(None, "cipher_memory_security", "ON")?;
+        conn.pragma_update(None, "temp_store", "MEMORY")?;
+        conn.pragma_update(None, "journal_mode", "WAL")?;
+
+        let db = Self { conn };
+        db.init_schema()?;
+
+        Ok(db)
     }
 
-    /// Supprime un message de la BDD après confirmation de réception/lecture.
-    pub fn delete_message(&self, id: i64) -> Result<()> {
-        self.conn.execute("DELETE FROM pending_messages WHERE id = ?1", params![id])?;
+    /// Initialise la structure minimale des tables isolées
+    fn init_schema(&self) -> Result<(), DbError> {
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS secure_kv (
+                key TEXT PRIMARY KEY,
+                val BLOB NOT NULL,
+                updated_at INTEGER NOT NULL
+            );",
+            [],
+        )?;
         Ok(())
     }
 
-    /// Purge intégrale de la table (Emergency Clean).
-    pub fn wipe_all(&self) -> Result<()> {
-        // CORRECTION SYNTAXE : Utilisation de ()
-        self.conn.execute("DELETE FROM pending_messages", ())?;
-        self.conn.execute("VACUUM", ())?;
+    /// Purge sécurisée d'une table avec écrasement physique (VACUUM)
+    pub fn secure_purge_table(&self, table_name: &str) -> Result<(), DbError> {
+        // Validation stricte contre les injections SQL sur les identifiants
+        if !table_name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+            return Err(DbError::InvalidIdentifier);
+        }
+
+        let query = format!("DELETE FROM {};", table_name);
+        self.conn.execute(&query, [])?;
+        self.conn.execute("VACUUM;", [])?;
+
         Ok(())
-    }
-}
-
-/// Générateur simple de timestamp UNIX en secondes sans dépendances lourdes
-fn chrono_like_timestamp() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs() as i64
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_temporary_storage_lifecycle() {
-        let storage = TemporaryStorage::open_in_memory().unwrap();
-        let recipient = "a1b2c3d4e5f67890a1b2c3d4e5f67890";
-        let payload = b"Message chiffre de test";
-
-        // Insertion
-        let msg_id = storage.store_message(recipient, payload).unwrap();
-        assert!(msg_id > 0);
-
-        // Lecture
-        let messages = storage.get_messages_for(recipient).unwrap();
-        assert_eq!(messages.len(), 1);
-        assert_eq!(messages[0].payload, payload);
-
-        // Suppression
-        storage.delete_message(msg_id).unwrap();
-        let empty_messages = storage.get_messages_for(recipient).unwrap();
-        assert_eq!(empty_messages.len(), 0);
     }
 }

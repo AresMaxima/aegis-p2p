@@ -1,0 +1,2 @@
+cd /d F:\AEGIS
+build_aegis.bat

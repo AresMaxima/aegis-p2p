@@ -8,8 +8,9 @@ crate-type = ["cdylib", "rlib", "staticlib"]
 
 [dependencies]
 # Sécurité Mémoire & Cryptographie Classique & Post-Quantique
-zeroize = { version = "1.7", features = ["derive"] }
+zeroize = { version = "1.7", features = ["alloc", "derive"] }
 getrandom = "0.2"
+argon2 = "0.5"
 chacha20poly1305 = "0.10"
 sha2 = "0.10"
 hkdf = "0.12"
@@ -20,6 +21,7 @@ pqcrypto-traits = "0.3"
 bip39 = "2.0"
 hex = "0.4"
 rand = "0.8"
+thiserror = "1.0"
 
 # Hardening Système, Stockage BDD, Signaux OS & FFI
 libc = "0.2"

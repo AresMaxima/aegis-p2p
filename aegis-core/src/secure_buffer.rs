@@ -1,4 +1,12 @@
+//! aegis-core/src/secure_buffer.rs
+//! Allocation de mémoire verrouillée et isolée (Anti-Swap & Anti-Dump)
+
+#[cfg(unix)]
 use libc::{mlock, munlock, sysconf, _SC_PAGESIZE};
+
+#[cfg(windows)]
+use windows_sys::Win32::System::Memory::{VirtualLock, VirtualUnlock};
+
 use std::alloc::{alloc_zeroed, dealloc, handle_alloc_error, Layout};
 use std::ops::{Deref, DerefMut};
 use std::ptr::NonNull;
@@ -19,8 +27,12 @@ impl SecureBuffer {
     pub fn new(len: usize) -> Self {
         assert!(len > 0, "Buffer size must be greater than zero");
 
-        // Validation stricte de la taille de page OS et contrôle de puissance de 2
+        // Récupération de la taille de la page OS
+        #[cfg(unix)]
         let page_size = unsafe { sysconf(_SC_PAGESIZE) };
+        #[cfg(windows)]
+        let page_size = 4096; // Fallback sécurisé par défaut sur Windows
+
         let align = if page_size > 0 && (page_size as usize).is_power_of_two() {
             page_size as usize
         } else {
@@ -36,9 +48,29 @@ impl SecureBuffer {
             NonNull::new(raw).unwrap_or_else(|| handle_alloc_error(layout))
         };
 
-        let lock_res = unsafe { mlock(ptr.as_ptr() as *const libc::c_void, len) };
-        if lock_res != 0 {
-            eprintln!("Warning: mlock failed. Memory might be swapped.");
+        // OPSEC CRITIQUE : Verrouillage mémoire strict (Anti-Swap) avec Zeroize pré-crash
+        #[cfg(unix)]
+        {
+            let lock_res = unsafe { mlock(ptr.as_ptr() as *const libc::c_void, len) };
+            if lock_res != 0 {
+                unsafe {
+                    slice::from_raw_parts_mut(ptr.as_ptr(), len).zeroize();
+                    dealloc(ptr.as_ptr(), layout);
+                }
+                panic!("CRITICAL OPSEC FAILURE: mlock() failed. Memory could be swapped to disk.");
+            }
+        }
+
+        #[cfg(windows)]
+        {
+            let lock_res = unsafe { VirtualLock(ptr.as_ptr() as *const core::ffi::c_void, len) };
+            if lock_res == 0 {
+                unsafe {
+                    slice::from_raw_parts_mut(ptr.as_ptr(), len).zeroize();
+                    dealloc(ptr.as_ptr(), layout);
+                }
+                panic!("CRITICAL OPSEC FAILURE: VirtualLock() failed.");
+            }
         }
 
         Self { ptr, len, layout }
@@ -69,10 +101,18 @@ impl DerefMut for SecureBuffer {
 impl Drop for SecureBuffer {
     fn drop(&mut self) {
         unsafe {
+            // 1. Zéroisation immédiate et déterministe
             let data = slice::from_raw_parts_mut(self.ptr.as_ptr(), self.len);
             data.zeroize();
 
+            // 2. Déverrouillage de la RAM OS
+            #[cfg(unix)]
             munlock(self.ptr.as_ptr() as *const libc::c_void, self.len);
+            
+            #[cfg(windows)]
+            VirtualUnlock(self.ptr.as_ptr() as *const core::ffi::c_void, self.len);
+
+            // 3. Libération de l'allocation
             dealloc(self.ptr.as_ptr(), self.layout);
         }
     }

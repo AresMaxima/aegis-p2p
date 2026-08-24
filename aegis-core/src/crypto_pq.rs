@@ -1,7 +1,7 @@
 use crate::secure_buffer::SecureBuffer;
 use hkdf::Hkdf;
 use pqcrypto_kyber::kyber1024::*;
-use pqcrypto_traits::kem::{Ciphertext as _, SharedSecret as _};
+use pqcrypto_traits::kem::SharedSecret as _;
 use sha2::Sha256;
 use x25519_dalek::{EphemeralSecret, PublicKey as X25519PublicKey};
 use zeroize::Zeroize;

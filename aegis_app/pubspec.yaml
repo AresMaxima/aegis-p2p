@@ -18,6 +18,8 @@ dependencies:
   cryptography: ^2.9.0
   flutter_windowmanager_plus: ^1.1.0
   shared_preferences: ^2.5.3
+  mobile_scanner: ^6.0.11
+  file_picker: ^11.0.3
 
 dev_dependencies:
   flutter_test:
