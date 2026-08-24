@@ -1,136 +1,81 @@
-# AEGIS P2P — Zero-Trust Decentralized Communication
-
-![License: AGPLv3](https://img.shields.io/badge/License-AGPLv3-blue.svg)
-![Security Model](https://img.shields.io/badge/Security-Zero--Trust%20%7C%20Zero--Trace-black.svg)
-![Build](https://img.shields.io/badge/Architecture-Rust%20%2B%20Flutter-orange.svg)
-
-AEGIS P2P is an ultra-secure, zero-persistence communication platform engineered with a Pure Rust core (`aegis-core`) and an isolated Flutter interface. 
-
-Designed for maximum operational security (OPSEC), AEGIS operates on a strict **Zero-Server / Pure P2P** model with post-quantum key exchange, anti-forensic RAM protection, and hardware-level crisis triggers.
-
----
-
-## 🛡️ Core Security Architecture
-
-* **Zero-Server & Pure P2P:** No central servers, relay databases, or centralized metadata storage.
-* **RAM-Only Execution:** Zero disk persistence. Secrets are locked in memory (`mlock`) and deterministically wiped (`zeroize`).
-* **Anti-Forensics & Cold-Boot Protection:** Polymorphic RAM obfuscation pools and memory noise canaries to blind forensic scanners (Volatility/Rekall).
-* **Post-Quantum Key Exchange:** Hybrid Kyber1024 + X25519 key exchange to prevent retroactive quantum decryption.
-* **Censorship Bypass:** Integrated pure-Rust Tor v3 client and dynamic multi-transport hopping (Tor WAN, Direct KadDHT, Air-Gapped Sneakernet Mesh).
-* **Emergency Hardware Triggers:** Instant "Silent Burn" execution via crisis PIN (`9999`), dead man's switch (24h inactivity), or hardware sensor anomalies (SIM removal, USB disconnection, accelerometer shocks).
-* **Clipboard & Capture Isolation:** Enforced `FLAG_SECURE` screen protection and complete clipboard bypass.
-
----
-
-## ⚖️ License & Official Distribution
-
-### Source Code Transparency
-The source code of AEGIS P2P is made public under the **GNU Affero General Public License v3.0 (AGPLv3)** to allow independent cryptographic audits, zero-backdoor verification, and research.
-
-### Official Binaries & Signed Releases
-Building the application from source requires a complex cross-compilation environment (Rust `aarch64-linux-android`, Flutter SDK, Android NDK, and C dependencies). 
-
-Pre-compiled, digitally signed binaries (APKs) certified by **Ares Maxima**, along with official integrity guarantees (SHA-256 hashes) and continuous updates, are distributed exclusively on our official platform:
-
-👉 **[Purchase Official AEGIS P2P License](https://aresmaxima.com)**
-
-*Notice: Commercial redistribution, re-packaging, or re-branding of pre-compiled binaries without an explicit commercial license from Ares Maxima is strictly prohibited under the AGPLv3 license.*
-
----
-
-## 🏗️ Architecture & Modules Overview
-
-```text
-aegis-core/src/           # Pure-Rust Security & Cryptographic Core
-├── crypto.rs             # Memory integrity & ptrace checks
-├── crypto_pq.rs          # Hybrid Kyber1024 / X25519 post-quantum exchange
-├── deadman.rs            # Inactivity timer (Dead Man's Switch 24h)
-├── hardware_triggers.rs  # Hardware sensor anomaly interception (SIM/USB/Motion)
-├── keystore.rs           # TPM 2.0 / StrongBox Hardware Keystore interface
-├── lib.rs                # FFI entry points & APK signature verification
-├── mesh.rs               # Offline P2P Sneakernet Mesh (BLE/Wi-Fi Direct)
-├── network.rs            # Constant-bitrate traffic shaper (512-byte fixed frames)
-├── panic.rs              # Silent Burn & NVRAM wipe routines
-├── polymorphic_ram.rs    # Sliding entropy mask obfuscation pools
-├── secure_buffer.rs      # Page-aligned mlock / zeroize buffers
-├── session.rs            # FFI Opaque Session Vault (Rust/Dart heap isolation)
-├── signals.rs            # OS signal interception & memory noise canaries
-├── stegano.rs            # Invisible Unicode steganography (Drowning)
-├── storage.rs            # RAM-only volatile database
-└── transport.rs          # Dynamic transport hopping router
-
-aegis_app/lib/            # Blind Flutter UI & FFI Wrapper
-├── main.dart             # LockScreen, FLAG_SECURE, & Multi-language App Engine
-└── services/
-    └── crypto_service.dart # Dart PBKDF2/AES-GCM wrapper over opaque pointer
-
-🛠️ Build & Toolchain Requirements
-To build AEGIS from source, ensure your environment meets the following specifications:
-
-Rust MSRV: 1.75.0+
-
-Flutter SDK: 3.19.0+
-
-Java JDK: Version 17 (JDK 17.0.10)
-
-Android SDK / NDK: compileSdk = 36 | NDK: 27.0.12077973 (aarch64-linux-android)
-
-Kotlin Plugin: 2.1.0
-
-System Build Libraries: clang, libssl-dev, pkg-config, libtss2-dev
-
-Compilation Procedure
-Build Native Rust Core:
-
-cd aegis-core
-cargo build --target aarch64-linux-android --release
-
-Sync Shared Native Library:
-
-# Windows (PowerShell)
-Copy-Item "target/aarch64-linux-android/release/libaegis_core.so" -Destination "../aegis_app/android/app/src/main/jniLibs/arm64-v8a/libaegis_core.so"
-
-# Linux / macOS
-cp target/aarch64-linux-android/release/libaegis_core.so ../aegis_app/android/app/src/main/jniLibs/arm64-v8a/libaegis_core.so
-
-Build Flutter APK:
-
-cd ../aegis_app
-flutter clean
-flutter pub get
-flutter build apk --release --split-per-abi
-
-Target Output: aegis_app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
-
-Forensic Memory Audit & Validation
-Verify memory sanitization and zero-trace execution using the built-in test suite:
-
-cd aegis-core
-
-# Unit & Cryptographic Tests
-cargo test --all-targets -- --nocapture
-
-# Undefined Behavior Audit (Miri)
-cargo +nightly miri test
-
-# AddressSanitizer & Memory Leak Verification
-RUSTFLAGS="-Zsanitizer=address" cargo +nightly test --target x86_64-unknown-linux-gnu
-
-# Valgrind RAM Leak Audit
-valgrind --tool=memcheck --leak-check=full --show-leak-kinds=all ./target/release/deps/aegis_core-*
-
-📬 Security Policy & Vulnerability Disclosure
-If you discover a security vulnerability or anomalous behavior in AEGIS, do not open a public issue.
-
-Encrypted Reporting Procedure
-Obtain our official PGP Public Key (SECURITY_KEY.asc).
-
-Fingerprint: B0D6 C685 9A1A E443 4AC7 40CF C477 BDB6 9890 AB3C
-
-Key ID: 0xC477BDB69890AB3C
-
-Encrypt your report and PoC using the key.
-
-Submit the encrypted advisory to: sales@aresmaxima.com
-
-A confirmation with a tracking ticket will be returned within 48 business hours.
+# AEGIS P2P v1.3.0-P2P-HEAVY - Zero-Trust Decentralized Platform 
+ 
+![License: AGPLv3](https://img.shields.io/badge/License-AGPLv3-blue.svg) 
+![Security Model](https://img.shields.io/badge/Security-Zero--Trust%%20%%7C%%20Zero--Trace-black.svg) 
+![Build](https://img.shields.io/badge/Architecture-Rust%%20%%2B%%20Flutter-orange.svg) 
+![Audit](https://img.shields.io/badge/Audit-PASSED%%20(v1.3.0)-brightgreen.svg) 
+ 
+AEGIS est une plateforme de communication P2P ultra-securisee concue sur un modele de confiance nulle (Zero-Trust), d'empreinte memoire minimale (Zero-Trace), d'etancheite post-quantique et d'auto-destruction materielle sous contrainte. 
+ 
+Le systeme repose sur un decouplage strict : 
+* **aegis-core (Rust)** : Moteur cryptographique, gestionnaires de memoire verrouillee (mlock) et polymorphe, controle d'integrite noyau/TPM, declencheurs materiels de crise, reseau maille hors-ligne et protocole de purge materielle. 
+* **aegis_app (Flutter / Dart)** : Coque d'affichage aveugle, isolee de la memoire vive cryptographique, protegee contre les captures d'ecran (FLAG_SECURE) et les fuites systeme. 
+ 
+--- 
+ 
+## Rapport d'Audit et Conformite Scellee 
+ 
+L'application a passe l'audit de conformite intrusif avec succes. Le manifeste d'audit complet est scelle a la racine du depot (AUDIT_MANIFEST.json). 
+ 
+* **Statut de l'audit** : PASSED 
+* **Version certifiee** : v1.3.0-P2P-HEAVY 
+* **Empreinte SHA-256 du manifeste** : dba403ad9eab4bee5ba5873b685b384eeedbaad3174f588e372f943b069ba173 
+* **Fonctions FFI verifiees** : aegis_ingest_file_zero_disk, aegis_purge_ram_buffer, aegis_panic_silent_burn 
+* **Profil Cargo** : panic = "abort", lto = true, strip = true 
+ 
+--- 
+ 
+## Licence et Distribution Officielle 
+ 
+### Transparence du Code Source 
+Le code source d'AEGIS P2P est publie sous licence GNU Affero General Public License v3.0 (AGPLv3) afin de permettre les audits cryptographiques independants, la verification de l'absence de portes derobees et la recherche en securite. 
+ 
+### Binaires Officiels et Certifies 
+La compilation requiert une chaine de compilation croisee complexe (Rust aarch64-linux-android, SDK Flutter, Android NDK et dependances C). 
+ 
+Les binaires pre-compiles et signes numeriquement par Ares Maxima, accompagnes des garanties d'integrite officielle (SHA-256), sont distribues exclusivement sur notre plateforme officielle : 
+ 
+https://aresmaxima.com 
+ 
+--- 
+ 
+## Matrice des Fonctionnalites et Specifications de Securite 
+ 
+### 1. Hardening Memoire RAM et Attestation Materielle 
+* **Verrouillage Memoire Precis (mlock)** : (src/secure_buffer.rs) Alignement dynamique sur la taille de page materielle de l'OS. Verrouillage en RAM via libc::mlock pour interdire toute ecriture dans le SWAP ou le fichier de pagination disque. Nettoyage deterministe par zeroize() avant deverrouillage (munlock). 
+* **Obfuscation Memoire Polymorphe** : (src/polymorphic_ram.rs) Masquage XOR des tampons secrets avec un masque d'entropie glissant. Revision du masque a chaque lecture, effacement de l'ancien masque via .zeroize(), et re-obfusquation a une nouvelle empreinte binaire. 
+* **Enclave Materielle et Measured Boot** : Interrogation des puces TPM 2.0 sous Linux ou StrongBox / Secure Enclave sous Android (src/keystore.rs). Refus d'initialisation en cas de detection de Rootkit ou Kernel altere. 
+* **Coffre d'Isolation Opaque Rust / Dart** : Confinement total des secrets dans le binaire Rust. Derivation cryptographique PBKDF2 (Hmac-SHA256, 100k iterations) et dechiffrement AES-256-GCM. Flutter ne manipule qu'un pointeur opaque 64-bit non dereferencable en Dart. 
+* **Interception Signaux OS et Canaris Anti-Cold Boot** : Ecoute dediee des signaux SIGINT / SIGTERM pour arret immediat (exit 137). Allocation de N tampons leurres ancres en RAM remplis d'entropie pour brouiller les scanners forensiques a chaud (Volatility/Rekall). 
+ 
+### 2. Cryptographie Post-Quantique et Anti-Coercition 
+* **Echange de Cles Hybride Kyber1024 / X25519** : Combinaison de la courbe elliptique X25519 et de l'algorithme a reseaux euclidiens Kyber-1024 via HKDF-SHA256. 
+* **Protocole d'Auto-Destruction Materielle (Silent Burn)** : La saisie du PIN de crise (9999) ordonne l'invalidation definitive de la cle racine scellee dans la NVRAM du TPM 2.0 / StrongBox, detruit les conteneurs et force un exit 137 immediat. 
+* **Brulure par Inactivite (Dead Man's Switch)** : Minuteur d'inactivite mecano-electrique rearticul� a chaque deverrouillage valide. Si aucun acces n'intervient sous 24h, le systeme execute automatiquement le Silent Burn. 
+* **Declencheurs Physiques d'Urgence** : Execution immediate du Silent Burn lors d'anomalies physiques : retrait brutal de carte SIM/MicroSD, deconnexion USB suspecte pendant une extraction de donnees, ou secousse de crise captee par l'accelerometre. 
+ 
+### 3. Protection Surface OS et Reseau OPSEC 
+* **Protection Surface OS (FLAG_SECURE et Clipboard Bypass)** : Activation de FLAG_SECURE sur Android (interdiction des captures, enregistrements video et floutage dans le gestionnaire de taches). Desactivation de la selection interactive sur tous les champs sensibles. 
+* **P2P Transport Hopping Dynamique** : Bascule a chaud automatique et deterministe entre Tor v3 (WAN), Direct WAN (libp2p KadDHT) et Reseau local isole (Air-Gapped / BLE / Wi-Fi Direct). 
+* **Reseau Maille Hors-Ligne (Sneakernet)** : Propagation opportuniste de proche en proche des trames chiffrees de 512 octets via BLE / Wi-Fi Direct en zone de coupure reseau. Deduplication par Hash SHA-256 et limitation TTL a 10 sauts. 
+* **Trafic d'Ombre a Debit Constant (Constant-Bitrate Padding)** : Enrobage de toutes les charges utiles dans des trames fixes de 512 octets transmises a intervalle regulier. Emission continue de trames leurres remplies de bruit blanc cryptographique. 
+ 
+--- 
+ 
+## Guide de Compilation et Distribution 
+ 
+### Prerequis 
+* Rust MSRV : 1.75.0+ 
+* Flutter SDK : 3.19.0+ 
+* Java JDK : Version 17 
+ 
+### Execution 
+powershell -ExecutionPolicy Bypass -File "force_build.ps1" 
+ 
+--- 
+ 
+## Politique de Divulgation des Vulnerabilites 
+ 
+Contact PGP pour signalement chiffre : sales@aresmaxima.com 
+Empreinte PGP : B0D6 C685 9A1A E443 4AC7 40CF C477 BDB6 9890 AB3C 
+ID de Cle : 0xC477BDB69890AB3C 
