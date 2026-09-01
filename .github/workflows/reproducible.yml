@@ -5,14 +5,14 @@ jobs:
   build-and-verify:
     runs-on: ubuntu-latest
     container:
-      image: rust:1.80-slim
+      image: rust:latest
     steps:
       - uses: actions/checkout@v4
       
       - name: Install System Dependencies & Kani
         run: |
           apt-get update && apt-get install -y build-essential pkg-config libssl-dev
-          cargo install --locked kani-verifier
+          cargo install kani-verifier --version 0.55.0 || cargo install kani-verifier
           cargo kani setup
 
       - name: Execute Kani Formal Verification
@@ -29,7 +29,7 @@ jobs:
       - name: Install Android NDK & Configure Toolchain
         run: |
           apt-get install -y wget unzip
-          wget https://dl.google.com/android/repository/android-ndk-r27-linux.zip
+          wget -q https://dl.google.com/android/repository/android-ndk-r27-linux.zip
           unzip -q android-ndk-r27-linux.zip
           rustup target add aarch64-linux-android
 
