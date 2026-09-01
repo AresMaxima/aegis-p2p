@@ -343,13 +343,3 @@ fn verify_process_512b_frame_bounds() {
     let res = process_512b_frame_ephemeral(&master_key, frame_index, &mut payload);
     kani::assert(res.is_ok(), "Process frame must never panic or fail on valid bounds");
 }
-
-#[cfg(kani)]
-#[kani::proof]
-fn verify_process_512b_frame_bounds() {
-    let master_key: [u8; 32] = kani::any();
-    let frame_index: u64 = kani::any();
-    let mut payload: [u8; 512] = kani::any();
-    let res = process_512b_frame_ephemeral(&master_key, frame_index, &mut payload);
-    kani::assert(res.is_ok(), "Process frame must never panic or fail on valid bounds");
-}
