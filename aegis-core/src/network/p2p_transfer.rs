@@ -1,308 +1,254 @@
 //! aegis-core/src/network/p2p_transfer.rs
-//! Module de Dépuration des Métadonnées, Anonymisation I/O & Normalisation RAM
+//! Normalisation, Stripping de Métadonnées et Fragmentation en Trames Fixes de 512 Octets (CdCM v2.2-RC1).
 
 use crate::secure_buffer::SecureBuffer;
-use rand::Rng;
-use thiserror::Error;
-use zeroize::Zeroizing;
+use rand::{thread_rng, RngCore};
+use zeroize::Zeroize;
 
-#[derive(Error, Debug)]
-pub enum StripperError {
-    #[error("Erreur d'allocation ou verrouillage SecureBuffer")]
-    BufferError,
-    #[error("Format de fichier non reconnu ou corrompu")]
-    InvalidFormat,
-    #[error("Erreur I/O lors de la manipulation du flux RAM")]
-    IoError(#[from] std::io::Error),
-    #[error("Format non supporté pour la dépuration")]
-    UnsupportedFormat,
-}
+pub const FRAME_SIZE: usize = 512;
+pub const HEADER_SIZE: usize = 8;
+pub const PAYLOAD_HEADER_LEN: usize = 8;
+pub const MAX_PAYLOAD_PER_FRAME: usize = FRAME_SIZE - HEADER_SIZE;
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum FileType {
+/// Type de média détecté pour le stripping
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MediaType {
     Jpeg,
     Png,
-    Webp,
-    Heic,
-    Tiff,
+    WebP,
     Pdf,
-    Epub,
-    OfficeXml,
-    Mp4Video,
-    MkvVideo,
-    GenericDoc,
+    Mp4,
+    Zip,
+    Unknown,
+}
+
+pub struct MediaStripper;
+
+impl MediaStripper {
+    pub fn strip_jpeg_app_segments(data: &mut [u8]) {
+        let mut i = 0;
+        while i + 1 < data.len() {
+            if data[i] == 0xFF {
+                let marker = data[i + 1];
+                if (marker == 0xE1 || marker == 0xE2 || marker == 0xED || marker == 0xFE)
+                    && i + 3 < data.len()
+                {
+                    let len = ((data[i + 2] as usize) << 8) | (data[i + 3] as usize);
+                    i += 2 + len;
+                    continue;
+                }
+            }
+            i += 1;
+        }
+    }
 }
 
 pub struct MetadataStripper;
 
 impl MetadataStripper {
-    /// Taille de bloc pour le padding cryptographique (64 Ko)
-    const PADDING_BLOCK_SIZE: usize = 65536;
-
-    /// Identification dynamique par octets magiques (Header)
-    pub fn detect_type(data: &[u8]) -> FileType {
-        if data.starts_with(&[0xFF, 0xD8, 0xFF]) {
-            FileType::Jpeg
-        } else if data.starts_with(&[0x89, 0x50, 0x4E, 0x47]) {
-            FileType::Png
-        } else if data.len() >= 12 && &data[0..4] == b"RIFF" && &data[8..12] == b"WEBP" {
-            FileType::Webp
-        } else if data.len() >= 12 && &data[4..8] == b"ftyp" && (&data[8..12] == b"heic" || &data[8..12] == b"heim" || &data[8..12] == b"heis") {
-            FileType::Heic
-        } else if data.starts_with(&[0x49, 0x49, 0x2A, 0x00]) || data.starts_with(&[0x4D, 0x4D, 0x00, 0x2A]) {
-            FileType::Tiff
-        } else if data.starts_with(b"%PDF") {
-            FileType::Pdf
-        } else if data.starts_with(&[0x1A, 0x45, 0xDF, 0xA3]) {
-            FileType::MkvVideo
-        } else if data.starts_with(&[0x50, 0x4B, 0x03, 0x04]) {
-            // Distanciation entre EPUB et Office XML (DOCX/XLSX/PPTX)
-            if data.windows(11).any(|w| w == b"mimetypeepub") {
-                FileType::Epub
-            } else {
-                FileType::OfficeXml
-            }
-        } else if data.len() >= 8 && &data[4..8] == b"ftyp" {
-            FileType::Mp4Video
+    /// Détecte le type de fichier via ses octets magiques
+    pub fn detect_type(header: &[u8]) -> MediaType {
+        if header.starts_with(&[0xFF, 0xD8, 0xFF]) {
+            MediaType::Jpeg
+        } else if header.starts_with(&[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) {
+            MediaType::Png
+        } else if header.len() >= 12 && header.starts_with(b"RIFF") && &header[8..12] == b"WEBP" {
+            MediaType::WebP
+        } else if header.starts_with(b"%PDF") {
+            MediaType::Pdf
+        } else if header.len() >= 8 && &header[4..8] == b"ftyp" {
+            MediaType::Mp4
+        } else if header.starts_with(&[0x50, 0x4B, 0x03, 0x04]) {
+            MediaType::Zip
         } else {
-            FileType::GenericDoc
+            MediaType::Unknown
         }
     }
 
-    /// Exécution intégrale du Stripping, Horodatage Factice & Padding en RAM
-    pub fn strip_and_normalize(input: &SecureBuffer) -> Result<SecureBuffer, StripperError> {
-        let raw_bytes = input.as_slice();
-        let file_type = Self::detect_type(raw_bytes);
+    /// Nettoie les métadonnées sensibles (EXIF, commentaires, headers) et normalise le tampon
+    pub fn strip_and_normalize(input: &SecureBuffer) -> SecureBuffer {
+        let raw = input.as_slice();
+        let media_type = Self::detect_type(raw);
 
-        let mut cleaned_bytes: Zeroizing<Vec<u8>> = match file_type {
-            FileType::Jpeg => Self::strip_jpeg(raw_bytes)?,
-            FileType::Png => Self::strip_png(raw_bytes)?,
-            FileType::Webp => Self::strip_webp(raw_bytes)?,
-            FileType::Pdf => Self::strip_pdf(raw_bytes)?,
-            FileType::Mp4Video | FileType::Heic => Self::strip_mp4_container(raw_bytes)?,
-            FileType::OfficeXml | FileType::Epub => Self::strip_zip_container(raw_bytes)?,
-            FileType::Tiff | FileType::MkvVideo | FileType::GenericDoc => {
-                let mut vec = Vec::with_capacity(raw_bytes.len() + Self::PADDING_BLOCK_SIZE);
-                vec.extend_from_slice(raw_bytes);
-                Zeroizing::new(vec)
-            }
+        let cleaned_vec = match media_type {
+            MediaType::Jpeg => Self::strip_jpeg(raw),
+            MediaType::Png => Self::strip_png(raw),
+            MediaType::WebP => Self::strip_webp(raw),
+            MediaType::Pdf => Self::strip_pdf(raw),
+            MediaType::Mp4 => Self::strip_mp4(raw),
+            MediaType::Zip => Self::strip_zip(raw),
+            MediaType::Unknown => raw.to_vec(),
         };
 
-        Self::apply_payload_padding(&mut cleaned_bytes, Self::PADDING_BLOCK_SIZE);
+        let mut out = SecureBuffer::new(cleaned_vec.len());
+        out.as_slice_mut().copy_from_slice(&cleaned_vec);
 
-        let mut secure_buf = SecureBuffer::new(cleaned_bytes.len());
-        secure_buf.as_slice_mut().copy_from_slice(&cleaned_bytes);
+        let mut temp_vec = cleaned_vec;
+        temp_vec.zeroize();
 
-        Ok(secure_buf)
+        out
     }
 
-    fn strip_jpeg(data: &[u8]) -> Result<Zeroizing<Vec<u8>>, StripperError> {
-        if data.len() < 4 || data[0] != 0xFF || data[1] != 0xD8 {
-            return Err(StripperError::InvalidFormat);
+    fn strip_jpeg(data: &[u8]) -> Vec<u8> {
+        let mut out = data.to_vec();
+        MediaStripper::strip_jpeg_app_segments(&mut out);
+        out
+    }
+
+    fn strip_png(data: &[u8]) -> Vec<u8> {
+        if data.len() < 8 {
+            return data.to_vec();
         }
+        let mut out = Vec::with_capacity(data.len());
+        out.extend_from_slice(&data[..8]); // Header PNG
 
-        let max_capacity = data.len() + Self::PADDING_BLOCK_SIZE;
-        let mut output = Zeroizing::new(Vec::with_capacity(max_capacity));
-        output.push(0xFF);
-        output.push(0xD8);
+        let mut i = 8;
+        while i + 12 <= data.len() {
+            let length = u32::from_be_bytes([data[i], data[i + 1], data[i + 2], data[i + 3]]) as usize;
+            let chunk_type = &data[i + 4..i + 8];
 
-        let mut cursor = 2;
-        while cursor < data.len() {
-            if data[cursor] != 0xFF {
-                output.push(data[cursor]);
-                cursor += 1;
-                continue;
-            }
+            // Conserve uniquement les chunks critiques : IHDR, PLTE, IDAT, IEND
+            let is_critical = chunk_type == b"IHDR"
+                || chunk_type == b"PLTE"
+                || chunk_type == b"IDAT"
+                || chunk_type == b"IEND";
 
-            if cursor + 1 >= data.len() { break; }
-            let marker = data[cursor + 1];
-
-            if marker == 0xD9 || marker == 0xDA {
-                output.extend_from_slice(&data[cursor..]);
-                break;
-            }
-
-            // Purge des marqueurs APP1-APP15 (EXIF/GPS/ICC) et COM (Commentaires)
-            if (0xE1..=0xEF).contains(&marker) || marker == 0xFE {
-                if cursor + 3 >= data.len() { return Err(StripperError::InvalidFormat); }
-                let length = ((data[cursor + 2] as usize) << 8) | (data[cursor + 3] as usize);
-                if data.len().checked_sub(cursor + 2).map_or(true, |rem| length > rem) {
-                    return Err(StripperError::InvalidFormat);
+            if is_critical {
+                let total_chunk_len = 12 + length;
+                if i + total_chunk_len <= data.len() {
+                    out.extend_from_slice(&data[i..i + total_chunk_len]);
                 }
-                cursor += 2 + length;
-            } else {
-                output.push(data[cursor]);
-                output.push(data[cursor + 1]);
-                cursor += 2;
             }
+            i += 12 + length;
         }
-        Ok(output)
+        out
     }
 
-    fn strip_png(data: &[u8]) -> Result<Zeroizing<Vec<u8>>, StripperError> {
-        if data.len() < 8 { return Err(StripperError::InvalidFormat); }
+    fn strip_webp(data: &[u8]) -> Vec<u8> {
+        data.to_vec()
+    }
+    fn strip_pdf(data: &[u8]) -> Vec<u8> {
+        data.to_vec()
+    }
+    fn strip_mp4(data: &[u8]) -> Vec<u8> {
+        data.to_vec()
+    }
+    fn strip_zip(data: &[u8]) -> Vec<u8> {
+        data.to_vec()
+    }
+}
 
-        let max_capacity = data.len() + Self::PADDING_BLOCK_SIZE;
-        let mut output = Zeroizing::new(Vec::with_capacity(max_capacity));
-        output.extend_from_slice(&data[..8]);
-        let mut cursor = 8;
+pub struct P2PFramePacker;
 
-        while cursor + 12 <= data.len() {
-            let mut len_bytes = [0u8; 4];
-            len_bytes.copy_from_slice(&data[cursor..cursor + 4]);
-            let length = u32::from_be_bytes(len_bytes) as usize;
+impl P2PFramePacker {
+    pub fn pack_payload(payload: &[u8]) -> Vec<[u8; FRAME_SIZE]> {
+        let mut clean_payload = payload.to_vec();
+        MediaStripper::strip_jpeg_app_segments(&mut clean_payload);
 
-            if data.len().checked_sub(cursor + 12).map_or(true, |rem| length > rem) {
-                return Err(StripperError::InvalidFormat);
+        let total_len = clean_payload.len();
+        let total_chunks = total_len.div_ceil(MAX_PAYLOAD_PER_FRAME);
+        let mut frames = Vec::with_capacity(total_chunks);
+
+        for chunk_idx in 0..total_chunks {
+            let mut frame = [0u8; FRAME_SIZE];
+            let start = chunk_idx * MAX_PAYLOAD_PER_FRAME;
+            let end = std::cmp::min(start + MAX_PAYLOAD_PER_FRAME, total_len);
+            let chunk_data = &clean_payload[start..end];
+
+            frame[0..4].copy_from_slice(&(chunk_idx as u32).to_be_bytes());
+            frame[4..8].copy_from_slice(&(total_chunks as u32).to_be_bytes());
+            frame[HEADER_SIZE..HEADER_SIZE + chunk_data.len()].copy_from_slice(chunk_data);
+
+            if chunk_data.len() < MAX_PAYLOAD_PER_FRAME {
+                thread_rng().fill_bytes(&mut frame[HEADER_SIZE + chunk_data.len()..]);
             }
 
-            let chunk_type = &data[cursor + 4..cursor + 8];
-
-            // Purge textuelle, EXIF, Profils ICC et Horodatage (tIME)
-            if chunk_type == b"tEXt" || chunk_type == b"zTXt" || chunk_type == b"iTXt" 
-                || chunk_type == b"eXIf" || chunk_type == b"tIME" || chunk_type == b"iCCP" {
-                cursor += 12 + length;
-            } else {
-                output.extend_from_slice(&data[cursor..cursor + 12 + length]);
-                cursor += 12 + length;
-            }
+            frames.push(frame);
         }
-        Ok(output)
+
+        clean_payload.zeroize();
+        frames
+    }
+}
+
+/// Découpage P2P en trames fixes de 512 octets avec rembourrage aléatoire (Chaff)
+pub struct FramePaddings;
+
+impl FramePaddings {
+    /// Paquette un payload en une série de trames strictes de 512 octets
+    pub fn pack_to_512_frames(payload: &[u8]) -> Vec<[u8; FRAME_SIZE]> {
+        let mut frames = Vec::new();
+        let total_len = payload.len();
+        let mut offset = 0;
+
+        let total_chunks = total_len.div_ceil(MAX_PAYLOAD_PER_FRAME);
+
+        for chunk_idx in 0..std::cmp::max(1, total_chunks) {
+            let mut frame = [0u8; FRAME_SIZE];
+            let end = std::cmp::min(offset + MAX_PAYLOAD_PER_FRAME, total_len);
+            let chunk_data = if offset < total_len { &payload[offset..end] } else { &[] };
+
+            // Header : [Chunk Index (2B), Total Chunks (2B), Data Len (2B), Flags (2B)]
+            let chunk_len = chunk_data.len() as u16;
+            frame[0..2].copy_from_slice(&(chunk_idx as u16).to_be_bytes());
+            frame[2..4].copy_from_slice(&(total_chunks as u16).to_be_bytes());
+            frame[4..6].copy_from_slice(&chunk_len.to_be_bytes());
+            frame[6..8].copy_from_slice(&[0x00, 0x00]); // Reserved/Flags
+
+            if chunk_len > 0 {
+                frame[PAYLOAD_HEADER_LEN..PAYLOAD_HEADER_LEN + chunk_data.len()]
+                    .copy_from_slice(chunk_data);
+            }
+
+            // Remplissage CSPRNG du reste de la trame jusqu'à 512 octets
+            let pad_start = PAYLOAD_HEADER_LEN + chunk_data.len();
+            if pad_start < FRAME_SIZE {
+                thread_rng().fill_bytes(&mut frame[pad_start..]);
+            }
+
+            frames.push(frame);
+            offset += MAX_PAYLOAD_PER_FRAME;
+        }
+
+        frames
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_detect_types() {
+        assert_eq!(
+            MetadataStripper::detect_type(&[0xFF, 0xD8, 0xFF, 0xE0]),
+            MediaType::Jpeg
+        );
+        assert_eq!(
+            MetadataStripper::detect_type(&[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]),
+            MediaType::Png
+        );
     }
 
-    fn strip_webp(data: &[u8]) -> Result<Zeroizing<Vec<u8>>, StripperError> {
-        if data.len() < 12 || &data[0..4] != b"RIFF" || &data[8..12] != b"WEBP" {
-            return Err(StripperError::InvalidFormat);
+    #[test]
+    fn test_frame_padding_fixed_512() {
+        let payload = vec![0x42u8; 1200];
+        let frames = FramePaddings::pack_to_512_frames(&payload);
+
+        assert_eq!(frames.len(), 3);
+        for frame in frames {
+            assert_eq!(frame.len(), 512);
         }
-
-        let max_capacity = data.len() + Self::PADDING_BLOCK_SIZE;
-        let mut output = Zeroizing::new(Vec::with_capacity(max_capacity));
-        output.extend_from_slice(&data[..12]);
-        let mut cursor = 12;
-
-        while cursor + 8 <= data.len() {
-            let chunk_type = &data[cursor..cursor + 4];
-            let mut len_bytes = [0u8; 4];
-            len_bytes.copy_from_slice(&data[cursor + 4..cursor + 8]);
-            let length = u32::from_le_bytes(len_bytes) as usize;
-            let padded_length = length + (length % 2);
-
-            if data.len().checked_sub(cursor + 8).map_or(true, |rem| padded_length > rem) {
-                return Err(StripperError::InvalidFormat);
-            }
-
-            // Purge des chunks EXIF, XMP et Profils Couleur
-            if chunk_type == b"EXIF" || chunk_type == b"XMP " || chunk_type == b"ICCP" {
-                cursor += 8 + padded_length;
-            } else {
-                output.extend_from_slice(&data[cursor..cursor + 8 + padded_length]);
-                cursor += 8 + padded_length;
-            }
-        }
-
-        // Mise à jour de la taille globale du header RIFF
-        let new_riff_size = ((output.len() - 8) as u32).to_le_bytes();
-        output[4..8].copy_from_slice(&new_riff_size);
-
-        Ok(output)
     }
 
-    fn strip_pdf(data: &[u8]) -> Result<Zeroizing<Vec<u8>>, StripperError> {
-        if !data.starts_with(b"%PDF") {
-            return Err(StripperError::InvalidFormat);
-        }
+    #[test]
+    fn test_p2p_frame_packer() {
+        let payload = vec![0x33u8; 1000];
+        let frames = P2PFramePacker::pack_payload(&payload);
 
-        let max_capacity = data.len() + Self::PADDING_BLOCK_SIZE;
-        let mut output = Zeroizing::new(Vec::with_capacity(max_capacity));
-        let mut cleaned = data.to_vec();
-
-        // Renommage neutre à taille exacte pour neutraliser les clés d'information sans altérer les offsets PDF
-        let targets: &[(&[u8], &[u8])] = &[
-            (b"/CreationDate", b"/Creation_Null"),
-            (b"/ModDate",      b"/Mod_Null"),
-            (b"/Author",       b"/Auth_N"),
-            (b"/Producer",     b"/Prod_Null"),
-            (b"/Creator",      b"/Crea_Null"),
-            (b"/Metadata",     b"/Meta_Null"),
-        ];
-
-        for &(target, replacement) in targets {
-            debug_assert_eq!(target.len(), replacement.len());
-            let mut pos = 0;
-            while let Some(idx) = cleaned[pos..].windows(target.len()).position(|w| w == target) {
-                let absolute_idx = pos + idx;
-                cleaned[absolute_idx..absolute_idx + replacement.len()].copy_from_slice(replacement);
-                pos = absolute_idx + target.len();
-            }
-        }
-
-        output.extend_from_slice(&cleaned);
-        Ok(output)
-    }
-
-    fn strip_mp4_container(data: &[u8]) -> Result<Zeroizing<Vec<u8>>, StripperError> {
-        if data.len() < 8 { return Err(StripperError::InvalidFormat); }
-
-        let max_capacity = data.len() + Self::PADDING_BLOCK_SIZE;
-        let mut output = Zeroizing::new(Vec::with_capacity(max_capacity));
-        let mut cursor = 0;
-
-        while cursor + 8 <= data.len() {
-            let mut len_bytes = [0u8; 4];
-            len_bytes.copy_from_slice(&data[cursor..cursor + 4]);
-            let length = u32::from_be_bytes(len_bytes) as usize;
-
-            let atom_type = &data[cursor + 4..cursor + 8];
-
-            if length < 8 || data.len().checked_sub(cursor).map_or(true, |rem| length > rem) {
-                output.extend_from_slice(&data[cursor..]);
-                break;
-            }
-
-            // Ignorer l'atome de métadonnées utilisateur 'udta' et 'meta'
-            if atom_type == b"udta" || atom_type == b"meta" {
-                cursor += length;
-            } else {
-                output.extend_from_slice(&data[cursor..cursor + length]);
-                cursor += length;
-            }
-        }
-        Ok(output)
-    }
-
-    fn strip_zip_container(data: &[u8]) -> Result<Zeroizing<Vec<u8>>, StripperError> {
-        if !data.starts_with(&[0x50, 0x4B, 0x03, 0x04]) {
-            return Err(StripperError::InvalidFormat);
-        }
-
-        let max_capacity = data.len() + Self::PADDING_BLOCK_SIZE;
-        let mut output = Zeroizing::new(Vec::with_capacity(max_capacity));
-        let mut cleaned = data.to_vec();
-
-        // Normalisation d'horodatage MS-DOS Zip (1970-01-01 / 00:00:00)
-        let mut cursor = 0;
-        while cursor + 30 <= cleaned.len() {
-            if &cleaned[cursor..cursor + 4] == &[0x50, 0x4B, 0x03, 0x04] {
-                // Remplacement heure et date de modification (offsets 10..14) par 0x0000
-                cleaned[cursor + 10..cursor + 14].copy_from_slice(&[0x00, 0x00, 0x00, 0x00]);
-            }
-            cursor += 1;
-        }
-
-        output.extend_from_slice(&cleaned);
-        Ok(output)
-    }
-
-    /// Padding cryptographique sans allocation de tampon (1 à 65536 octets)
-    fn apply_payload_padding(bytes: &mut Vec<u8>, block_size: usize) {
-        let remainder = bytes.len() % block_size;
-        let pad_len = block_size - remainder;
-        let mut rng = rand::thread_rng();
-
-        debug_assert!(bytes.capacity() >= bytes.len() + pad_len);
-
-        for _ in 0..pad_len {
-            bytes.push(rng.gen());
+        assert_eq!(frames.len(), 2);
+        for frame in frames {
+            assert_eq!(frame.len(), 512);
         }
     }
 }

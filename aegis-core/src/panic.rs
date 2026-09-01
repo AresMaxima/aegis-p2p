@@ -1,32 +1,121 @@
+//! aegis-core/src/panic.rs
+//! Moteur d'Éradication d'Urgence PanicPurge & Silent Burn — Phase 4 (CdCM v2.2-RC1).
+
 use crate::keystore::HardwareKeystore;
+use crate::secure_buffer;
+use std::ffi::CStr;
+use std::fs::File;
+use std::io::{Read, Write};
 use std::os::raw::c_char;
-use std::process;
+use std::sync::Mutex;
+
+static VAULT_PATH: Mutex<Option<String>> = Mutex::new(None);
+
+/// # Safety
+///
+/// Le pointeur `path` doit pointer vers une chaîne de caractères C valide terminée par un octet nul (`\0`).
+#[no_mangle]
+pub unsafe extern "C" fn aegis_init_vault_path(path: *const c_char) -> i32 {
+    if path.is_null() {
+        return -1;
+    }
+    let c_str = unsafe { CStr::from_ptr(path) };
+    if let Ok(s) = c_str.to_str() {
+        if let Ok(mut guard) = VAULT_PATH.lock() {
+            *guard = Some(s.to_string());
+            return 0;
+        }
+    }
+    -2
+}
+
+#[inline(always)]
+fn system_exit(code: i32) -> ! {
+    std::process::exit(code);
+}
 
 pub struct PanicPurge;
 
 impl PanicPurge {
-    /// Exécute la destruction irréversible des clés et provoque la fermeture d'urgence
     pub fn execute_silent_burn() -> ! {
-        // 1. Destruction de la clé racine dans le composant matériel (TPM2 / StrongBox)
         let _ = HardwareKeystore::wipe_root_key();
+        unsafe {
+            secure_buffer::global_wipe_all_buffers();
+        }
+        system_exit(137)
+    }
 
-        // 2. Interruption système instantanée pour interdire toute écriture rélictuelle
-        process::exit(137);
+    pub fn trigger() {
+        panic_purge();
     }
 }
 
-/// Point d'entrée FFI appelé lors de la saisie du PIN critique
-#[no_mangle]
-pub unsafe extern "C" fn aegis_panic_silent_burn() {
-    PanicPurge::execute_silent_burn();
+pub fn panic_purge() {
+    let _ = HardwareKeystore::wipe_root_key();
+    unsafe {
+        secure_buffer::global_wipe_all_buffers();
+    }
+    system_exit(137);
 }
 
-// =========================================================================
-// FONCTIONS FFI REQUISES POUR L'AUDIT
-// =========================================================================
+#[no_mangle]
+pub extern "C" fn aegis_purge_ram_buffer() {
+    unsafe {
+        secure_buffer::global_wipe_all_buffers();
+    }
+}
 
 #[no_mangle]
-pub extern "C" fn aegis_ingest_file_zero_disk(path: *const c_char) -> i32 {
+pub extern "C" fn aegis_panic_purge() {
+    panic_purge();
+}
+
+fn internal_silent_burn() -> ! {
+    let _ = HardwareKeystore::wipe_root_key();
+    unsafe {
+        secure_buffer::global_wipe_all_buffers();
+    }
+
+    if let Ok(guard) = VAULT_PATH.lock() {
+        if let Some(ref path) = *guard {
+            let original_size = std::fs::metadata(path).map(|m| m.len() as usize).unwrap_or(0);
+
+            if original_size > 0 {
+                if let Ok(mut file) = File::create(path) {
+                    const CHUNK_SIZE: usize = 64 * 1024;
+                    let mut chunk = secure_buffer::SecureBuffer::new(CHUNK_SIZE);
+
+                    let mut written = 0usize;
+                    while written < original_size {
+                        let to_write = std::cmp::min(CHUNK_SIZE, original_size - written);
+                        if let Ok(mut urandom) = File::open("/dev/urandom") {
+                            let _ = urandom.read_exact(&mut chunk.as_slice_mut()[..to_write]);
+                        } else {
+                            chunk.as_slice_mut()[..to_write].fill(0x55);
+                        }
+                        let _ = file.write_all(&chunk.as_slice()[..to_write]);
+                        written += to_write;
+                    }
+                    let _ = file.sync_all();
+                    chunk.clear();
+                }
+            }
+        }
+    }
+
+    system_exit(137)
+}
+
+#[no_mangle]
+pub extern "C" fn aegis_panic_silent_burn() {
+    internal_silent_burn();
+}
+
+/// # Safety
+///
+/// Le pointeur `path` doit être soit nul, soit pointer vers une chaîne C valide.
+#[no_mangle]
+pub unsafe extern "C" fn aegis_ingest(path: *const c_char) -> i32 {
     if path.is_null() {
         return -1;
     }
@@ -34,16 +123,29 @@ pub extern "C" fn aegis_ingest_file_zero_disk(path: *const c_char) -> i32 {
 }
 
 #[no_mangle]
-pub extern "C" fn aegis_purge_ram_buffer() {
-    // Purge déterministe RAM
-}
-
-#[no_mangle]
-pub extern "C" fn aegis_ingest(path: *const c_char) -> i32 {
-    aegis_ingest_file_zero_disk(path)
-}
-
-#[no_mangle]
 pub extern "C" fn aegis_purge() {
-    aegis_purge_ram_buffer();
+    panic_purge();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::ptr;
+
+    #[test]
+    fn test_ffi_aegis_purge_ram_buffer() {
+        aegis_purge_ram_buffer();
+    }
+
+    #[test]
+    fn test_ffi_aegis_ingest_branches() {
+        unsafe {
+            let res_null = aegis_ingest(ptr::null());
+            assert_eq!(res_null, -1);
+
+            let dummy_path = "fake_path\0";
+            let res_ok = aegis_ingest(dummy_path.as_ptr() as *const c_char);
+            assert_eq!(res_ok, 0);
+        }
+    }
 }

@@ -1,4 +1,7 @@
-﻿[target.aarch64-linux-android]
-linker = "D:/Android/Sdk/ndk/26.3.11579264/toolchains/llvm/prebuilt/windows-x86_64/bin/clang.exe"
-ar = "D:/Android/Sdk/ndk/26.3.11579264/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-ar.exe"
-rustflags = ["-C", "link-arg=--target=aarch64-linux-android27"]
+[target.aarch64-linux-android]
+linker = "D:/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/windows-x86_64/bin/aarch64-linux-android29-clang.cmd"
+ar = "D:/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-ar.exe"
+
+[env]
+CC_aarch64_linux_android = "D:/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/windows-x86_64/bin/aarch64-linux-android29-clang.cmd"
+AR_aarch64_linux_android = "D:/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-ar.exe"

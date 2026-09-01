@@ -1,8 +1,11 @@
+//! aegis-core/src/stegano/drowning.rs
+//! Dissimulation Stéganographique Textuelle Zero-Width & Infiltration de Clés (CdCM v2.2-RC1).
+
 use rand::Rng;
 
 // Caractères Unicode Invisibles (Zero-Width Steganography)
 const ZW_ZERO: char = '\u{200B}'; // Zero-Width Space (représente le bit 0)
-const ZW_ONE: char  = '\u{200C}'; // Zero-Width Non-Joiner (représente le bit 1)
+const ZW_ONE: char = '\u{200C}'; // Zero-Width Non-Joiner (représente le bit 1)
 const ZW_MARK: char = '\u{200D}'; // Zero-Width Joiner (Marqueur de début/fin)
 
 /// Banque de poèmes hôtes pour éviter la redondance
@@ -11,7 +14,7 @@ const COVER_POEMS: &[&str] = &[
     "Au loin, les étoiles brillent au-dessus des collines. Les feuilles tombent sans un bruit dans la forêt endormie. La rivière poursuit sa course vers la mer.",
     "Sous la pluie fine de novembre, la ville s'endort paisiblement. Rien ne trouble la quiétude de cet instant suspendu. Le vent murmure d'anciens secrets.",
     "Des lueurs dorées traversent le brouillard matinal. L'horizon s'éclaire doucement sous un ciel d'argent. Tout redevient calme après la tempête.",
-    "L'ombre du vieux chêne s'étend sur le sol gelé. Dans le silence absolu de la nuit, le froid s'installe. Seule la lune observe la terre endormie."
+    "L'ombre du vieux chêne s'étend sur le sol gelé. Dans le silence absolu de la nuit, le froid s'installe. Seule la lune observe la terre endormie.",
 ];
 
 /// Retourne un poème au hasard dans la banque hôte
@@ -22,7 +25,7 @@ pub fn get_random_cover_poem() -> &'static str {
 }
 
 /// Noyage/Dissimulation d'une phrase mnémonique ou clé dans un texte hôte.
-/// Si `cover_text` est vide ou None, un poème est choisi aléatoirement.
+/// Si `cover_text_opt` est vide ou None, un poème est choisi aléatoirement.
 pub fn hide_mnemonic_in_text(mnemonic: &str, cover_text_opt: Option<&str>) -> Result<String, String> {
     if mnemonic.trim().is_empty() {
         return Err("La phrase mnémonique est vide".to_string());
@@ -70,13 +73,14 @@ pub fn hide_mnemonic_in_text(mnemonic: &str, cover_text_opt: Option<&str>) -> Re
 /// Extraction de la phrase mnémonique ou clé à partir du texte hôte.
 pub fn extract_mnemonic_from_text(stego_text: &str) -> Result<String, String> {
     // 1. Cherche les marqueurs de début et de fin (ZW_MARK)
-    // CORRECTION SYNTAXE : Remplacement de ok_ok_or_else par ok_or_else
-    let start_idx = stego_text.find(ZW_MARK)
+    let start_idx = stego_text
+        .find(ZW_MARK)
         .ok_or_else(|| "Aucun message stéganographié détecté dans le texte".to_string())?;
-    
+
     let after_start = &stego_text[start_idx + ZW_MARK.len_utf8()..];
-    
-    let end_idx = after_start.find(ZW_MARK)
+
+    let end_idx = after_start
+        .find(ZW_MARK)
         .ok_or_else(|| "Marqueur de fin stéganographique manquant".to_string())?;
 
     let invisible_payload = &after_start[..end_idx];
@@ -91,7 +95,7 @@ pub fn extract_mnemonic_from_text(stego_text: &str) -> Result<String, String> {
         }
     }
 
-    if binary_str.is_empty() || binary_str.len() % 8 != 0 {
+    if binary_str.is_empty() || !binary_str.len().is_multiple_of(8) {
         return Err("Charge utile stéganographique corrompue".to_string());
     }
 
@@ -109,6 +113,9 @@ pub fn extract_mnemonic_from_text(stego_text: &str) -> Result<String, String> {
         .map_err(|_| "Échec du décodage de la phrase mnémonique en UTF-8".to_string())
 }
 
+// =========================================================================
+// TESTS UNITAIRES
+// =========================================================================
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -116,15 +123,25 @@ mod tests {
     #[test]
     fn test_steganography_hide_and_extract() {
         let mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
-        
+
         // Test 1: Avec un poème aléatoire automatique
         let stego = hide_mnemonic_in_text(mnemonic, None).unwrap();
-        
-        // Vérifie qu'AUCUN crochet ou mot mnémonique n'est visible en clair
+
+        // Vérifie qu'AUCUN mot mnémonique n'est visible en clair dans le texte hôte
         assert!(!stego.contains("[abandon]"));
         assert!(!stego.contains("abandon"));
 
         // Test d'extraction
+        let extracted = extract_mnemonic_from_text(&stego).unwrap();
+        assert_eq!(extracted, mnemonic);
+    }
+
+    #[test]
+    fn test_steganography_custom_cover_text() {
+        let mnemonic = "secret_key_123";
+        let custom_cover = "Ceci est un texte de couverture personnalisé pour le test.";
+
+        let stego = hide_mnemonic_in_text(mnemonic, Some(custom_cover)).unwrap();
         let extracted = extract_mnemonic_from_text(&stego).unwrap();
         assert_eq!(extracted, mnemonic);
     }

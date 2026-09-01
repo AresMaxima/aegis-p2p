@@ -1,8 +1,24 @@
+//! aegis-core/src/network/hopping.rs
+//! Routage Hopping Dynamique Multi-Transports & Générateur de Trafic Leurre (Chaff) - CdCM v2.2-RC1.
+
 use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
 use tokio::time::sleep;
+
+pub struct HoppingGuard {
+    pub id: u64,
+    pub priority: u32,
+}
+
+pub struct TransportHoppingRouter;
+
+impl TransportHoppingRouter {
+    pub fn reorder_guards(guards: &mut [HoppingGuard]) {
+        guards.sort_by_key(|b| std::cmp::Reverse(b.priority));
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TransportType {
@@ -36,7 +52,7 @@ impl TransportSelector {
     pub async fn add_route(&self, candidate: RouteCandidate) {
         let mut guards = self.candidates.write().await;
         guards.push(candidate);
-        guards.sort_by(|a, b| b.priority.cmp(&a.priority));
+        guards.sort_by_key(|b| std::cmp::Reverse(b.priority));
     }
 
     pub async fn get_best_route(&self) -> Option<RouteCandidate> {
@@ -131,6 +147,19 @@ impl ChaffTrafficGenerator {
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
+
+    #[test]
+    fn test_hopping_guard_reorder() {
+        let mut guards = vec![
+            HoppingGuard { id: 1, priority: 5 },
+            HoppingGuard { id: 2, priority: 10 },
+            HoppingGuard { id: 3, priority: 1 },
+        ];
+        TransportHoppingRouter::reorder_guards(&mut guards);
+        assert_eq!(guards[0].priority, 10);
+        assert_eq!(guards[1].priority, 5);
+        assert_eq!(guards[2].priority, 1);
+    }
 
     #[tokio::test]
     async fn test_transport_hopping_selection() {
