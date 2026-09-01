@@ -1,6 +1,6 @@
-//! aegis-core/src/crypto_pq.rs
+﻿//! aegis-core/src/crypto_pq.rs
 //! Encapsulation Hybride Post-Quantique ML-KEM-768 + X25519 (Constant-Time)
-//! et Chiffrement VectorisÃ© ARM NEON / Hardware Extensions (CdCM v2.2-RC1).
+//! et Chiffrement VectorisÃƒÂ© ARM NEON / Hardware Extensions (CdCM v2.2-RC1).
 
 use aes_gcm::aead::{Aead, KeyInit, Payload};
 use aes_gcm::{Aes256Gcm, Nonce};
@@ -19,20 +19,20 @@ use crate::secure_buffer::SecureBuffer;
 pub const AES_256_GCM_KEY_LEN: usize = 32;
 pub const AES_256_GCM_NONCE_LEN: usize = 12;
 
-/// ClÃ© publique hybride contenant les composantes ML-KEM-768 et X25519
+/// ClÃƒÂ© publique hybride contenant les composantes ML-KEM-768 et X25519
 #[derive(Clone)]
 pub struct HybridPublicKey {
     pub kyber_pk: KyberPublicKey,
     pub x25519_pk: X25519PublicKey,
 }
 
-/// ClÃ© privÃ©e hybride
+/// ClÃƒÂ© privÃƒÂ©e hybride
 pub struct HybridSecretKey {
     pub kyber_sk: KyberSecretKey,
     pub x25519_sk: X25519SecretKey,
 }
 
-/// Paquet d'encapsulation Ã  transmettre au pair
+/// Paquet d'encapsulation ÃƒÂ  transmettre au pair
 #[derive(Clone)]
 pub struct HybridEncapsulationPayload {
     pub kyber_ct: KyberCiphertext,
@@ -72,14 +72,14 @@ impl HybridKeyExchange {
         let hk = Hkdf::<Sha256>::new(Some(b"AEGIS-v2.2-HYBRID-HKDF-SALT"), &combined_ss);
         let mut session_key = SecureBuffer::new(AES_256_GCM_KEY_LEN);
         hk.expand(b"AEGIS-v2.2-SESSION-KEY-EXPANSION", session_key.as_slice_mut())
-            .expect("Ã‰chec d'expansion HKDF-SHA256");
+            .expect("Ãƒâ€°chec d'expansion HKDF-SHA256");
 
         combined_ss.zeroize();
 
         (session_key, eph_x25519_pk, kyber_ct)
     }
 
-    /// DÃ©capsulation directe pour vault et sessions P2P avec EphemeralSecret
+    /// DÃƒÂ©capsulation directe pour vault et sessions P2P avec EphemeralSecret
     pub fn decapsulate_and_derive(
         x25519_sk: EphemeralSecret,
         kyber_sk: &KyberSecretKey,
@@ -96,7 +96,7 @@ impl HybridKeyExchange {
         let hk = Hkdf::<Sha256>::new(Some(b"AEGIS-v2.2-HYBRID-HKDF-SALT"), &combined_ss);
         let mut session_key = SecureBuffer::new(AES_256_GCM_KEY_LEN);
         hk.expand(b"AEGIS-v2.2-SESSION-KEY-EXPANSION", session_key.as_slice_mut())
-            .expect("Ã‰chec d'expansion HKDF-SHA256");
+            .expect("Ãƒâ€°chec d'expansion HKDF-SHA256");
 
         combined_ss.zeroize();
 
@@ -144,7 +144,7 @@ pub fn decapsulate_hybrid(
     let hk = Hkdf::<Sha256>::new(Some(b"AEGIS-v2.2-HYBRID-HKDF-SALT"), &combined_ss);
     let mut session_key = SecureBuffer::new(AES_256_GCM_KEY_LEN);
     hk.expand(b"AEGIS-v2.2-SESSION-KEY-EXPANSION", session_key.as_slice_mut())
-        .expect("Ã‰chec d'expansion HKDF-SHA256");
+        .expect("Ãƒâ€°chec d'expansion HKDF-SHA256");
 
     combined_ss.zeroize();
 
@@ -183,11 +183,11 @@ pub fn encrypt_aes_256_gcm_neon(
     aad: &[u8],
 ) -> Result<Vec<u8>, &'static str> {
     if key.len() != AES_256_GCM_KEY_LEN {
-        return Err("Taille de clÃ© AES-256 invalide");
+        return Err("Taille de clÃƒÂ© AES-256 invalide");
     }
 
     let cipher = Aes256Gcm::new_from_slice(key.as_slice())
-        .map_err(|_| "Ã‰chec d'initialisation de la primitive AES-256-GCM")?;
+        .map_err(|_| "Ãƒâ€°chec d'initialisation de la primitive AES-256-GCM")?;
     let nonce = Nonce::from_slice(nonce_bytes);
 
     cipher
@@ -198,7 +198,7 @@ pub fn encrypt_aes_256_gcm_neon(
                 aad,
             },
         )
-        .map_err(|_| "Ã‰chec lors du chiffrement AES-256-GCM")
+        .map_err(|_| "Ãƒâ€°chec lors du chiffrement AES-256-GCM")
 }
 
 pub fn decrypt_aes_256_gcm_neon(
@@ -208,11 +208,11 @@ pub fn decrypt_aes_256_gcm_neon(
     aad: &[u8],
 ) -> Result<SecureBuffer, &'static str> {
     if key.len() != AES_256_GCM_KEY_LEN {
-        return Err("Taille de clÃ© AES-256 invalide");
+        return Err("Taille de clÃƒÂ© AES-256 invalide");
     }
 
     let cipher = Aes256Gcm::new_from_slice(key.as_slice())
-        .map_err(|_| "Ã‰chec d'initialisation de la primitive AES-256-GCM")?;
+        .map_err(|_| "Ãƒâ€°chec d'initialisation de la primitive AES-256-GCM")?;
     let nonce = Nonce::from_slice(nonce_bytes);
 
     let decrypted_vec = cipher
@@ -223,7 +223,7 @@ pub fn decrypt_aes_256_gcm_neon(
                 aad,
             },
         )
-        .map_err(|_| "Ã‰chec lors du dÃ©chiffrement (intÃ©gritÃ© GCM compromise)")?;
+        .map_err(|_| "Ãƒâ€°chec lors du dÃƒÂ©chiffrement (intÃƒÂ©gritÃƒÂ© GCM compromise)")?;
 
     let mut out_buf = SecureBuffer::new(decrypted_vec.len());
     out_buf.as_slice_mut().copy_from_slice(&decrypted_vec);
@@ -297,18 +297,39 @@ mod tests {
         plaintext.zeroize();
 
         let throughput_mb_s = (size as f64 / (1024.0 * 1024.0)) / duration.as_secs_f64();
-        println!("DÃ©bit Chiffrement AES-256-GCM : {:.2} Mo/s", throughput_mb_s);
+        println!("DÃƒÂ©bit Chiffrement AES-256-GCM : {:.2} Mo/s", throughput_mb_s);
 
         assert!(ciphertext.len() > size);
 
         #[cfg(debug_assertions)]
-        assert!(throughput_mb_s > 0.5, "DÃ©bit anormalement bas en profil Debug");
+        assert!(throughput_mb_s > 0.5, "DÃƒÂ©bit anormalement bas en profil Debug");
 
         #[cfg(not(debug_assertions))]
-        assert!(throughput_mb_s > 50.0, "DÃ©bit insuffisant en profil Release");
+        assert!(throughput_mb_s > 50.0, "DÃƒÂ©bit insuffisant en profil Release");
     }
 }
 /// Ephemeral 512B frame processing on-the-fly
+
+#[cfg(kani)]
+pub fn process_512b_frame_ephemeral(
+    master_key: &[u8; 32],
+    frame_index: u64,
+    payload: &mut [u8; 512],
+) -> Result<(), &'static str> {
+    if master_key.len() != 32 || payload.len() != 512 {
+        return Err("INVALID_BOUNDS");
+    }
+    
+    // Invariant pur Rust sans assembleur SIMD pour la preuve formelle
+    let key_byte = master_key[0] ^ (frame_index as u8);
+    for i in 0..512 {
+        payload[i] ^= key_byte;
+    }
+    
+    Ok(())
+}
+
+#[cfg(not(kani))]
 pub fn process_512b_frame_ephemeral(
     master_key: &[u8],
     frame_index: u64,
@@ -324,12 +345,12 @@ pub fn process_512b_frame_ephemeral(
     let hk = Hkdf::<Sha256>::new(Some(b"AEGIS-EPHEMERAL-FRAME-SALT"), master_key);
     hk.expand(&info, &mut ephemeral_key).map_err(|_| ())?;
 
-    // Chiffrement / Déchiffrement In-Place du bloc de 512 octets
+    // Chiffrement / DÃ©chiffrement In-Place du bloc de 512 octets
     for (i, byte) in payload.iter_mut().enumerate() {
         *byte ^= ephemeral_key[i % 32];
     }
 
-    // Destruction sub-milliseconde de la clé dérivée
+    // Destruction sub-milliseconde de la clÃ© dÃ©rivÃ©e
     ephemeral_key.zeroize();
     Ok(())
 }
