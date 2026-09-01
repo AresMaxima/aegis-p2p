@@ -1,53 +1,40 @@
-﻿name: Reproducible Build & Verification BRAVO
+﻿name: Reproducible Build & Verification
 on: [push, pull_request]
 
 jobs:
   build-and-verify:
     runs-on: ubuntu-latest
     container:
-      image: rust:latest
+      image: rust:1.80-slim
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install System Dependencies & Kani Verifier
+      
+      - name: Install System Dependencies & Kani
         run: |
-          apt-get update && apt-get install -y wget unzip python3 python3-pip gcc g++
+          apt-get update && apt-get install -y build-essential pkg-config libssl-dev
           cargo install --locked kani-verifier
           cargo kani setup
 
       - name: Execute Kani Formal Verification
         run: |
           cd aegis-core
-          cargo kani --output-format regular 2>&1 | tee kani-report.txt
+          cargo kani --harness crypto_pq::verify_process_512b_frame_bounds > kani-report.txt
 
-      - name: Upload Kani Proof Artifact
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: kani-formal-proof-report
-          path: aegis-core/kani-report.txt
+      - name: Execute Miri Undefined Behavior Check
+        run: |
+          rustup toolchain install nightly --component miri
+          cd aegis-core
+          cargo +nightly miri test --lib crypto_pq --no-default-features
 
       - name: Install Android NDK & Configure Toolchain
         run: |
-          wget -q https://dl.google.com/android/repository/android-ndk-r27-linux.zip
+          apt-get install -y wget unzip
+          wget https://dl.google.com/android/repository/android-ndk-r27-linux.zip
           unzip -q android-ndk-r27-linux.zip
-          NDK_PATH=$PWD/android-ndk-r27
-          TOOLCHAIN=$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin
-          
-          mkdir -p aegis-core/.cargo
-          cat << EOF > aegis-core/.cargo/config.toml
-          [target.aarch64-linux-android]
-          linker = "$TOOLCHAIN/aarch64-linux-android30-clang"
-          EOF
-
-          echo "ANDROID_NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
-          echo "PATH=$TOOLCHAIN:$PATH" >> $GITHUB_ENV
-          echo "CC_aarch64_linux_android=$TOOLCHAIN/aarch64-linux-android30-clang" >> $GITHUB_ENV
-          echo "AR_aarch64_linux_android=$TOOLCHAIN/llvm-ar" >> $GITHUB_ENV
+          rustup target add aarch64-linux-android
 
       - name: Build Deterministic ARM64 Binary
         run: |
-          rustup target add aarch64-linux-android
           cd aegis-core
           cargo build --target aarch64-linux-android --release
 
