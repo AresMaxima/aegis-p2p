@@ -190,7 +190,7 @@ impl Drop for SecureBuffer {
 
             if self.locked {
                 #[cfg(unix)]
-                munlock(self.ptr.as_ptr() as *const libc::c_void, self.len);
+                if !cfg!(miri) { unsafe { munlock(self.ptr.as_ptr() as *const libc::c_void, self.len); } }
                 #[cfg(windows)]
                 VirtualUnlock(self.ptr.as_ptr() as *const core::ffi::c_void, self.len);
             }
@@ -281,3 +281,4 @@ mod tests {
         assert_eq!(read_cleared[0], 0x00);
     }
 }
+
