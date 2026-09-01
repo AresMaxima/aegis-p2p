@@ -27,14 +27,23 @@ jobs:
           name: kani-formal-proof-report
           path: aegis-core/kani-report.json
 
-      - name: Install Android NDK & Set Linker
+      - name: Install Android NDK & Configure Toolchain
         run: |
           wget -q https://dl.google.com/android/repository/android-ndk-r27-linux.zip
           unzip -q android-ndk-r27-linux.zip
           NDK_PATH=$PWD/android-ndk-r27
+          TOOLCHAIN=$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin
+          
+          mkdir -p aegis-core/.cargo
+          cat << EOF > aegis-core/.cargo/config.toml
+          [target.aarch64-linux-android]
+          linker = "$TOOLCHAIN/aarch64-linux-android30-clang"
+          EOF
+
           echo "ANDROID_NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
-          echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android30-clang" >> $GITHUB_ENV
-          echo "PATH=$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH" >> $GITHUB_ENV
+          echo "PATH=$TOOLCHAIN:$PATH" >> $GITHUB_ENV
+          echo "CC_aarch64_linux_android=$TOOLCHAIN/aarch64-linux-android30-clang" >> $GITHUB_ENV
+          echo "AR_aarch64_linux_android=$TOOLCHAIN/llvm-ar" >> $GITHUB_ENV
 
       - name: Build Deterministic ARM64 Binary
         run: |
