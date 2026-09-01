@@ -1,7 +1,4 @@
-Set-Location F:\AEGIS
-
-$tpmContent = @'
-use std::process::abort;
+﻿use std::process::abort;
 
 #[cfg(all(target_os = "linux", not(kani)))]
 use tss_esapi::{
@@ -133,14 +130,14 @@ impl AegisTpmManager {
 
     /// Méthode interne pour l'injection de dépendances (Testing)
     fn verify_integrity_with<T: TpmHardware>(hardware: &T) -> Result<(), Box<dyn std::error::Error>> {
-        hardware.verify_integrity().map_err(|e| {
+        hardware.verify_integrity().map_err(|_e| {
             Self::trigger_emergency_abort();
         })
     }
 
     /// Méthode interne pour l'injection de dépendances (Testing)
     fn unseal_with<T: TpmHardware>(hardware: &T, sealed_data: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-        hardware.unseal(sealed_data).map_err(|e| {
+        hardware.unseal(sealed_data).map_err(|_e| {
             Self::trigger_emergency_abort();
         })
     }
@@ -196,6 +193,3 @@ mod tests {
         AegisTpmManager::trigger_emergency_abort();
     }
 }
-'@
-
-Set-Content -Path 'aegis-core\src\crypto\tpm.rs' -Value $tpmContent -Encoding UTF8
