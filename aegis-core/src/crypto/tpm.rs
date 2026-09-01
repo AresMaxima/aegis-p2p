@@ -1,4 +1,5 @@
-﻿use std::process::abort;
+﻿#![cfg(not(miri))]
+use std::process::abort;
 
 #[cfg(all(target_os = "linux", not(kani)))]
 use tss_esapi::{
@@ -193,3 +194,4 @@ mod tests {
         AegisTpmManager::trigger_emergency_abort();
     }
 }
+
