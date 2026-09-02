@@ -106,3 +106,4 @@ pub unsafe extern "C" fn Java_com_example_aegis_1app_MainActivity_aegis_1control
 ) -> i32 {
     viewer::stream_pipe::aegis_control_media_player(cmd, param)
 }
+pub mod integrity_timing;

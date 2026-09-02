@@ -30,3 +30,8 @@ __pycache__/
 *.pyo
 .DS_Store
 Thumbs.db
+
+# 6. AUDIT
+# Ne jamais commiter la clé privée d'audit (déjà couverte par *.key)
+audit_private.key
+!audit_public.pem

@@ -59,3 +59,12 @@ proptest = "1.4"
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(kani)'] }
+
+[features]
+default = ["software_alpha_shields"]
+software_alpha_shields = []
+
+# DESIGN CONCEPTUEL NON COMPILÉ PAR DÉFAUT (PHASE 9 B2G)
+b2g_phase9_soc = ["efuse_access", "hw_zeroization_mesh"]
+efuse_access = []
+hw_zeroization_mesh = []

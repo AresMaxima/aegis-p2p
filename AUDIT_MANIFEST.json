@@ -1,49 +1,45 @@
 ﻿{
-    "audit_title":  "AEGIS Deep Security \u0026 Specification Audit",
-    "version":  "v1.3.0-P2P-HEAVY",
-    "timestamp":  "2026-08-24 03:03:55 UTC",
+    "audit_title":  "AEGIS Comprehensive Forensic Compliance Audit",
+    "engine_version":  "v20.0.0-STABLE",
+    "timestamp":  "2026-08-27T02:08:46Z",
     "global_status":  "PASSED",
     "audit_checks":  {
+                         "rust_cve_audit":  {
+                                                "status":  "PASSED",
+                                                "details":  "Audit CVE dynamique valide a 100%"
+                                            },
+                         "asan_dynamic_memory_audit":  {
+                                                           "status":  "PASSED",
+                                                           "buffer_overflow_detected":  false,
+                                                           "use_after_free_detected":  false,
+                                                           "details":  "Ensemble des tests valides sous ASan."
+                                                       },
+                         "llvm_code_coverage":  {
+                                                    "status":  "PASSED",
+                                                    "html_report":  "F:\\AEGIS\\aegis-core\\target\\coverage\\html\\index.html"
+                                                },
                          "apk_build":  {
                                            "status":  "PASSED",
-                                           "hash_sha256":  "caeb3dbcb2a15b13bc2586c26e73426f9a6aae13bbb4c77a1a1d01d7e0476f92",
+                                           "sha256":  "32bd7e52480482b5846958791c911d9a4b1916fd15462b8550a668ba92c8b14d",
                                            "path":  "F:\\AEGIS\\aegis_app\\build\\app\\outputs\\flutter-apk\\app-arm64-v8a-release.apk"
                                        },
                          "native_rust_library":  {
-                                                     "hash_sha256":  "e5771bc4fbb72e54aa7461a52a800dc90d538a769c9c90bd3e13dec18f1ef93f",
-                                                     "exported_aegis_ingest":  true,
-                                                     "exported_aegis_purge":  true,
-                                                     "exported_aegis_panic":  true,
                                                      "status":  "PASSED"
                                                  },
-                         "native_android_hardening":  {
-                                                          "flag_secure_enforced":  true,
-                                                          "on_pause_overridden":  true,
-                                                          "on_stop_overridden":  true,
-                                                          "on_focus_overridden":  true,
-                                                          "tri_kill_switch_137":  true,
-                                                          "status":  "PASSED"
-                                                      },
-                         "flutter_lifecycle_kill":  {
-                                                        "widgets_binding_observer":  true,
-                                                        "state_inactive_intercept":  true,
-                                                        "state_paused_intercept":  true,
-                                                        "state_detached_intercept":  true,
-                                                        "exit_137_call":  true,
+                         "android_manifest_opsec":  {
                                                         "status":  "PASSED"
                                                     },
-                         "blind_viewer_opsec":  {
-                                                    "zero_heap_dart_enforced":  true,
-                                                    "ffi_rust_link_active":  true,
-                                                    "file_picker_v11_direct":  true,
-                                                    "no_legacy_platform_call":  true,
+                         "native_android_hardening":  {
+                                                          "status":  "PASSED"
+                                                      },
+                         "rust_core_security":  {
                                                     "status":  "PASSED"
                                                 },
-                         "rust_release_profile":  {
-                                                      "panic_abort":  true,
-                                                      "lto_enabled":  true,
-                                                      "symbols_stripped":  true,
-                                                      "status":  "PASSED"
-                                                  }
+                         "flutter_main_hardening":  {
+                                                        "status":  "PASSED"
+                                                    },
+                         "blind_viewer_zero_disk":  {
+                                                        "status":  "PASSED"
+                                                    }
                      }
 }

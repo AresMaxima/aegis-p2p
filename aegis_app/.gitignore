@@ -1,14 +1,3 @@
-# ==========================================
-# 🛡️ OPSEC PROTOCOL: CRITICAL SECURITY
-# NEVER commit signature keys and secrets
-# ==========================================
-*.jks
-*.keystore
-key.properties
-secret.properties
-*.idsig
-*.env
-
 # Miscellaneous
 *.class
 *.log
@@ -54,7 +43,3 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
-
-# Ne pas pousser les APK locaux dans le dépôt Git
-*.apk
-*.aab

@@ -1,0 +1,97 @@
+﻿================================================================================
+AEGIS v2.1-FINAL - RAPPORT D'AUDIT LOCAL ET MATERIEL (VERSION DEFINITIVE)
+================================================================================
+
+[1] ZERO-DISK, MLOCK & VRAM (Preuves Rust)
+--------------------------------------------------------------------------------
+use zeroize::{Zeroize, ZeroizeOnDrop};
+/// Implémente `ZeroizeOnDrop` pour garantir l'effacement de la mémoire vive à la destruction.
+#[derive(Zeroize, ZeroizeOnDrop)]
+    #[zeroize(skip)]
+    entropy.zeroize();
+    ed_bytes.zeroize();
+    x_bytes.zeroize();
+    seed.zeroize();
+use zeroize::Zeroize;
+            libc::mlock(ptr as *const _, len) == 0
+        unmasked.zeroize();
+        self.masked_data.zeroize();
+        self.mask.zeroize();
+        self.data.zeroize();
+        // La réponse dépend des droits OS (VirtualLock/mlock) : on valide que le retour booléen est maîtrisé
+        master_secret.zeroize();
+        self.sending_key.zeroize();
+        self.receiving_key.zeroize();
+        temp_vec.zeroize();
+            key.as_slice_mut().zeroize();
+use zeroize::Zeroizing;
+        combined_ss.zeroize();
+    combined_ss.zeroize();
+    decrypted_vec.zeroize();
+        plaintext.zeroize();
+static mut GLOBAL_ZEROIZE_FN: Option<unsafe fn()> = None;
+pub fn register_zeroize_callback(f: unsafe fn()) {
+        GLOBAL_ZEROIZE_FN = Some(f);
+        if let Some(zfn) = GLOBAL_ZEROIZE_FN {
+            fn ANativeWindow_lock(window: *mut std::ffi::c_void, outBuffer: *mut ANativeWindow_Buffer, inOutDirtyBounds: *mut std::ffi::c_void) -> i32;
+        if ANativeWindow_lock(window, &mut window_buffer, std::ptr::null_mut()) == 0 {
+use zeroize::{Zeroize, Zeroizing};
+        self.kyber_pk_bytes.zeroize();
+        self.ed25519_pk_bytes.zeroize();
+        self.tor_onion_address.zeroize();
+use libc::{mlock, munlock, sysconf, _SC_PAGESIZE};
+            slice::from_raw_parts_mut(ptr, len).zeroize();
+    ffi_security::register_zeroize_callback(global_wipe_all_buffers);
+            let lock_res = unsafe { mlock(ptr.as_ptr() as *const libc::c_void, len) };
+                    slice::from_raw_parts_mut(ptr.as_ptr(), len).zeroize();
+        self.as_slice_mut().zeroize();
+    pub fn clone_zeroized(&self) -> Self {
+            data.zeroize();
+            self.buffer.as_slice_mut()[offset..offset + len].zeroize();
+        vault.active_session_id.zeroize();
+        self.guard_before.zeroize();
+        self.canary_data.zeroize();
+        self.guard_after.zeroize();
+
+[2] CAMERA ANTI-PRNU & METADATA STRIPPING (Preuves Rust)
+--------------------------------------------------------------------------------
+    /// Nettoie les métadonnées sensibles (EXIF, commentaires, headers) et normalise le tampon
+                // Ignore APP1 (EXIF), APP2 (ICC), APP13 (Photoshop) et COM (Commentaires)
+        Self::apply_anti_prnu_gaussian_filter(secure_frame.as_slice_mut(), width, height);
+    fn apply_anti_prnu_gaussian_filter(yuv_data: &mut [u8], width: usize, height: usize) {
+pub fn aegis_ingest_camera_frame_direct(
+        let res = aegis_ingest_camera_frame_direct(
+    ingestion::aegis_ingest_camera_frame_direct(
+
+[3] SAF ZERO-TRACE & BYPASS GARBAGE COLLECTOR (Preuves Dart)
+--------------------------------------------------------------------------------
+        type: FileType.any,
+        withData: false,
+    malloc.free(pathPtr);
+
+[4] OS HARDENING & BYPASS KILL-SWITCH (Preuves Dart)
+--------------------------------------------------------------------------------
+Future<void> _setIntentPending(bool pending) async {
+    await _setIntentPending(true);
+      await _setIntentPending(false);
+      await FlutterWindowManagerPlus.addFlags(FlutterWindowManagerPlus.FLAG_SECURE);
+    debugPrint("Erreur lors de l'activation de FLAG_SECURE : $e");
+
+[5] MATRICE DE TOKENS & PANIC PURGE (Preuves Rust)
+--------------------------------------------------------------------------------
+use std::sync::atomic::{AtomicU64, Ordering};
+static LAST_HEARTBEAT: AtomicU64 = AtomicU64::new(0);
+static TIMEOUT_SECS: AtomicU64 = AtomicU64::new(DEFAULT_TIMEOUT_SECS);
+        libc::syscall(libc::SYS_exit_group, 137);
+
+[6] EMPREINTE DU BINAIRE DE PRODUCTION
+SHA-256 libaegis_core.so : BE6FBC6B665D81833E146F2FFDD147D1CB136BD1ECA0BE8E8592085D4568562D
+
+================================================================================
+SCELLEMENT CRYPTOGRAPHIQUE (ECDSA P-256 / SHA-256)
+================================================================================
+CLE PUBLIQUE (Base64) : RUNTMSAAAADJ/+I7Hj+2uVoR9RVpXNhUH5iYzs9VjnCL2m2JqiUYwkf6mhEZsiJmlTgXQ+zebFBzyXmsLnACL08Mmx+fxWTf
+
+SIGNATURE DU RAPPORT  : GncXcNP/IAudhQTph28C9G2xr9UZwNsN3qrNfwHvumnxorGuZWp2+06qVi6SsdIyzFzp3KOIoSaZyny0VBXaCQ==
+================================================================================
+

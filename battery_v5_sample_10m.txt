@@ -1,0 +1,11 @@
+﻿TIMESTAMP;COMPUTED_DRAIN;ACTUAL_DRAIN;CPU_TIME
+2026-09-01 23:27:47;0, actual drain: 0;0;u=14s 392ms s=9s 129ms 
+2026-09-01 23:28:48;0, actual drain: 0;0;u=27s 587ms s=16s 946ms 
+2026-09-01 23:29:49;0, actual drain: 0;0;u=54s 648ms s=37s 545ms 
+2026-09-01 23:30:49;0, actual drain: 0;0;u=1m 17s 541ms s=54s 435ms 
+2026-09-01 23:31:50;0, actual drain: 0;0;u=1m 42s 728ms s=1m 12s 330ms 
+2026-09-01 23:32:51;0, actual drain: 0;0;u=2m 6s 968ms s=1m 29s 755ms 
+2026-09-01 23:33:51;0, actual drain: 0;0;u=2m 32s 338ms s=1m 47s 337ms 
+2026-09-01 23:34:52;0, actual drain: 0;0;u=2m 58s 380ms s=2m 10s 181ms 
+2026-09-01 23:35:53;0, actual drain: 0;0;u=3m 22s 913ms s=2m 27s 919ms 
+2026-09-01 23:36:53;0, actual drain: 0;0;u=3m 48s 17ms s=2m 45s 799ms 
