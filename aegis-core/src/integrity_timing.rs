@@ -3,6 +3,14 @@ use std::arch::asm;
 #[cfg(unix)]
 use libc::{clock_gettime, timespec, CLOCK_MONOTONIC_RAW, getpid};
 
+/// Lecture atomique du compteur de cycles CPU virtuel avec barrière ISB.
+/// 
+/// # Limite du modèle de menace (ARMv8.4-A VHE) :
+/// Sur les SoCs supportant ARMv8.4-A Virtual Host Extensions (VHE), un hyperviseur
+/// sophistiqué peut manipuler le registre `CNTVOFF_EL2` pour ajuster l'offset temporel
+/// et masquer la latence des traps hyperviseurs sans créer de dérive visible.
+/// Cette mesure reste néanmoins une barrière efficace contre les rootkits Ring-0
+/// conventionnels (eBPF, ftrace, hooks kprobes) et les hyperviseurs non-VHE.
 #[inline(always)]
 fn read_cntvct_atomic() -> u64 {
     #[cfg(all(target_arch = "aarch64", unix))]
