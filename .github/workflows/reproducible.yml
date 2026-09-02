@@ -34,6 +34,11 @@ jobs:
           rustup target add aarch64-linux-android
 
       - name: Build Deterministic ARM64 Binary
+        env:
+          ANDROID_NDK_HOME: ${{ github.workspace }}/android-ndk-r27
+          CC_aarch64_linux_android: ${{ github.workspace }}/android-ndk-r27/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang
+          AR_aarch64_linux_android: ${{ github.workspace }}/android-ndk-r27/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
+          CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER: ${{ github.workspace }}/android-ndk-r27/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang
         run: |
           cd aegis-core
           cargo build --target aarch64-linux-android --release
@@ -41,4 +46,3 @@ jobs:
       - name: Verify Cryptographic Hash
         run: |
           sha256sum aegis-core/target/aarch64-linux-android/release/libaegis_core.so
-
