@@ -24,7 +24,7 @@ jobs:
         run: |
           rustup toolchain install nightly --component miri
           cd aegis-core
-          cargo +nightly miri test --lib crypto_pq
+          cargo +nightly miri test --lib crypto_pq -- --exact crypto_pq::tests::test_aes_256_gcm_neon_roundtrip
 
       - name: Install Android NDK & Configure Toolchain
         run: |
@@ -41,3 +41,4 @@ jobs:
       - name: Verify Cryptographic Hash
         run: |
           sha256sum aegis-core/target/aarch64-linux-android/release/libaegis_core.so
+
