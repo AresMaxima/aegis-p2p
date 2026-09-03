@@ -3,7 +3,7 @@ use std::process::abort;
 
 #[cfg(all(target_os = "linux", not(kani)))]
 use tss_esapi::{
-    interface_types::{algorithm::HashingAlgorithm, pcr::PcrSlot},
+    interface_types::algorithm::HashingAlgorithm, structures::PcrSlot,
     structures::PcrSelectionListBuilder,
     tcti_ldr::TctiNameConf,
     Context,

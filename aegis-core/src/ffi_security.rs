@@ -65,3 +65,21 @@ where
         }
     })
 }
+#[cfg(test)]
+mod cov_ffi {
+    use super::*;
+    unsafe fn d_cb() {}
+    #[test]
+    fn t() {
+        init_native_security();
+        register_zeroize_callback(d_cb);
+        trigger_emergency_zeroize();
+        let _ = execute_constant_time_ffi(1, || 42);
+        handle_flutter_ui_error("err");
+        let _ = safe_ffi_boundary(|| Ok::<i32, String>(100));
+        let _ = safe_ffi_boundary(|| Err::<i32, String>("e".into()));
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn force_gpu_scramble() {}

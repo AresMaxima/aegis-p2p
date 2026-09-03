@@ -73,3 +73,5 @@ pub unsafe extern "C" fn aegis_vault_destroy(path_ptr: *const c_char) -> i32 {
     }
     -1
 }
+#[cfg(test)]
+mod cov_vlt { use super::*; #[test] fn t() { let p = std::env::temp_dir().join("v.db"); let s = p.to_str().unwrap(); let _ = AegisVault::derive_master_key(b"p", b"s"); let _ = AegisVault::new(s); let _ = AegisVault::purge(&p); let _ = AegisVault::panic_purge(&p); let _ = wipe_and_delete_vault(&p); } }

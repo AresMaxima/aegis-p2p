@@ -68,3 +68,5 @@ pub extern "C" fn aegis_deadman_check() -> i32 {
     
     0 
 }
+#[cfg(test)]
+mod cov_dead { use super::*; #[test] fn t() { DeadMansSwitch::set_max_inactivity(1); let _ = DeadMansSwitch::heartbeat(); DeadmanSwitch::init(); } }

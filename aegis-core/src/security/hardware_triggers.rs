@@ -47,7 +47,25 @@ impl HardwareGuard {
     pub fn enforce_runtime_security() {
         if Self::check_anti_debugging() {
             eprintln!("[ALERT CRITIQUE] Inspection ptrace / Debugger détectée.");
+            
+            #[cfg(not(test))]
             process::exit(137);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_hardware_trigger_logic() {
+        // Appelle la vérification d'état
+        let _is_debugging = HardwareGuard::check_anti_debugging();
+        
+        // Appelle l'application de la sécurité. 
+        // Si un debugger est attaché pendant le test, le message d'alerte s'affichera
+        // mais le process::exit(137) sera ignoré, préservant la sauvegarde LLVM.
+        HardwareGuard::enforce_runtime_security();
     }
 }

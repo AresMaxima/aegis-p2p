@@ -7,17 +7,17 @@ pub struct HardwareTriggerMonitor;
 
 impl HardwareTriggerMonitor {
     /// Déclenché en cas de retrait brutal de la carte SIM ou du stockage externe
-    pub fn on_storage_tampered() -> ! {
+    pub fn on_storage_tampered()  {
         PanicPurge::execute_silent_burn();
     }
 
     /// Déclenché lors d'une déconnexion USB suspecte pendant une session active
-    pub fn on_usb_tampered() -> ! {
+    pub fn on_usb_tampered()  {
         PanicPurge::execute_silent_burn();
     }
 
     /// Déclenché par une séquence d'accéléromètre spécifique (mouvement de crise)
-    pub fn on_motion_emergency() -> ! {
+    pub fn on_motion_emergency()  {
         PanicPurge::execute_silent_burn();
     }
 }

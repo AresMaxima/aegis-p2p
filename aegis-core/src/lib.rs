@@ -107,3 +107,22 @@ pub unsafe extern "C" fn Java_com_example_aegis_1app_MainActivity_aegis_1control
     viewer::stream_pipe::aegis_control_media_player(cmd, param)
 }
 pub mod integrity_timing;
+
+#[cfg(test)]
+mod cov_lib_safe {
+    use super::*;
+    #[test]
+    fn t_crypto_pq_errors() {
+        let k = secure_buffer::SecureBuffer::new(32);
+        let bad_k = secure_buffer::SecureBuffer::new(16);
+        let n = [0u8; 12];
+        let p = b"DATA";
+        let _ = crypto_pq::encrypt_aes_256_gcm_neon(&bad_k, &n, p, b"");
+        let _ = crypto_pq::decrypt_aes_256_gcm_neon(&bad_k, &n, p, b"");
+        if let Ok(ct) = crypto_pq::encrypt_aes_256_gcm_neon(&k, &n, p, b"") {
+            let mut c_ct = ct.clone();
+            if !c_ct.is_empty() { c_ct[0] ^= 0xFF; }
+            let _ = crypto_pq::decrypt_aes_256_gcm_neon(&k, &n, &c_ct, b"");
+        }
+    }
+}

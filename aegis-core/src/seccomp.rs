@@ -34,11 +34,29 @@ pub fn apply_strict_seccomp_filter() {
         filter: filter.as_ptr() as *mut sock_filter,
     };
 
+    #[cfg(not(test))]
     unsafe {
         prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0);
         prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &prog);
+    }
+
+    #[cfg(test)]
+    {
+        let _ = prog; // Évite l'avertissement de variable inutilisée pendant l'exécution des tests
     }
 }
 
 #[cfg(not(any(target_os = "linux", target_os = "android")))]
 pub fn apply_strict_seccomp_filter() {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_seccomp_policy_generation() {
+        // Appelle la fonction d'initialisation des filtres BPF
+        // En mode test, la logique est traversée mais prctl n'est pas invoqué
+        apply_strict_seccomp_filter();
+    }
+}

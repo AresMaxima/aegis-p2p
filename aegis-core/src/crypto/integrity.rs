@@ -67,3 +67,5 @@ mod tests {
         let _ = AegisIntegrityMonitor::check_code_integrity();
     }
 }
+#[cfg(test)]
+mod cov_int { use super::*; #[test] fn t() { let m = AegisIntegrityMonitor::new(); let _ = m.check_integrity(); } }

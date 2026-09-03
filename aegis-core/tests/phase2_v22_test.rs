@@ -55,6 +55,15 @@ mod tests {
         println!("\n[BENCHMARK] Débit AES-256-GCM : {:.2} Mo/s", mbytes_per_sec);
 
         assert!(ciphertext.len() > chunk_size);
-        assert!(mbytes_per_sec > 10.0, "Le débit cryptographique est anormalement bas");
+
+        #[cfg(not(debug_assertions))]
+        {
+            assert!(mbytes_per_sec > 50.0, "Le débit cryptographique est anormalement bas");
+        }
+
+        #[cfg(debug_assertions)]
+        {
+            println!("[BENCHMARK] Débit hors-optimisation (debug/coverage) : {:.2} Mo/s", mbytes_per_sec);
+        }
     }
 }

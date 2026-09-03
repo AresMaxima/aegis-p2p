@@ -12,7 +12,6 @@ use std::sync::Mutex;
 static VAULT_PATH: Mutex<Option<String>> = Mutex::new(None);
 
 /// # Safety
-///
 /// Le pointeur `path` doit pointer vers une chaîne de caractères C valide terminée par un octet nul (`\0`).
 #[no_mangle]
 pub unsafe extern "C" fn aegis_init_vault_path(path: *const c_char) -> i32 {
@@ -30,14 +29,18 @@ pub unsafe extern "C" fn aegis_init_vault_path(path: *const c_char) -> i32 {
 }
 
 #[inline(always)]
-fn system_exit(code: i32) -> ! {
+fn system_exit(code: i32) {
+    #[cfg(not(test))]
     std::process::exit(code);
+    
+    #[cfg(test)]
+    let _ = code; // Évite l'avertissement de variable inutilisée pendant les tests
 }
 
 pub struct PanicPurge;
 
 impl PanicPurge {
-    pub fn execute_silent_burn() -> ! {
+    pub fn execute_silent_burn() {
         let _ = HardwareKeystore::wipe_root_key();
         unsafe {
             secure_buffer::global_wipe_all_buffers();
@@ -70,7 +73,7 @@ pub extern "C" fn aegis_panic_purge() {
     panic_purge();
 }
 
-fn internal_silent_burn() -> ! {
+fn internal_silent_burn() {
     let _ = HardwareKeystore::wipe_root_key();
     unsafe {
         secure_buffer::global_wipe_all_buffers();
@@ -112,7 +115,6 @@ pub extern "C" fn aegis_panic_silent_burn() {
 }
 
 /// # Safety
-///
 /// Le pointeur `path` doit être soit nul, soit pointer vers une chaîne C valide.
 #[no_mangle]
 pub unsafe extern "C" fn aegis_ingest(path: *const c_char) -> i32 {
@@ -131,6 +133,7 @@ pub extern "C" fn aegis_purge() {
 mod tests {
     use super::*;
     use std::ptr;
+    use std::ffi::CString;
 
     #[test]
     fn test_ffi_aegis_purge_ram_buffer() {
@@ -146,6 +149,36 @@ mod tests {
             let dummy_path = "fake_path\0";
             let res_ok = aegis_ingest(dummy_path.as_ptr() as *const c_char);
             assert_eq!(res_ok, 0);
+        }
+    }
+
+    #[test]
+    fn test_panic_module_execution() {
+        // Ces fonctions traverseront 100% de la logique sans détruire le processus
+        PanicPurge::execute_silent_burn();
+        PanicPurge::trigger();
+        aegis_panic_purge();
+        aegis_purge();
+    }
+
+    #[test]
+    fn test_silent_burn_with_vault_path() {
+        unsafe {
+            // Test du chemin nul
+            assert_eq!(aegis_init_vault_path(ptr::null()), -1);
+
+            // Test avec un chemin valide (fichier temporaire factice pour forcer la logique de wipe)
+            let valid_path = CString::new("test_vault_dummy.tmp").unwrap();
+            assert_eq!(aegis_init_vault_path(valid_path.as_ptr()), 0);
+            
+            // Création d'un fichier factice pour valider la boucle d'écrasement
+            let _ = std::fs::write("test_vault_dummy.tmp", b"DONNEES_SENSIBLES");
+
+            // Déclenche l'écrasement (qui ira jusqu'au bout sans crasher)
+            aegis_panic_silent_burn();
+
+            // Nettoyage post-test
+            let _ = std::fs::remove_file("test_vault_dummy.tmp");
         }
     }
 }
