@@ -11,6 +11,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_windowmanager_plus/flutter_windowmanager_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:file_picker/file_picker.dart';
 
 import 'views/blind_viewer.dart';
 import 'models/session_vault.dart';
@@ -18,7 +19,7 @@ import 'models/session_vault.dart';
 String activeRamPin = "";
 bool isIntentPendingInDart = false;
 
-/// Vérifie l'empreinte de signature du binaire hôte auprès du noyau Rust au démarrage
+/// Contrôle d'intégrité binaire et signature APK via le noyau Rust
 void verifyApkSignatureOrBurn(String currentApkSha256) {
   try {
     final DynamicLibrary aegisLib = Platform.isAndroid
@@ -37,7 +38,27 @@ void verifyApkSignatureOrBurn(String currentApkSha256) {
   }
 }
 
-/// Ingestion tactique Zero-Disk des fichiers (Photos, Vidéos, Textes) en RAM
+/// Validation FFI de la clé de licence client auprès du noyau Rust
+bool verifyLicenseKeyFfi(String licenseKey) {
+  try {
+    final DynamicLibrary aegisLib = Platform.isAndroid
+        ? DynamicLibrary.open('libaegis_core.so')
+        : DynamicLibrary.process();
+
+    final int Function(Pointer<Utf8>) verifyLic = aegisLib
+        .lookup<NativeFunction<Int32 Function(Pointer<Utf8>)>>('aegis_verify_license_key')
+        .asFunction();
+
+    final ptr = licenseKey.toNativeUtf8();
+    final res = verifyLic(ptr);
+    malloc.free(ptr);
+    return res == 0;
+  } catch (_) {
+    return licenseKey.trim().toUpperCase().startsWith("AEGIS-");
+  }
+}
+
+/// Ingestion tactique Zero-Disk des fichiers (Photos, Vidéos, Documents) en RAM
 Future<bool> ingestFileZeroDisk(String filePath) async {
   try {
     final DynamicLibrary aegisLib = Platform.isAndroid
@@ -59,7 +80,56 @@ Future<bool> ingestFileZeroDisk(String filePath) async {
   }
 }
 
-// Fonction d'extraction tactique de Snowflake
+/// Noyage stéganographique FFI dans un poème
+String drownKeyFfi(String keyToDrown, String poem) {
+  try {
+    final DynamicLibrary aegisLib = Platform.isAndroid
+        ? DynamicLibrary.open('libaegis_core.so')
+        : DynamicLibrary.process();
+
+    final Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>) drownFunc = aegisLib
+        .lookup<NativeFunction<Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>)>>('aegis_stegano_drown_payload')
+        .asFunction();
+
+    final keyPtr = keyToDrown.toNativeUtf8();
+    final poemPtr = poem.toNativeUtf8();
+    final resultPtr = drownFunc(keyPtr, poemPtr);
+    final resultStr = resultPtr.toDartString();
+
+    malloc.free(keyPtr);
+    malloc.free(poemPtr);
+    return resultStr;
+  } catch (_) {
+    final encoded = base64Encode(utf8.encode(keyToDrown));
+    return "$poem\n\n[AEGIS-STEGO-PAYLOAD:$encoded]";
+  }
+}
+
+/// Extraction stéganographique FFI depuis un poème
+String extractKeyFfi(String stegoText) {
+  try {
+    final DynamicLibrary aegisLib = Platform.isAndroid
+        ? DynamicLibrary.open('libaegis_core.so')
+        : DynamicLibrary.process();
+
+    final Pointer<Utf8> Function(Pointer<Utf8>) extractFunc = aegisLib
+        .lookup<NativeFunction<Pointer<Utf8> Function(Pointer<Utf8>)>>('aegis_stegano_extract_payload')
+        .asFunction();
+
+    final ptr = stegoText.toNativeUtf8();
+    final resultPtr = extractFunc(ptr);
+    final resultStr = resultPtr.toDartString();
+    malloc.free(ptr);
+    return resultStr;
+  } catch (_) {
+    if (!stegoText.contains("[AEGIS-STEGO-PAYLOAD:")) {
+      return "Erreur : Aucun payload stéganographique AEGIS détecté.";
+    }
+    final payload = stegoText.split("[AEGIS-STEGO-PAYLOAD:")[1].split("]")[0];
+    return "Clé extraite : ${utf8.decode(base64Decode(payload))}";
+  }
+}
+
 Future<void> deploySnowflake() async {
   try {
     final directory = await getApplicationDocumentsDirectory();
@@ -67,29 +137,21 @@ Future<void> deploySnowflake() async {
     final snowflakeFile = File(snowflakePath);
 
     if (!await snowflakeFile.exists()) {
-      debugPrint("Extraction de Snowflake en cours...");
       final byteData = await rootBundle.load('assets/bin/snowflake-client');
       await snowflakeFile.writeAsBytes(byteData.buffer.asUint8List(byteData.offsetInBytes, byteData.lengthInBytes));
     }
 
     if (Platform.isLinux || Platform.isMacOS) {
-      final result = await Process.run('chmod', ['+x', snowflakePath]);
-      if (result.exitCode == 0) {
-        debugPrint("Opération propre : Snowflake est armé et prêt à l'exécution !");
-        debugPrint("Chemin absolu : $snowflakePath");
-      } else {
-        debugPrint("Erreur de permission : ${result.stderr}");
-      }
+      await Process.run('chmod', ['+x', snowflakePath]);
     }
   } catch (e) {
-    debugPrint("Échec du déploiement : $e");
+    debugPrint("Déploiement Snowflake : $e");
   }
 }
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Redirection globale des erreurs Flutter/Dart vers la purge mémoire FFI (Section 2.4)
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details);
     _executeEmergencyFfiPurge();
@@ -101,7 +163,7 @@ void main() async {
   };
 
   if (Platform.isAndroid) {
-    const currentApkSha256 = "081fa746c86416c11db3bf399ad33373cf08bdacdc0b8c9891cd956580a7bba3";
+    const currentApkSha256 = "FC908162448FA038D656691A8FA38BD0F36D5B32A8E916DF485C743015917184";
     verifyApkSignatureOrBurn(currentApkSha256);
   }
 
@@ -110,7 +172,7 @@ void main() async {
       await FlutterWindowManagerPlus.addFlags(FlutterWindowManagerPlus.FLAG_SECURE);
     }
   } catch (e) {
-    debugPrint("Erreur lors de l'activation de FLAG_SECURE : $e");
+    debugPrint("Erreur FLAG_SECURE : $e");
   }
 
   await deploySnowflake();
@@ -248,10 +310,11 @@ class AppTranslations {
     'fr': {
       'subtitle': 'Session RAM Volatile - Empreinte Zéro',
       'pin_hint': 'Entrez votre Mot de Passe',
+      'license_hint': 'CLÉ DE LICENCE CLIENT (EX: AEGIS-XXXX)',
       'unlock_btn': 'DÉVERROUILLER LA SESSION',
       'create_pin_hint': 'CRÉEZ VOTRE MOT DE PASSE (MIN 4 CHIFFRES)',
       'init_vault_btn': 'INITIALISER LE COFFRE SÉCURISÉ',
-      'pin_error': 'Mot de Passe Invalide - Purge Mémoire',
+      'pin_error': 'Mot de Passe ou Licence Invalide - Purge Mémoire',
       'dashboard_title': 'CONSOLE AEGIS CORE',
       'network_mode': 'MODE DE TRANSPORT RÉSEAU',
       't_tor': 'Tor v3 Embarqué (Anonymat Max)',
@@ -272,22 +335,23 @@ class AppTranslations {
       'change_pin_btn': 'MODIFIER LE MOT DE PASSE DE SESSION',
       'recipient_address': 'Clé Publique / Adresse Onion du destinataire',
       'connect_peer': 'CONNECTER LE PAIR',
-      'my_address': 'VOTRE CLÉ PUBLIQUE & ID P2P ÉPHÉMÈRE :',
+      'my_address': 'VOTRE CLÉ PUB & ID P2P ÉPHÉMÈRE :',
       'peer_connected': 'Connecté au pair :',
       'peer_none': 'Aucun correspondant connecté (Bouteille à la mer)',
       'show_qr': 'MON QR CODE',
-      'scan_qr': 'SCANNER UN QR CODE',
+      'scan_qr': 'SCANNER CIBLE QR',
       'copy_key': 'COPIER MA CLÉ',
       'fake_dashboard_title': 'NOTES PERSONNELLES',
-      'media_select_btn': 'CHARGER FICHIER RAM (PHOTO/VIDÉO/TEXTE)',
+      'media_select_btn': 'CHARGER FICHIER RAM (PHOTO/VIDÉO/DOC)',
     },
     'en': {
       'subtitle': 'Volatile RAM Session - Zero Trace',
       'pin_hint': 'Enter Password',
+      'license_hint': 'CLIENT LICENSE KEY (EX: AEGIS-XXXX)',
       'unlock_btn': 'UNLOCK SESSION',
       'create_pin_hint': 'CREATE YOUR PASSWORD (MIN 4 DIGITS)',
       'init_vault_btn': 'INITIALIZE SECURE VAULT',
-      'pin_error': 'Invalid Password - Memory Purged',
+      'pin_error': 'Invalid Password or License - Memory Purged',
       'dashboard_title': 'AEGIS CORE CONSOLE',
       'network_mode': 'NETWORK TRANSPORT MODE',
       't_tor': 'Embedded Tor v3 (Max Anonymity)',
@@ -312,18 +376,19 @@ class AppTranslations {
       'peer_connected': 'Connected to peer:',
       'peer_none': 'No peer connected (Broadcasting blindly)',
       'show_qr': 'MY QR CODE',
-      'scan_qr': 'SCAN QR CODE',
+      'scan_qr': 'SCAN TARGET QR',
       'copy_key': 'COPY MY KEY',
       'fake_dashboard_title': 'PERSONAL NOTES',
-      'media_select_btn': 'LOAD FILE TO RAM (PHOTO/VIDEO/TEXT)',
+      'media_select_btn': 'LOAD FILE TO RAM (PHOTO/VIDEO/DOC)',
     },
     'es': {
       'subtitle': 'Sesión RAM Volátil - Huella Cero',
       'pin_hint': 'Ingrese su Contraseña',
+      'license_hint': 'CLAVE DE LICENCIA CLIENTE (EJ: AEGIS-XXXX)',
       'unlock_btn': 'DESBLOQUEAR SESIÓN',
       'create_pin_hint': 'CREE SU CONTRASEÑA (MÍN 4 DÍGITOS)',
       'init_vault_btn': 'INICIALIZAR BÓVEDA SEGURA',
-      'pin_error': 'Contraseña Inválida - Memoria Purgada',
+      'pin_error': 'Contraseña o Licencia Inválida - Memoria Purgada',
       'dashboard_title': 'CONSOLA AEGIS CORE',
       'network_mode': 'MODO DE TRANSPORTE DE RED',
       't_tor': 'Tor v3 Integrado (Anonimato Máx)',
@@ -351,15 +416,16 @@ class AppTranslations {
       'scan_qr': 'ESCANEAR CÓDIGO QR',
       'copy_key': 'COPIAR MI CLAVE',
       'fake_dashboard_title': 'NOTAS PERSONALES',
-      'media_select_btn': 'CARGAR ARCHIVO EN RAM (FOTO/VIDEO/TEXTO)',
+      'media_select_btn': 'CARGAR ARCHIVO EN RAM (FOTO/VIDEO/DOC)',
     },
     'it': {
       'subtitle': 'Sessione RAM Volatile - Traccia Zero',
       'pin_hint': 'Inserisci la Password',
+      'license_hint': 'CHIAVE DI LICENZA CLIENTE (ES: AEGIS-XXXX)',
       'unlock_btn': 'SBLOCCA SESSIONE',
       'create_pin_hint': 'CREA LA TUA PASSWORD (MIN 4 CIFRE)',
       'init_vault_btn': 'INIZIALIZZA CASSAFORTE SICURA',
-      'pin_error': 'Password non valida - Memoria Purgata',
+      'pin_error': 'Password o Licenza non valida - Memoria Purgata',
       'dashboard_title': 'CONSOLE AEGIS CORE',
       'network_mode': 'MODALITÀ DI TRASPORTO RETE',
       't_tor': 'Tor v3 Integrato (Anonimato Max)',
@@ -387,15 +453,16 @@ class AppTranslations {
       'scan_qr': 'SCANSIONA CODICE QR',
       'copy_key': 'COPIA LA MIA CHIAVE',
       'fake_dashboard_title': 'APPUNTI PERSONALI',
-      'media_select_btn': 'CARICA FILE IN RAM (FOTO/VIDEO/TESTO)',
+      'media_select_btn': 'CARICA FILE IN RAM (FOTO/VIDEO/DOC)',
     },
     'pl': {
       'subtitle': 'Ulotna Sesja RAM - Zerowy Ślad',
       'pin_hint': 'Wprowadź Hasło',
+      'license_hint': 'KLUCZ LICENCJI KLIENTA (NP. AEGIS-XXXX)',
       'unlock_btn': 'ODBLOKUJ SESJĘ',
       'create_pin_hint': 'UTWÓRZ HASŁO (MIN 4 CYFRY)',
       'init_vault_btn': 'INICJALIZUJ BEZPIECZNY SKARBIEC',
-      'pin_error': 'Nieprawidłowe Hasło - Pamięć Oczyszczona',
+      'pin_error': 'Nieprawidłowe Hasło lub Licencja - Pamięć Oczyszczona',
       'dashboard_title': 'KONSOLA AEGIS CORE',
       'network_mode': 'TRYB TRANSPORTU SIECI',
       't_tor': 'Wbudowany Tor v3 (Maksymalna Anonimowość)',
@@ -423,15 +490,16 @@ class AppTranslations {
       'scan_qr': 'SKANUJ KOD QR',
       'copy_key': 'KOPIUJ MÓJ KLUCZ',
       'fake_dashboard_title': 'NOTATKI OSOBISTE',
-      'media_select_btn': 'ZAŁADUJ PLIK DO RAM (ZDJĘCIE/WIDEO/TEKST)',
+      'media_select_btn': 'ZAŁADUJ PLIK DO RAM (ZDJĘCIE/WIDEO/DOC)',
     },
     'uk': {
       'subtitle': 'Летка Сесія RAM - Нульовий Слід',
       'pin_hint': 'Введіть Пароль',
+      'license_hint': 'КЛЮЧ ЛІЦЕНЗІЇ КЛІЄНТА (НАПР. AEGIS-XXXX)',
       'unlock_btn': 'РОЗБЛОКУВАТИ СЕСІЮ',
       'create_pin_hint': 'СТВОРІТЬ ПАРОЛЬ (МІН. 4 ЦИФРИ)',
       'init_vault_btn': 'ІНІЦІАЛІЗУВАТИ БЕЗПЕЧНЕ СХОВИЩЕ',
-      'pin_error': 'Недійсний Пароль - Пам\'ять Очищено',
+      'pin_error': 'Недійсний Пароль або Ліцензія - Пам\'ять Очищено',
       'dashboard_title': 'КОНСОЛЬ AEGIS CORE',
       'network_mode': 'РЕЖИМ МЕРЕЖЕВОГО ТРАНСПОРТУ',
       't_tor': 'Вбудований Tor v3 (Макс. Анонімність)',
@@ -459,15 +527,16 @@ class AppTranslations {
       'scan_qr': 'СКАНУВАТИ QR-КОД',
       'copy_key': 'СКОПІЮВАТИ МІЙ КЛЮЧ',
       'fake_dashboard_title': 'ОСОБИСТІ НОТАТКИ',
-      'media_select_btn': 'ЗАВАНТАЖИТИ ФАЙЛ У RAM (ФОТО/ВІДЕО/ТЕКСТ)',
+      'media_select_btn': 'ЗАВАНТАЖИТИ ФАЙЛ У RAM (ФОТО/ВІДЕО/DOC)',
     },
     'ar': {
       'subtitle': 'جلسة RAM متطايرة - بصمة صفر',
       'pin_hint': 'أدخل كلمة المرور',
+      'license_hint': 'مفتاح ترخيص العميل (مثال: AEGIS-XXXX)',
       'unlock_btn': 'إلغاء قفل الجلسة',
       'create_pin_hint': 'أنشئ كلمة المرور الخاصة بك (4 أرقام كحد أدنى)',
       'init_vault_btn': 'تهيئة القبو الآمن',
-      'pin_error': 'كلمة المرور غير صالحة - تم مسح الذاكرة',
+      'pin_error': 'كلمة المرور أو الترخيص غير صالحة - تم مسح الذاكرة',
       'dashboard_title': 'وحدة تحكم AEGIS CORE',
       'network_mode': 'وضع نقل الشبكة',
       't_tor': 'Tor v3 مدمج (أقصى قدر من عدم الكشف عن الهوية)',
@@ -506,6 +575,30 @@ class AppTranslations {
   }
 }
 
+class AegisLogoWidget extends StatelessWidget {
+  const AegisLogoWidget({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    const brandYellow = Color(0xFFFCBE0B);
+    return Container(
+      width: 90,
+      height: 90,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: brandYellow, width: 3),
+        color: const Color(0xFF141416),
+        boxShadow: const [
+          BoxShadow(color: brandYellow, blurRadius: 10, spreadRadius: -2),
+        ],
+      ),
+      child: const Center(
+        child: Icon(Icons.shield_outlined, size: 50, color: brandYellow),
+      ),
+    );
+  }
+}
+
 class LockScreen extends StatefulWidget {
   const LockScreen({super.key});
 
@@ -515,9 +608,10 @@ class LockScreen extends StatefulWidget {
 
 class _LockScreenState extends State<LockScreen> {
   final TextEditingController _pinController = TextEditingController();
+  final TextEditingController _licenseController = TextEditingController();
   final SessionVault _vault = SessionVault();
-  bool _isLoading = false;
 
+  bool _isLoading = false;
   bool? _isVaultInitialized;
 
   @override
@@ -538,6 +632,7 @@ class _LockScreenState extends State<LockScreen> {
   @override
   void dispose() {
     _pinController.dispose();
+    _licenseController.dispose();
     super.dispose();
   }
 
@@ -554,7 +649,6 @@ class _LockScreenState extends State<LockScreen> {
 
       aegisPanicSilentBurn();
     } catch (e) {
-      debugPrint("Échec de l'appel FFI Silent Burn, secours local : $e");
       SystemNavigator.pop();
       exit(137);
     }
@@ -571,16 +665,16 @@ class _LockScreenState extends State<LockScreen> {
           .asFunction();
 
       heartbeat();
-    } catch (e) {
-      debugPrint("Échec d'envoi du Heartbeat DeadMan : $e");
-    }
+    } catch (_) {}
   }
 
   void _unlock() async {
     final pin = _pinController.text.trim();
+    final licenseKey = _licenseController.text.trim();
+
     if (pin.isEmpty) return;
 
-    if (pin == "9999") {
+    if (pin == "9999" || pin == "0000") {
       _pinController.clear();
       _triggerSilentBurn();
       return;
@@ -589,11 +683,21 @@ class _LockScreenState extends State<LockScreen> {
     setState(() { _isLoading = true; });
 
     if (_isVaultInitialized == false) {
-      final success = await _vault.initializeMasterPin(pin);
+      if (licenseKey.isNotEmpty && !verifyLicenseKeyFfi(licenseKey)) {
+        if (!mounted) return;
+        _pinController.clear();
+        setState(() { _isLoading = false; });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppTranslations.get(context, 'pin_error'))),
+        );
+        return;
+      }
 
+      final success = await _vault.initializeMasterPin(pin);
       if (!mounted) return;
 
       _pinController.clear();
+      _licenseController.clear();
       setState(() { _isLoading = false; });
 
       if (success) {
@@ -607,7 +711,6 @@ class _LockScreenState extends State<LockScreen> {
     }
 
     final session = await _vault.unlockSession(pin);
-
     if (!mounted) return;
 
     _pinController.clear();
@@ -656,15 +759,7 @@ class _LockScreenState extends State<LockScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Image.asset(
-                  'assets/logo.png',
-                  height: 130,
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) => const Text(
-                    'ARES / AEGIS',
-                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: brandYellow),
-                  ),
-                ),
+                const AegisLogoWidget(),
                 const SizedBox(height: 16),
                 const Text('AEGIS P2P', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 2, color: brandYellow)),
                 Text(AppTranslations.get(context, 'subtitle'), style: const TextStyle(color: Colors.grey, fontSize: 11)),
@@ -700,6 +795,21 @@ class _LockScreenState extends State<LockScreen> {
                   }
                 ),
                 const SizedBox(height: 16),
+                if (_isVaultInitialized == false) ...[
+                  TextField(
+                    controller: _licenseController,
+                    enableInteractiveSelection: false,
+                    enabled: !_isLoading,
+                    style: const TextStyle(color: brandYellow, letterSpacing: 1),
+                    decoration: InputDecoration(
+                      hintText: AppTranslations.get(context, 'license_hint'),
+                      hintStyle: const TextStyle(color: Colors.white38, fontSize: 11),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: brandYellow)),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 TextField(
                   controller: _pinController,
                   obscureText: true,
@@ -858,7 +968,7 @@ class FakeDashboard extends StatelessWidget {
             ListView(
               padding: const EdgeInsets.all(16.0),
               children: decoyNotes[0].map((note) => Card(
-                color: Colors.grey[850],
+                color: const Color(0xFF1C1C1E),
                 child: ListTile(
                   title: Text(note['title']!, style: const TextStyle(fontWeight: FontWeight.bold)),
                   subtitle: Text(note['subtitle']!),
@@ -868,7 +978,7 @@ class FakeDashboard extends StatelessWidget {
             ListView(
               padding: const EdgeInsets.all(16.0),
               children: decoyNotes[1].map((note) => Card(
-                color: Colors.grey[850],
+                color: const Color(0xFF1C1C1E),
                 child: ListTile(
                   leading: const Icon(Icons.check_box_outline_blank, color: Colors.amber),
                   title: Text(note['title']!, style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -898,6 +1008,7 @@ class _MainDashboardState extends State<MainDashboard> {
   String _steganoResult = "";
   final List<String> _chatMessages = [];
   String _networkMode = "t_auto";
+  String _connectedPeer = "";
 
   final Map<String, List<String>> _localizedPoems = {
     'fr': [
@@ -952,33 +1063,128 @@ class _MainDashboardState extends State<MainDashboard> {
     final String langCode = Localizations.localeOf(context).languageCode;
     final poemsList = _localizedPoems[langCode] ?? _localizedPoems['en']!;
     final poem = poemsList[Random().nextInt(poemsList.length)];
-    final encoded = base64Encode(utf8.encode(text));
 
     setState(() {
-      _steganoResult = "$poem\n\n[AEGIS-STEGO-PAYLOAD:$encoded]";
+      _steganoResult = drownKeyFfi(text, poem);
     });
   }
 
   void _extractKeyFromPoem() {
     final text = _steganoController.text.trim();
-    if (!text.contains("[AEGIS-STEGO-PAYLOAD:")) {
-      setState(() {
-        _steganoResult = "Erreur : Aucun payload stéganographique AEGIS détecté.";
-      });
-      return;
-    }
+    if (text.isEmpty) return;
 
+    setState(() {
+      _steganoResult = extractKeyFfi(text);
+    });
+  }
+
+  Future<void> _pickFileZeroDisk() async {
+    isIntentPendingInDart = true;
     try {
-      final payload = text.split("[AEGIS-STEGO-PAYLOAD:")[1].split("]")[0];
-      final decoded = utf8.decode(base64Decode(payload));
-      setState(() {
-        _steganoResult = "Clé extraite : $decoded";
-      });
+      FilePickerResult? result = await FilePicker.pickFiles(
+        type: FileType.any,
+        allowMultiple: false,
+        withData: false,
+      );
+
+      if (result != null && result.files.isNotEmpty) {
+        final String? path = result.files.single.path;
+        if (path != null && path.isNotEmpty) {
+          final success = await ingestFileZeroDisk(path);
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(success
+                  ? "Fichier ingéré en RAM Zero-Disk avec succès (mlock)"
+                  : "Échec de l'ingestion Zero-Disk"),
+              backgroundColor: success ? Colors.green : Colors.red,
+            ),
+          );
+        }
+      }
     } catch (e) {
-      setState(() {
-        _steganoResult = "Erreur d'extraction : $e";
-      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Erreur sélection fichier : $e")),
+      );
+    } finally {
+      isIntentPendingInDart = false;
     }
+  }
+
+  void _openQrScanner() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.black,
+      builder: (ctx) => SizedBox(
+        height: 420,
+        child: Column(
+          children: [
+            AppBar(
+              title: Text(AppTranslations.get(context, 'scan_qr')),
+              backgroundColor: Colors.grey[900],
+              leading: IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.pop(ctx),
+              ),
+            ),
+            Expanded(
+              child: MobileScanner(
+                onDetect: (capture) {
+                  for (final barcode in capture.barcodes) {
+                    if (barcode.rawValue != null) {
+                      setState(() {
+                        _recipientController.text = barcode.rawValue!;
+                        _connectedPeer = barcode.rawValue!;
+                      });
+                      Navigator.pop(ctx);
+                      break;
+                    }
+                  }
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showMyQrCode() {
+    const String myEphemeralKey = "AEGIS-P2P-v2.2-GA-4F8B12E9903A7C12D";
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF141416),
+        title: Text(AppTranslations.get(context, 'show_qr'), style: const TextStyle(color: Color(0xFFFCBE0B))),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              color: Colors.white,
+              child: const Icon(Icons.qr_code_2, size: 140, color: Colors.black),
+            ),
+            const SizedBox(height: 12),
+            const SelectableText(
+              myEphemeralKey,
+              style: TextStyle(color: Colors.greenAccent, fontSize: 11),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Clipboard.setData(const ClipboardData(text: myEphemeralKey));
+              Navigator.pop(ctx);
+            },
+            child: Text(AppTranslations.get(context, 'copy_key'), style: const TextStyle(color: Color(0xFFFCBE0B))),
+          ),
+        ],
+      ),
+    );
   }
 
   void _sendMessage() {
@@ -992,26 +1198,7 @@ class _MainDashboardState extends State<MainDashboard> {
   }
 
   void _instantRamPurge() {
-    try {
-      final DynamicLibrary aegisLib = Platform.isAndroid
-          ? DynamicLibrary.open('libaegis_core.so')
-          : DynamicLibrary.process();
-
-      try {
-        final void Function() aegisPurge = aegisLib
-            .lookup<NativeFunction<Void Function()>>('aegis_purge_ram_buffer')
-            .asFunction();
-        aegisPurge();
-      } catch (_) {
-        final void Function() aegisPanic = aegisLib
-            .lookup<NativeFunction<Void Function()>>('aegis_panic_purge')
-            .asFunction();
-        aegisPanic();
-      }
-    } catch (e) {
-      debugPrint("FFI Purge error: $e");
-    }
-
+    _executeEmergencyFfiPurge();
     activeRamPin = "";
     SystemNavigator.pop();
     exit(137);
@@ -1063,23 +1250,71 @@ class _MainDashboardState extends State<MainDashboard> {
                   if (val != null) setState(() => _networkMode = val);
                 },
               ),
-              const Divider(height: 32, color: Colors.grey),
-              ElevatedButton.icon(
+              const Divider(height: 24, color: Colors.grey),
+              Text(AppTranslations.get(context, 'my_address'), style: const TextStyle(fontWeight: FontWeight.bold, color: brandYellow, fontSize: 11)),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _showMyQrCode,
+                      icon: const Icon(Icons.qr_code, color: brandYellow, size: 18),
+                      label: Text(AppTranslations.get(context, 'show_qr'), style: const TextStyle(color: Colors.white, fontSize: 11)),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _openQrScanner,
+                      icon: const Icon(Icons.qr_code_scanner, color: Colors.greenAccent, size: 18),
+                      label: Text(AppTranslations.get(context, 'scan_qr'), style: const TextStyle(color: Colors.white, fontSize: 11)),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _recipientController,
+                enableInteractiveSelection: false,
+                style: const TextStyle(fontSize: 12),
+                decoration: InputDecoration(
+                  hintText: AppTranslations.get(context, 'recipient_address'),
+                  border: const OutlineInputBorder(),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                ),
+              ),
+              const SizedBox(height: 6),
+              ElevatedButton(
                 onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const BlindViewerScreen()),
-                  );
+                  final peer = _recipientController.text.trim();
+                  if (peer.isNotEmpty) {
+                    setState(() => _connectedPeer = peer);
+                  }
                 },
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.blueGrey[800], foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 36)),
+                child: Text(AppTranslations.get(context, 'connect_peer'), style: const TextStyle(fontSize: 11)),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 4.0),
+                child: Text(
+                  _connectedPeer.isNotEmpty
+                      ? "${AppTranslations.get(context, 'peer_connected')} $_connectedPeer"
+                      : AppTranslations.get(context, 'peer_none'),
+                  style: TextStyle(color: _connectedPeer.isNotEmpty ? Colors.greenAccent : Colors.grey, fontSize: 10),
+                ),
+              ),
+              const Divider(height: 24, color: Colors.grey),
+              ElevatedButton.icon(
+                onPressed: _pickFileZeroDisk,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: brandYellow,
                   foregroundColor: Colors.black,
                   minimumSize: const Size(double.infinity, 44),
                 ),
                 icon: const Icon(Icons.attach_file),
-                label: Text(AppTranslations.get(context, 'media_select_btn')),
+                label: Text(AppTranslations.get(context, 'media_select_btn'), style: const TextStyle(fontWeight: FontWeight.bold)),
               ),
-              const Divider(height: 32, color: Colors.grey),
+              const Divider(height: 28, color: Colors.grey),
               Text(AppTranslations.get(context, 'stegano_title'), style: const TextStyle(fontWeight: FontWeight.bold, color: brandYellow)),
               const SizedBox(height: 8),
               TextField(
@@ -1098,7 +1333,7 @@ class _MainDashboardState extends State<MainDashboard> {
                     child: ElevatedButton(
                       onPressed: _drownKeyInPoem,
                       style: ElevatedButton.styleFrom(backgroundColor: brandYellow, foregroundColor: Colors.black),
-                      child: Text(AppTranslations.get(context, 'stegano_btn'), style: const TextStyle(fontSize: 10)),
+                      child: Text(AppTranslations.get(context, 'stegano_btn'), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -1116,11 +1351,11 @@ class _MainDashboardState extends State<MainDashboard> {
                 Text(AppTranslations.get(context, 'stegano_result'), style: const TextStyle(fontSize: 12, color: Colors.grey)),
                 SelectableText(_steganoResult, style: const TextStyle(color: Colors.greenAccent, fontSize: 12)),
               ],
-              const Divider(height: 32, color: Colors.grey),
+              const Divider(height: 28, color: Colors.grey),
               Text(AppTranslations.get(context, 'chat_title'), style: const TextStyle(fontWeight: FontWeight.bold, color: brandYellow)),
               const SizedBox(height: 8),
               Container(
-                height: 120,
+                height: 100,
                 decoration: BoxDecoration(border: Border.all(color: Colors.grey[800]!), borderRadius: BorderRadius.circular(8)),
                 child: _chatMessages.isEmpty
                     ? Center(child: Text(AppTranslations.get(context, 'chat_empty'), style: const TextStyle(color: Colors.grey, fontSize: 12)))
@@ -1152,16 +1387,16 @@ class _MainDashboardState extends State<MainDashboard> {
                   ),
                 ],
               ),
-              const Divider(height: 32, color: Colors.grey),
+              const Divider(height: 28, color: Colors.grey),
               ElevatedButton.icon(
                 onPressed: _instantRamPurge,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red[900],
                   foregroundColor: Colors.white,
-                  minimumSize: const Size(double.infinity, 48),
+                  minimumSize: const Size(double.infinity, 44),
                 ),
                 icon: const Icon(Icons.warning),
-                label: Text(AppTranslations.get(context, 'kill_switch_btn')),
+                label: Text(AppTranslations.get(context, 'kill_switch_btn'), style: const TextStyle(fontWeight: FontWeight.bold)),
               ),
             ],
           ),
