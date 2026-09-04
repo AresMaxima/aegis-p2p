@@ -71,14 +71,9 @@ fn test_blindspots_full_26_modules_sweep() {
     setup_signal_handler();
     let _canary = MemoryNoiseCanary::inject(1, 32);
 
-    // --- CORRECTION DU MODULE CRYPTO_PQ ---
-    let (pk, sk) = HybridKeyExchange::generate_keypair();
-    let (_shared_sec, eph_pk, ct) =
-        HybridKeyExchange::encapsulate_and_derive(&pk.x25519_pk, &pk.kyber_pk);
-
-    let eph_sk = x25519_dalek::EphemeralSecret::random_from_rng(&mut rand::thread_rng());
-    let _ = HybridKeyExchange::decapsulate_and_derive(eph_sk, &sk.kyber_sk, &eph_pk, &ct);
-    // -------------------------------------
+    let (sk, pk) = HybridKeyExchange::generate_keypair();
+    let (_shared_sec, eph_pk, ct) = HybridKeyExchange::encapsulate_and_derive(&pk.0, &pk.1);
+    let _ = HybridKeyExchange::decapsulate_and_derive(sk.0, &sk.1, &eph_pk, &ct);
 
     if let Ok(m) = generate_mnemonic(12) {
         if let Ok(k) = derive_keys_from_mnemonic(&m) {

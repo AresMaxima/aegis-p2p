@@ -1,19 +1,7 @@
 ﻿[advisories]
 ignore = [
-    "RUSTSEC-2026-0258", # h2 unbounded empty DATA frames
-    "RUSTSEC-2026-0119", # hickory-proto O(n²) name compression
-    "RUSTSEC-2025-0009", # ring AES overflow panic
-    "RUSTSEC-2025-0010", # ring < 0.17 unmaintained
-    "RUSTSEC-2023-0071", # rsa Marvin Attack (timing sidechannels)
-    "RUSTSEC-2026-0098", # rustls-webpki URI name constraints
-    "RUSTSEC-2026-0099", # rustls-webpki wildcard name constraints
-    "RUSTSEC-2026-0104", # rustls-webpki CRL parsing panic
-    "RUSTSEC-2026-0002", # lru IterMut unsoundness
-    "RUSTSEC-2026-0253", # lru pop() use-after-free
-    "RUSTSEC-2024-0381", # pqcrypto-kyber replaced by pqcrypto-mlkem
-    "RUSTSEC-2026-0162", # pqcrypto-traits unmaintained
-    "RUSTSEC-2026-0163", # pqcrypto-internals unmaintained
-    "RUSTSEC-2025-0141", # bincode unmaintained
-    "RUSTSEC-2024-0384", # instant unmaintained
-    "RUSTSEC-2024-0436", # paste unmaintained
+    "RUSTSEC-2026-0258", "RUSTSEC-2026-0119", "RUSTSEC-2025-0009", "RUSTSEC-2023-0071",
+    "RUSTSEC-2026-0098", "RUSTSEC-2026-0099", "RUSTSEC-2026-0104", "RUSTSEC-2026-0002",
+    "RUSTSEC-2026-0253", "RUSTSEC-2024-0381", "RUSTSEC-2026-0163", "RUSTSEC-2026-0162",
+    "RUSTSEC-2025-0141", "RUSTSEC-2024-0384", "RUSTSEC-2024-0436", "RUSTSEC-2025-0010"
 ]

@@ -1,4 +1,4 @@
-# 1. SECURITE ET RISQUES COMMERCIAUX
+﻿# 1. SECURITE ET RISQUES COMMERCIAUX
 *.jks
 *.keystore
 *.pem
@@ -32,6 +32,5 @@ __pycache__/
 Thumbs.db
 
 # 6. AUDIT
-# Ne jamais commiter la clé privée d'audit (déjà couverte par *.key)
 audit_private.key
 !audit_public.pem

@@ -1,16 +1,16 @@
 ﻿=================================================================
            AEGIS AUDIT COMPLIANCE REPORT (v20.0)                 
 =================================================================
-Status    : PASSED
+Status    : FAILED
 
-[PASSED] Module: rust_cve_audit
-[PASSED] Module: asan_dynamic_memory_audit
-[PASSED] Module: llvm_code_coverage
+[FAILED] Module: rust_cve_audit
+[FAILED] Module: asan_dynamic_memory_audit
+[FAILED] Module: llvm_code_coverage
 [PASSED] Module: apk_build
-[PASSED] Module: native_rust_library
-[PASSED] Module: android_manifest_opsec
-[PASSED] Module: native_android_hardening
-[PASSED] Module: rust_core_security
-[PASSED] Module: flutter_main_hardening
-[PASSED] Module: blind_viewer_zero_disk
+[FAILED] Module: native_rust_library
+[FAILED] Module: android_manifest_opsec
+[FAILED] Module: native_android_hardening
+[FAILED] Module: rust_core_security
+[FAILED] Module: flutter_main_hardening
+[FAILED] Module: blind_viewer_zero_disk
 
