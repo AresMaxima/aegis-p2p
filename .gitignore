@@ -45,3 +45,14 @@ audit_private.key
 *.txt
 aegis-core/coverage-report/
 aegis-core/llvm-cov.toml
+
+# 7. ARTIFACTS DE BENCHMARK ET RAPPORTS
+*.jpeg
+*.png
+*.pdf
+*.docx
+*.zip
+*.csv
+*.txt
+aegis-core/coverage-report/
+aegis-core/llvm-cov.toml
