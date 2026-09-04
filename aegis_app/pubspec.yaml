@@ -38,6 +38,13 @@ dependencies:
   integration_test:
     sdk: flutter
   path_provider: ^2.1.5
+  flutter_windowmanager_plus: ^1.1.0
+  mobile_scanner: ^6.0.11
+  file_picker: ^11.0.3
+  cryptography: ^2.9.0
+  shared_preferences: ^2.5.3
+  flutter_localizations:
+    sdk: flutter
 
 dev_dependencies:
   flutter_test:
