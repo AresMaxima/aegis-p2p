@@ -69,3 +69,6 @@ software_alpha_shields = []
 b2g_phase9_soc = ["efuse_access", "hw_zeroization_mesh"]
 efuse_access = []
 hw_zeroization_mesh = []
+
+[profile.test]
+panic = "unwind"

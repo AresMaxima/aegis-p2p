@@ -2,7 +2,7 @@
 
 proptest! {
     #![proptest_config(ProptestConfig {
-        cases: 100_000,
+        cases: 2_000_000,
         max_shrink_iters: 10_000,
         .. ProptestConfig::default()
     })]

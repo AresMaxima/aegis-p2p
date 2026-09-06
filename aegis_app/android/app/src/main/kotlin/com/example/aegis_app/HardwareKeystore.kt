@@ -1,63 +1,58 @@
 ﻿package com.example.aegis_app
 
-import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
-import android.security.keystore.StrongBoxUnavailableException
+import android.util.Log
 import java.security.KeyStore
-import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
-import javax.crypto.SecretKey
-import javax.crypto.spec.GCMParameterSpec
+import javax.crypto.Mac
 
-class HardwareKeystore(private val context: Context) {
+object HardwareKeystore {
+    private const val TAG = "HardwareKeystore"
+    private const val ALIAS = "aegis_strongbox_master_slot"
+    private const val PROVIDER = "AndroidKeyStore"
+    private val HARDWARE_SALT = "AEGIS_HMAC_STRONGBOX_SALT_V2".toByteArray(Charsets.UTF_8)
 
-    companion object {
-        private const val KEY_ALIAS = "aegis_master_key_v2"
-        private const val ANDROID_KEYSTORE = "AndroidKeyStore"
-    }
-
-    fun generateStrongBoxKey(): Boolean {
+    @JvmStatic
+    fun getHardwareSecret(isVaultEmpty: Boolean): ByteArray? {
         return try {
-            val keyGenerator = KeyGenerator.getInstance(
-                KeyProperties.KEY_ALGORITHM_AES,
-                ANDROID_KEYSTORE
-            )
+            val keyStore = KeyStore.getInstance(PROVIDER).apply { load(null) }
 
-            val builder = KeyGenParameterSpec.Builder(
-                KEY_ALIAS,
-                KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
-            )
-                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+            if (isVaultEmpty && keyStore.containsAlias(ALIAS)) {
+                keyStore.deleteEntry(ALIAS)
+                Log.i(TAG, "Slot StrongBox orphelin purgé avec succès.")
+            }
+
+            if (!keyStore.containsAlias(ALIAS)) {
+                val keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_HMAC_SHA256, PROVIDER)
+                val spec = KeyGenParameterSpec.Builder(
+                    ALIAS,
+                    KeyProperties.PURPOSE_SIGN
+                )
                 .setKeySize(256)
                 .setIsStrongBoxBacked(true)
-                .setUserAuthenticationRequired(true)
-                .setUserAuthenticationValidityDurationSeconds(1)
-                .setInvalidatedByBiometricEnrollment(true)
+                .build()
 
-            keyGenerator.init(builder.build())
-            keyGenerator.generateKey()
-            true
-        } catch (e: StrongBoxUnavailableException) {
-            false
+                keyGenerator.init(spec)
+                keyGenerator.generateKey()
+                Log.i(TAG, "Nouvelle clé HMAC générée et scellée dans StrongBox TEE.")
+            }
+
+            val entry = keyStore.getEntry(ALIAS, null) as? KeyStore.SecretKeyEntry
+            if (entry == null) {
+                Log.e(TAG, "SecretKeyEntry introuvable dans KeyStore.")
+                return null
+            }
+
+            val mac = Mac.getInstance("HmacSHA256").apply {
+                init(entry.secretKey)
+            }
+
+            val derivedSecret = mac.doFinal(HARDWARE_SALT)
+            Log.i(TAG, "Secret maître de 256 bits dérivé avec succès par StrongBox TEE.")
+            derivedSecret
         } catch (e: Exception) {
-            e.printStackTrace()
-            false
-        }
-    }
-
-    fun decryptPayloadInHardware(encryptedData: ByteArray, iv: ByteArray): ByteArray? {
-        return try {
-            val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
-            val secretKey = keyStore.getKey(KEY_ALIAS, null) as? SecretKey ?: return null
-
-            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-            val spec = GCMParameterSpec(128, iv)
-            cipher.init(Cipher.DECRYPT_MODE, secretKey, spec)
-
-            cipher.doFinal(encryptedData)
-        } catch (e: Exception) {
+            Log.e(TAG, "Échec critique lors de l'accès au StrongBox TEE", e)
             null
         }
     }

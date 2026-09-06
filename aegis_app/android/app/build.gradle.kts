@@ -1,4 +1,4 @@
-plugins {
+﻿plugins {
     id("com.android.application")
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
@@ -35,7 +35,7 @@ android {
 
         externalNativeBuild {
             ndkBuild {
-                // Forcer le linker Android à charger libandroid.so avec les symboles ANativeWindow
+                // Forcer le linker Android Ã  charger libandroid.so avec les symboles ANativeWindow
                 arguments("NDK_LIBS=-landroid")
             }
         }
@@ -43,6 +43,7 @@ android {
 
     buildTypes {
         release {
+        proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
@@ -53,3 +54,4 @@ android {
 flutter {
     source = "../.."
 }
+

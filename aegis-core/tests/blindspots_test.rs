@@ -1,4 +1,4 @@
-﻿use aegis_core::{
+use aegis_core::{
     crypto::{
         integrity::AegisIntegrityMonitor,
         keys::{derive_keys_from_mnemonic, generate_mnemonic},
@@ -72,8 +72,14 @@ fn test_blindspots_full_26_modules_sweep() {
     let _canary = MemoryNoiseCanary::inject(1, 32);
 
     let (sk, pk) = HybridKeyExchange::generate_keypair();
-    let (_shared_sec, eph_pk, ct) = HybridKeyExchange::encapsulate_and_derive(&pk.0, &pk.1);
-    let _ = HybridKeyExchange::decapsulate_and_derive(sk.0, &sk.1, &eph_pk, &ct);
+    
+    // Instanciation du secret éphémère (Correction de l'export et du RNG)
+    let recv_eph_sk = x25519_dalek::EphemeralSecret::random_from_rng(rand::thread_rng());
+    let recv_eph_pk = x25519_dalek::PublicKey::from(&recv_eph_sk);
+
+    // Exécution de l'échange de clés
+    let (_shared_sec, eph_pk, ct) = HybridKeyExchange::encapsulate_and_derive(&recv_eph_pk, &sk.kyber_pk);
+    let _ = HybridKeyExchange::decapsulate_and_derive(recv_eph_sk, &pk.kyber_sk, &eph_pk, &ct);
 
     if let Ok(m) = generate_mnemonic(12) {
         if let Ok(k) = derive_keys_from_mnemonic(&m) {
