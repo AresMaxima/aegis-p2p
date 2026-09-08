@@ -19,7 +19,6 @@ pub async fn create_local_swarm() -> Result<(PeerId, Swarm<LocalBehaviour>), Box
             libp2p::noise::Config::new,
             libp2p::yamux::Config::default,
         )?
-        .with_quic()
         .with_behaviour(|key| {
             let local_peer_id = key.public().to_peer_id();
             let mdns_config = mdns::Config::default();
@@ -30,8 +29,8 @@ pub async fn create_local_swarm() -> Result<(PeerId, Swarm<LocalBehaviour>), Box
 
     let local_peer_id = *swarm.local_peer_id();
     
-    // Écoute sur une adresse UDP pour QUIC
-    swarm.listen_on("/ip4/0.0.0.0/udp/0/quic-v1".parse()?)?;
+    // Écoute standard TCP
+    swarm.listen_on("/ip4/0.0.0.0/tcp/0".parse()?)?;
 
     Ok((local_peer_id, swarm))
 }
@@ -41,7 +40,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    #[cfg_attr(miri, ignore)] // Demande à Miri d'ignorer la création de sockets UDP/mDNS
+    #[cfg_attr(miri, ignore)] // Demande à Miri d'ignorer la création de sockets réseau bas niveau
     async fn test_local_swarm_creation() {
         let result = create_local_swarm().await;
         assert!(result.is_ok(), "L'initialisation de la découverte mDNS a échoué");
