@@ -240,6 +240,7 @@ mod tests {
     use std::time::Instant;
 
     #[test]
+    #[cfg_attr(miri, ignore)] // Demande à Miri d'ignorer ce test FFI
     fn test_hybrid_key_exchange_roundtrip() {
         let (alice_pk, alice_sk) = HybridKeyExchange::generate_keypair();
         let (payload, bob_session_key) = HybridKeyExchange::encapsulate(&alice_pk);
@@ -249,6 +250,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)] // Demande à Miri d'ignorer ce test FFI
     fn test_encapsulate_and_derive_direct_roundtrip() {
         let bob_x_secret = EphemeralSecret::random_from_rng(rand::thread_rng());
         let bob_x_public = X25519PublicKey::from(&bob_x_secret);
