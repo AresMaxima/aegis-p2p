@@ -93,6 +93,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn test_qr_payload_serialize_deserialize() {
         let dummy_payload = OutOfBandPairingPayload {
             kyber_pk_bytes: [0x55u8; KYBER768_PK_LEN],
