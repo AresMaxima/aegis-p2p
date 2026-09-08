@@ -46,6 +46,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    #[cfg_attr(miri, ignore)] // Demande à Miri d'ignorer ce test réseau bas niveau (Netlink)
     async fn test_dht_swarm_creation() {
         let result = create_dht_swarm().await;
         assert!(result.is_ok(), "L'initialisation de la DHT Kademlia a échoué");
