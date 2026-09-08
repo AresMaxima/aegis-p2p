@@ -1,5 +1,5 @@
 ﻿//! aegis-core/src/secure_buffer.rs
-//! Allocation RAM SÃ©curisÃ©e avec mlock/VirtualLock, registre atomique de purge d'urgence,
+//! Allocation RAM Sécurisée avec mlock/VirtualLock, registre atomique de purge d'urgence,
 //! madvise DONTDUMP / WIPEONFORK et SlidingWindowBuffer (CdCM v2.2-RC1).
 
 #[cfg(unix)]
@@ -54,9 +54,9 @@ fn atomic_unregister(ptr: *mut u8) {
 
 /// # Safety
 ///
-/// Cette fonction parcourt l'ensemble des tampons actifs enregistrÃ©s dans le registre atomique
-/// et exÃ©cute un nettoyage volatil immÃ©diat (`zeroize`) en mÃ©moire vive.
-/// L'appelant doit s'assurer que les pointeurs stockÃ©s restent valides au moment du balayage.
+/// Cette fonction parcourt l'ensemble des tampons actifs enregistrés dans le registre atomique
+/// et exécute un nettoyage volatil immédiat (`zeroize`) en mémoire vive.
+/// L'appelant doit s'assurer que les pointeurs stockés restent valides au moment du balayage.
 pub unsafe fn global_wipe_all_buffers() {
     for i in 0..MAX_TRACKED_BUFFERS {
         let addr = TRACKED_PTRS[i].load(Ordering::SeqCst);
@@ -109,11 +109,13 @@ impl SecureBuffer {
             }
 
             unsafe {
-                madvise(ptr.as_ptr() as *mut libc::c_void, len, MADV_DONTDUMP);
-                #[cfg(target_os = "android")]
-                {
-                    const MADV_WIPEONFORK: libc::c_int = 18;
-                    madvise(ptr.as_ptr() as *mut libc::c_void, len, MADV_WIPEONFORK);
+                if !cfg!(miri) {
+                    madvise(ptr.as_ptr() as *mut libc::c_void, len, MADV_DONTDUMP);
+                    #[cfg(target_os = "android")]
+                    {
+                        const MADV_WIPEONFORK: libc::c_int = 18;
+                        madvise(ptr.as_ptr() as *mut libc::c_void, len, MADV_WIPEONFORK);
+                    }
                 }
             }
         }
@@ -190,7 +192,7 @@ impl Drop for SecureBuffer {
 
             if self.locked {
                 #[cfg(unix)]
-                if !cfg!(miri) { unsafe { munlock(self.ptr.as_ptr() as *const libc::c_void, self.len); } }
+                if !cfg!(miri) { munlock(self.ptr.as_ptr() as *const libc::c_void, self.len); }
                 #[cfg(windows)]
                 VirtualUnlock(self.ptr.as_ptr() as *const core::ffi::c_void, self.len);
             }
@@ -222,7 +224,7 @@ impl SlidingWindowBuffer {
 
     pub fn write_chunk(&mut self, offset: usize, src_chunk: &[u8]) -> Result<(), &'static str> {
         if src_chunk.len() > CHUNK_SIZE || offset.checked_add(src_chunk.len()).is_none_or(|end| end > self.capacity) {
-            return Err("DÃ©passement de la capacitÃ© de fenÃªtre du buffer");
+            return Err("Dépassement de la capacité de fenêtre du buffer");
         }
         let dst = &mut self.buffer.as_slice_mut()[offset..offset + src_chunk.len()];
         dst.copy_from_slice(src_chunk);
@@ -281,7 +283,6 @@ mod tests {
         assert_eq!(read_cleared[0], 0x00);
     }
 }
-
 
 #[cfg(test)]
 mod cov_secbuf { use super::*; #[test] fn t() { let mut b = SecureBuffer::new(64); b.as_slice_mut().fill(0xAA); unsafe { global_wipe_all_buffers(); } let _w = SlidingWindowBuffer::new(); } }
