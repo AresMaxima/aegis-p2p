@@ -16,13 +16,18 @@ impl MemoryProvider for SystemMemoryProvider {
         if ptr.is_null() || len == 0 {
             return false;
         }
-        #[cfg(target_os = "windows")]
+        
+        #[cfg(miri)]
+        { return true; }
+        
+        #[cfg(all(target_os = "windows", not(miri)))]
         unsafe {
-            windows_sys::Win32::System::Memory::VirtualLock(ptr as *const _, len) != 0
+            return windows_sys::Win32::System::Memory::VirtualLock(ptr as *const _, len) != 0;
         }
-        #[cfg(not(target_os = "windows"))]
+        
+        #[cfg(all(not(target_os = "windows"), not(miri)))]
         unsafe {
-            libc::mlock(ptr as *const _, len) == 0
+            return libc::mlock(ptr as *const _, len) == 0;
         }
     }
 
@@ -30,13 +35,18 @@ impl MemoryProvider for SystemMemoryProvider {
         if ptr.is_null() || len == 0 {
             return false;
         }
-        #[cfg(target_os = "windows")]
+        
+        #[cfg(miri)]
+        { return true; }
+        
+        #[cfg(all(target_os = "windows", not(miri)))]
         unsafe {
-            windows_sys::Win32::System::Memory::VirtualUnlock(ptr as *const _, len) != 0
+            return windows_sys::Win32::System::Memory::VirtualUnlock(ptr as *const _, len) != 0;
         }
-        #[cfg(not(target_os = "windows"))]
+        
+        #[cfg(all(not(target_os = "windows"), not(miri)))]
         unsafe {
-            libc::munlock(ptr as *const _, len) == 0
+            return libc::munlock(ptr as *const _, len) == 0;
         }
     }
 
@@ -80,7 +90,13 @@ impl MemoryProvider for MockMemoryProvider {
 /// Empêche la génération de memory dumps et interdit la lecture de `/proc/self/mem`
 /// par d'autres processus ou spyciels.
 pub fn prevent_core_dumps() {
-    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[cfg(miri)]
+    {
+        // Miri ne supporte pas le syscall prctl(PR_SET_DUMPABLE), on ignore donc cette étape en audit.
+        return;
+    }
+
+    #[cfg(all(any(target_os = "linux", target_os = "android"), not(miri)))]
     unsafe {
         libc::prctl(libc::PR_SET_DUMPABLE, 0, 0, 0, 0);
     }
