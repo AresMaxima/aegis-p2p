@@ -285,4 +285,15 @@ mod tests {
 }
 
 #[cfg(test)]
-mod cov_secbuf { use super::*; #[test] fn t() { let mut b = SecureBuffer::new(64); b.as_slice_mut().fill(0xAA); unsafe { global_wipe_all_buffers(); } let _w = SlidingWindowBuffer::new(); } }
+mod cov_secbuf {
+    use super::*;
+
+    #[test]
+    #[cfg_attr(miri, ignore)] // Empêche le crash mémoire (OOM) du serveur GitHub Actions
+    fn t() {
+        let mut b = SecureBuffer::new(64);
+        b.as_slice_mut().fill(0xAA);
+        unsafe { global_wipe_all_buffers(); }
+        let _w = SlidingWindowBuffer::new(); // Alloue 32 Mo (trop lourd pour Miri)
+    }
+}
