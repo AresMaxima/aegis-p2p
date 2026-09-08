@@ -1,3 +1,5 @@
+#![cfg(not(miri))]
+//
 use aegis_core::{
     crypto::{
         integrity::AegisIntegrityMonitor,
