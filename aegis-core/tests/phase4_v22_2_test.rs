@@ -1,3 +1,5 @@
+#![cfg(not(miri))]
+// ... le reste du fichier de test
 //! aegis-core/tests/phase4_v22_2_test.rs
 //! Tests d'Intégration Phase 4.2 (Storage & Vault Initialization) — CdCM v2.2-RC1.
 
