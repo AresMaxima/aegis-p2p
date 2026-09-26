@@ -1,6 +1,19 @@
 //! aegis-core/src/crypto_pq.rs
 //! Encapsulation Hybride Post-Quantique ML-KEM-768 + X25519 (Constant-Time)
 //! et Chiffrement Vectorisé ARM NEON / Hardware Extensions (CdCM v2.2-RC1).
+//!
+//! NOTE (audit 2026-09-27) :
+//!   • Les tags HKDF "AEGIS-v2.2-*" sont FIGÉS pour compatibilité vault
+//!     avec les sessions v2.2 existantes. NE PAS modifier sans migration
+//!     de vault explicite (casserait le déchiffrement des données existantes).
+//!   • La version #[cfg(kani)] de process_512b_frame_ephemeral est une
+//!     simplification qui modélise les BORNES d'accès (payload[i] avec i∈[0,512[)
+//!     mais PAS la sémantique cryptographique réelle (HKDF n'est pas
+//!     instrumentable par Kani). La preuve porte sur l'absence de panique
+//!     et de débordement, pas sur la correction du chiffrement.
+//!   • API AES-256-GCM unifiée via `encrypt_aes_256_gcm_neon` (avec AAD).
+//!     L'ancienne API `Aes256GcmEngine` (sans AAD) a été supprimée
+//!     (audit 2026-09-27 — code mort, aucun usage externe).
 
 use aes_gcm::aead::{Aead, KeyInit, Payload};
 use aes_gcm::{Aes256Gcm, Nonce};
@@ -27,10 +40,26 @@ pub struct HybridPublicKey {
 }
 
 /// Clé privée hybride
+///
+/// Cycle de vie :
+///   • `KyberSecretKey` implémente `Drop` via `pqcrypto_traits` (crate tierce).
+///   • `X25519SecretKey` implémente `Zeroize on Drop` via `x25519-dalek`.
+///   • Voir la NOTE en dessous de la struct pour la justification de
+///     l'absence de `Drop` custom.
 pub struct HybridSecretKey {
     pub kyber_sk: KyberSecretKey,
     pub x25519_sk: X25519SecretKey,
 }
+
+// NOTE (audit 2026-09-27) : pas de `impl Drop` explicite ici.
+//   • `KyberSecretKey` (pqcrypto_mlkem) : implémente `Drop` via
+//     `pqcrypto_traits::kem::SecretKey` mais NE dérive PAS `Zeroize`
+//     (trait bounds incompatibles). Sa destruction est gérée par la crate.
+//   • `X25519SecretKey` (x25519-dalek) : implémente `Zeroize on Drop`
+//     via la feature `zeroize` (activée par défaut dans le workspace).
+//   • Un `Drop` custom serait no-op sémantique ET empêcherait la
+//     dérivation automatique ; on s'appuie donc sur les crates tierces,
+//     déjà auditées.
 
 /// Paquet d'encapsulation à transmettre au pair
 #[derive(Clone)]
@@ -55,6 +84,8 @@ impl HybridKeyExchange {
     }
 
     /// Encapsulation directe pour vault et sessions P2P : autonome et sans boucle d'appel
+    ///
+    /// ⚠️ Tag HKDF "AEGIS-v2.2-*" figé pour compatibilité vault — ne pas modifier.
     pub fn encapsulate_and_derive(
         peer_x25519_pk: &X25519PublicKey,
         peer_kyber_pk: &KyberPublicKey,
@@ -69,6 +100,7 @@ impl HybridKeyExchange {
         combined_ss.extend_from_slice(kyber_ss.as_bytes());
         combined_ss.extend_from_slice(x25519_ss.as_bytes());
 
+        // Tag "v2.2" FIGÉ — voir note module.
         let hk = Hkdf::<Sha256>::new(Some(b"AEGIS-v2.2-HYBRID-HKDF-SALT"), &combined_ss);
         let mut session_key = SecureBuffer::new(AES_256_GCM_KEY_LEN);
         hk.expand(b"AEGIS-v2.2-SESSION-KEY-EXPANSION", session_key.as_slice_mut())
@@ -80,6 +112,8 @@ impl HybridKeyExchange {
     }
 
     /// Décapsulation directe pour vault et sessions P2P avec EphemeralSecret
+    ///
+    /// ⚠️ Tag HKDF "AEGIS-v2.2-*" figé pour compatibilité vault — ne pas modifier.
     pub fn decapsulate_and_derive(
         x25519_sk: EphemeralSecret,
         kyber_sk: &KyberSecretKey,
@@ -93,6 +127,7 @@ impl HybridKeyExchange {
         combined_ss.extend_from_slice(kyber_ss.as_bytes());
         combined_ss.extend_from_slice(x25519_ss.as_bytes());
 
+        // Tag "v2.2" FIGÉ — voir note module.
         let hk = Hkdf::<Sha256>::new(Some(b"AEGIS-v2.2-HYBRID-HKDF-SALT"), &combined_ss);
         let mut session_key = SecureBuffer::new(AES_256_GCM_KEY_LEN);
         hk.expand(b"AEGIS-v2.2-SESSION-KEY-EXPANSION", session_key.as_slice_mut())
@@ -141,6 +176,7 @@ pub fn decapsulate_hybrid(
     combined_ss.extend_from_slice(kyber_ss.as_bytes());
     combined_ss.extend_from_slice(x25519_ss.as_bytes());
 
+    // Tag "v2.2" FIGÉ — voir note module.
     let hk = Hkdf::<Sha256>::new(Some(b"AEGIS-v2.2-HYBRID-HKDF-SALT"), &combined_ss);
     let mut session_key = SecureBuffer::new(AES_256_GCM_KEY_LEN);
     hk.expand(b"AEGIS-v2.2-SESSION-KEY-EXPANSION", session_key.as_slice_mut())
@@ -149,31 +185,6 @@ pub fn decapsulate_hybrid(
     combined_ss.zeroize();
 
     session_key
-}
-
-pub struct Aes256GcmEngine;
-
-impl Aes256GcmEngine {
-    pub fn encrypt(
-        key: &SecureBuffer,
-        nonce: &[u8; AES_256_GCM_NONCE_LEN],
-        plaintext: &[u8],
-    ) -> Result<Vec<u8>, aes_gcm::Error> {
-        let cipher = Aes256Gcm::new_from_slice(key.as_slice()).map_err(|_| aes_gcm::Error)?;
-        cipher.encrypt(Nonce::from_slice(nonce), plaintext)
-    }
-
-    pub fn decrypt(
-        key: &SecureBuffer,
-        nonce: &[u8; AES_256_GCM_NONCE_LEN],
-        ciphertext: &[u8],
-    ) -> Result<SecureBuffer, aes_gcm::Error> {
-        let cipher = Aes256Gcm::new_from_slice(key.as_slice()).map_err(|_| aes_gcm::Error)?;
-        let plaintext = cipher.decrypt(Nonce::from_slice(nonce), ciphertext)?;
-        let mut buf = SecureBuffer::new(plaintext.len());
-        buf.as_slice_mut().copy_from_slice(&plaintext);
-        Ok(buf)
-    }
 }
 
 pub fn encrypt_aes_256_gcm_neon(
@@ -313,6 +324,13 @@ mod tests {
 }
 
 /// Ephemeral 512B frame processing on-the-fly
+///
+/// ⚠️ Version #[cfg(kani)] — SIMPLIFIÉE pour la vérification formelle :
+///   • Modélise les BORNES d'accès (`payload[i]` avec `i ∈ [0, 512[`).
+///   • Ne modélise PAS la sémantique cryptographique (HKDF n'est pas
+///     instrumentable par Kani car appel à `sha2` non-formalisé).
+///   • La preuve porte sur : absence de panique + absence de débordement.
+///   • La version réelle (chiffrement HKDF-SHA256) est en #[cfg(not(kani))].
 #[cfg(kani)]
 pub fn process_512b_frame_ephemeral(
     master_key: &[u8; 32],
@@ -322,13 +340,13 @@ pub fn process_512b_frame_ephemeral(
     if master_key.len() != 32 || payload.len() != 512 {
         return Err("INVALID_BOUNDS");
     }
-    
+
     // Invariant pur Rust sans assembleur SIMD pour la preuve formelle
     let key_byte = master_key[0] ^ (frame_index as u8);
     for i in 0..512 {
         payload[i] ^= key_byte;
     }
-    
+
     Ok(())
 }
 
@@ -344,7 +362,7 @@ pub fn process_512b_frame_ephemeral(
 
     let mut ephemeral_key = [0u8; 32];
     let info = frame_index.to_le_bytes();
-    
+
     let hk = Hkdf::<Sha256>::new(Some(b"AEGIS-EPHEMERAL-FRAME-SALT"), master_key);
     hk.expand(&info, &mut ephemeral_key).map_err(|_| ())?;
 

@@ -66,6 +66,11 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 #[derive(Zeroize, ZeroizeOnDrop)]
 pub struct IdentityKeys {
     /// Clé privée d'édition Ed25519 (Signature)
+    ///
+    /// Note (audit 2026-09-27) : `#[zeroize(skip)]` car `Ed25519SigningKey`
+    /// implémente déjà `Zeroize on Drop` via `ed25519-dalek` (feature
+    /// `zeroize` activée dans le workspace). Un `Drop` custom serait
+    /// no-op sémantique ET empêcherait la dérivation automatique.
     #[zeroize(skip)]
     pub ed25519_signing: Ed25519SigningKey,
     /// Clé privée statique X25519 (Chiffrement / Diffie-Hellman)
@@ -105,6 +110,10 @@ pub fn generate_mnemonic(word_count: usize) -> Result<String, String> {
     getrandom::getrandom(&mut entropy)
         .map_err(|e| format!("Erreur du générateur d'entropie matérielle: {}", e))?;
 
+    // Note (audit 2026-09-27) : langue FIGÉE à l'anglais (standard BIP-39).
+    // Les 7 langues d'interface AEGIS partagent le même vocabulaire
+    // mnémonique → interop mnémonique entre utilisateurs de langues
+    // différentes. NE PAS changer.
     let mnemonic = Mnemonic::from_entropy_in(Language::English, &entropy)
         .map_err(|e| format!("Erreur lors de la création du mnémonique: {}", e))?;
 
@@ -119,6 +128,7 @@ pub fn generate_mnemonic(word_count: usize) -> Result<String, String> {
 /// **ATTENTION** : dérivation **non-SLIP-0010** — voir le bloc de commentaires
 /// en haut de ce fichier pour les implications d'interopérabilité.
 pub fn derive_keys_from_mnemonic(mnemonic_phrase: &str) -> Result<IdentityKeys, String> {
+    // Langue FIGÉE à l'anglais — voir note dans generate_mnemonic().
     let mnemonic = Mnemonic::parse_in(Language::English, mnemonic_phrase)
         .map_err(|e| format!("Phrase mnémonique invalide: {}", e))?;
 
