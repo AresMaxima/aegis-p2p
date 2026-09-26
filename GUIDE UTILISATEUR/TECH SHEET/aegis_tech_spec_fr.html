@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AEGIS P2P — Fiche Technique d'Architecture & Spécifications OpSec</title>
+    <style>
+        :root {
+            --primary: #fcbe0b;
+            --bg-dark: #0d0d0e;
+            --card-bg: #141416;
+            --text-color: #e0e0e0;
+            --text-muted: #a0a0a0;
+            --border-color: #26262a;
+            --alert-color: #ff5555;
+            --accent-blue: #4a90e2;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-dark) !important;
+            color: var(--text-color) !important;
+            line-height: 1.35;
+            margin: 0;
+            padding: 15px;
+            font-size: 0.88em;
+            text-align: justify;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 8px;
+            margin-bottom: 12px;
+            gap: 15px;
+        }
+
+        .header-title {
+            flex: 1;
+        }
+
+        .logo {
+            height: 45px;
+            width: auto;
+            max-width: 160px;
+            object-fit: contain;
+        }
+
+        h1 {
+            color: var(--primary) !important;
+            margin: 0 0 2px 0;
+            font-size: 1.6em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .subtitle {
+            color: var(--text-muted) !important;
+            font-size: 0.82em;
+            margin: 0;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        section {
+            background: var(--card-bg) !important;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            padding: 10px 12px;
+            margin-bottom: 10px;
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+
+        h2 {
+            color: var(--primary) !important;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 3px;
+            margin-top: 0;
+            margin-bottom: 6px;
+            font-size: 1.05em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        p {
+            margin-top: 0;
+            margin-bottom: 6px;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .tech-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 4px;
+            font-size: 0.92em;
+        }
+
+        .tech-table th, .tech-table td {
+            border: 1px solid var(--border-color);
+            padding: 5px 8px;
+            text-align: left;
+        }
+
+        .tech-table th {
+            background-color: #1a1a1e !important;
+            color: var(--primary) !important;
+            font-size: 0.85em;
+            text-transform: uppercase;
+        }
+
+        .tech-table td {
+            background-color: #111113 !important;
+        }
+
+        ul {
+            list-style-type: none;
+            padding-left: 0;
+            margin: 0;
+        }
+
+        li {
+            margin-bottom: 4px;
+            position: relative;
+            padding-left: 16px;
+        }
+
+        li::before {
+            content: "▪";
+            color: var(--primary) !important;
+            position: absolute;
+            left: 0;
+            font-size: 0.9em;
+        }
+
+        .code-inline {
+            background: #26262a !important;
+            color: var(--primary) !important;
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+
+        .spec-box {
+            background: #18181c !important;
+            border-left: 3px solid var(--primary);
+            padding: 6px 10px;
+            margin-top: 6px;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .spec-box.alert {
+            border-left-color: var(--alert-color);
+        }
+
+        .spec-title {
+            font-weight: bold;
+            color: #ffffff !important;
+            font-size: 0.85em;
+            display: block;
+            margin-bottom: 2px;
+        }
+
+        .cta-container {
+            text-align: center;
+            margin-top: 10px;
+            padding: 8px;
+            background: var(--card-bg) !important;
+            border: 1px solid var(--primary);
+            border-radius: 5px;
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+
+        .link-url {
+            color: var(--primary) !important;
+            font-size: 0.85em;
+            text-decoration: underline !important;
+            font-weight: bold;
+        }
+
+        @page {
+            size: A4;
+            margin: 8mm;
+        }
+
+        @media print {
+            html, body {
+                background-color: #0d0d0e !important;
+                color: #e0e0e0 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            .page-break {
+                page-break-before: always !important;
+                break-before: page !important;
+                height: 0;
+                display: block;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <!-- PAGE 1 -->
+    <header>
+        <div class="header-title">
+            <h1>AEGIS P2P</h1>
+            <p class="subtitle">Fiche Technique d'Architecture & Spécifications Cryptographiques (Audit/SysAdmin)</p>
+        </div>
+        <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima Logo" class="logo">
+    </header>
+
+    <section>
+        <h2>1. Primitives Cryptographiques & Modèle de Chiffrement</h2>
+        <p>L'architecture cryptographique d'AEGIS repose sur des primitives modernes à haute résistance post-quantique hybride et souveraineté de clés :</p>
+        
+        <table class="tech-table">
+            <thead>
+                <tr>
+                    <th>Fonction</th>
+                    <th>Primitive / Algorithme</th>
+                    <th>Spécification & Taille de Clé</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Échange de Clés (KEX)</strong></td>
+                    <td>X25519 (Courbe Elliptique)</td>
+                    <td>Clés éphémères ECDH 256-bit générées en RAM</td>
+                </tr>
+                <tr>
+                    <td><strong>Signature & Identité</strong></td>
+                    <td>Ed25519</td>
+                    <td>Paires de clés d'authentification sans persistance</td>
+                </tr>
+                <tr>
+                    <td><strong>Chiffrement Symétrique</strong></td>
+                    <td>ChaCha20-Poly1305 / AES-256-GCM</td>
+                    <td>AEAD avec Nonce unique 96-bit par paquet</td>
+                </tr>
+                <tr>
+                    <td><strong>Dérivation de Clé (KDF)</strong></td>
+                    <td>HKDF-SHA256 / Argon2id</td>
+                    <td>Sels d'entropie dynamique (Memory-hard)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="spec-box">
+            <span class="spec-title">Double-Ratchet Protocol (Forward & Break-in Secrecy)</span>
+            Chaîne de clés rafraîchie à chaque message envoyé/reçu. La compromission d'une clé de session n'a aucun impact sur les échanges passés ou futurs.
+        </div>
+    </section>
+
+    <section>
+        <h2>2. Sécurisation Mémoire (RAM Isolation & Anti-Forensics)</h2>
+        <ul>
+            <li><strong>Zero-Persistence Strict :</strong> Le système d'exploitation hôte interdit tout appel à `SharedPreferences`, `SQLite` ou écriture de fichiers de cache disque.</li>
+            <li><strong>Protection contre le Swapping :</strong> Verrouillage de la mémoire vive allouée via <span class="code-inline">mlock()</span> pour empêcher le kernel d'écrire la RAM sur la partition SWAP ou le fichier d'hibernation.</li>
+            <li><strong>Purge Mémoire (Zeroize) :</strong> Implémentation du trait `Zeroize` en Rust / C++ natif. Chaque buffer de clé, message déchiffré ou structure réseau est réécrit avec des zéros binaires (`0x00`) dès sa libération.</li>
+            <li><strong>Défense contre la Saisie Mémoire (Cold Boot) :</strong> Minuteur matériel de purge forcée (3 minutes d'inactivité) déclenchant la destruction des pointeurs de clés et l'invocation de <span class="code-inline">exit(0)</span>.</li>
+        </ul>
+    </section>
+
+    <section>
+        <h2>3. Hardening Android Native (OS-Level Mitigations)</h2>
+        <div class="grid-2">
+            <div class="spec-box">
+                <span class="spec-title">Surface d'Attaque UI (FLAG_SECURE)</span>
+                Activation systématique du drapeau natif <span class="code-inline">WindowManager.LayoutParams.FLAG_SECURE</span>. Bloque les captures/enregistrements d'écran et efface le buffer d'affichage dans la vue multitâche OS.
+            </div>
+            <div class="spec-box alert">
+                <span class="spec-title">Mécanisme Dynamic PIN & Anti-Contrainte (DURESS & KILL)</span>
+                Le mot de passe de session est dynamique. La saisie de <strong>N'IMPORTE QUEL PIN valide</strong> autre que la clé principale ou les codes système déclenche l'affichage d'un tableau leurre ("Notes"). La saisie d'un code de panique (ex: <span class="code-inline">0000</span>) ou des tentatives erronées répétées déclenchent l'effacement immédiat de la RAM et le crash du processus.
+            </div>
+        </div>
+    </section>
+
+    <div class="page-break"></div>
+
+    <!-- PAGE 2 -->
+    <section style="margin-top: 10px;">
+        <h2>4. Architecture Transport Réseau & Saut de Fréquence (Frequency Hopping)</h2>
+        <p>AEGIS intègre un commutateur de transport dynamique (Transport Switch) avec stratégie de saut de fréquence anti-censure :</p>
+        
+        <table class="tech-table">
+            <thead>
+                <tr>
+                    <th>Mode Transport</th>
+                    <th>Stack Protocolaire</th>
+                    <th>Mise en Œuvre & Résilience</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Tor v3 Embedded</strong></td>
+                    <td>Services Masqués v3 (.onion) + Obfs4</td>
+                    <td>Anonymat maximal de la couche IP, contournement des pare-feux DPI nationaux.</td>
+                </tr>
+                <tr>
+                    <td><strong>WAN P2P Direct</strong></td>
+                    <td>Kademlia DHT + STUN / WebRTC</td>
+                    <td>Routage P2P direct distribué, latence minimale sans serveur central.</td>
+                </tr>
+                <tr>
+                    <td><strong>Local Mesh (LAN/BT)</strong></td>
+                    <td>Wi-Fi Direct / Multicast UDP / Bluetooth Mesh</td>
+                    <td>Communication totalement déconnectée d'Internet pour réunions physiques.</td>
+                </tr>
+                <tr>
+                    <td><strong>Saut de Fréquence (Frequency Hopping)</strong></td>
+                    <td>Dynamic Failover + Snowflake / Pluggable Transports</td>
+                    <td>Changement dynamique de canal et de protocole en temps réel dès la détection de dégradation de canal, de blocage DPI ou de brouillage réseau.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="spec-box">
+            <span class="spec-title">Régulation du Saut de Fréquence Réseau</span>
+            En cas de coupure ou d'inspection active par un pare-feu étatique (DPI), AEGIS bascule de façon transparente de Tor v3 vers WebRTC/Snowflake puis vers le maillage Bluetooth/Wi-Fi sans perte de session E2EE.
+        </div>
+    </section>
+
+    <section>
+        <h2>5. Module Stéganographique (Text-Based Steganography)</h2>
+        <ul>
+            <li><strong>Encodage Discret :</strong> Dissimulation de clés publiques et payloads chiffrés au sein de structures textuelles en langage naturel (poèmes, prose).</li>
+            <li><strong>Mapping Utf-8 Zero-Width :</strong> Conversion des octets binaires chiffrés en caractères Unicode invisibles (Zero-Width Space `U+200B`, Zero-Width Non-Joiner `U+200C`) intercalés dans le texte porteur.</li>
+            <li><strong>Analyse Entropy-Resistant :</strong> Contourne les scanners d'inspection de contenu (DPI) et l'analyse stéganalytique statistique basée sur les fréquences de mots.</li>
+        </ul>
+    </section>
+
+    <section>
+        <h2>6. Matrice d'Audit de Sécurité & Conformité</h2>
+        <table class="tech-table">
+            <thead>
+                <tr>
+                    <th>Vecteur de Menace</th>
+                    <th>Mitigation Technique Appliquée</th>
+                    <th>Statut Conformité</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Saisie Physique de Téléphone Déverrouillé</td>
+                    <td>DURESS dynamique (Leurre), Kill Switch (`0000`) & Minuteur 3 min</td>
+                    <td><span style="color:#55ff55;">CONFORME</span></td>
+                </tr>
+                <tr>
+                    <td>Analyse Forensique Post-Mortem Disque (NAND)</td>
+                    <td>Zero-Persistence Architecture (0 octet écrit)</td>
+                    <td><span style="color:#55ff55;">CONFORME</span></td>
+                </tr>
+                <tr>
+                    <td>Intersection / Écoute Réseau Globale (ISP/Gouv)</td>
+                    <td>Saut de fréquence réseau, Tor v3 Routing + Double-Ratchet E2EE</td>
+                    <td><span style="color:#55ff55;">CONFORME</span></td>
+                </tr>
+                <tr>
+                    <td>Attaque par Saisie Mémoire RAM à Froid (Cold Boot)</td>
+                    <td>Invocations `mlock` & Zeroize automatique Rust</td>
+                    <td><span style="color:#55ff55;">CONFORME</span></td>
+                </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <div class="cta-container">
+        <span>Ressources d'Audit & Documentation Officielle Ares Maxima :</span><br>
+        <a href="https://aresmaxima.com/aegis-p2p/" class="link-url" target="_blank" rel="noopener">https://aresmaxima.com/aegis-p2p/</a>
+    </div>
+
+</div>
+
+</body>
+</html>

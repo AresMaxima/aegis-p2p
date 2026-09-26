@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" width="100%" height="100%">
+  <defs>
+    <!-- Ombrage et Lueur Mythique -->
+    <filter id="aegisGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComponentTransfer in="blur" result="glow1">
+        <feFuncA type="linear" slope="0.8"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode in="glow1" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <!-- Dégradé Or Ancien (ARES / AEGIS) -->
+    <radialGradient id="goldCore" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FFE57F" />
+      <stop offset="50%" stop-color="#FCBE0B" />
+      <stop offset="85%" stop-color="#8A6400" />
+      <stop offset="100%" stop-color="#2A1E00" />
+    </radialGradient>
+
+    <!-- Dégradé Acier Obscur & Cuir Mythique -->
+    <radialGradient id="shieldPlate" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#222226" />
+      <stop offset="70%" stop-color="#111113" />
+      <stop offset="100%" stop-color="#050506" />
+    </radialGradient>
+  </defs>
+
+  <!-- Fond Noir Pur -->
+  <rect width="100%" height="100%" fill="#0D0D0E" />
+
+  <g transform="translate(300, 300)">
+    <!-- 1. Aura Extérieure Dorée -->
+    <circle r="275" fill="none" stroke="#FCBE0B" stroke-width="2" opacity="0.3" filter="url(#aegisGlow)" />
+    
+    <!-- 2. Bordure Extérieure du Bouclier ROND Antique -->
+    <circle r="260" fill="url(#shieldPlate)" stroke="url(#goldCore)" stroke-width="8" filter="url(#aegisGlow)" />
+    <circle r="242" fill="none" stroke="#FCBE0B" stroke-width="2" opacity="0.5" stroke-dasharray="8,6" />
+
+    <!-- 3. Frise / Runes Grecques circulaires (Méandre Antique) -->
+    <circle r="225" fill="none" stroke="#FCBE0B" stroke-width="12" opacity="0.15" />
+    <circle r="210" fill="none" stroke="url(#goldCore)" stroke-width="3" />
+
+    <!-- 4. LES SERPENTS DE MÉDUSE (Tressés sur la bordure) -->
+    <!-- Serpent Gauche Supérieur -->
+    <path d="M -150,-150 Q -210,-100 -180,-40 Q -150,20 -200,60" fill="none" stroke="#FCBE0B" stroke-width="5" stroke-linecap="round" />
+    <polygon points="-205,60 -220,50 -215,75" fill="#FCBE0B" />
+    
+    <!-- Serpent Droit Supérieur -->
+    <path d="M 150,-150 Q 210,-100 180,-40 Q 150,20 200,60" fill="none" stroke="#FCBE0B" stroke-width="5" stroke-linecap="round" />
+    <polygon points="205,60 220,50 215,75" fill="#FCBE0B" />
+
+    <!-- Serpent Gauche Inférieur -->
+    <path d="M -130,130 Q -180,180 -120,210 Q -60,240 -80,190" fill="none" stroke="#FCBE0B" stroke-width="4" />
+    
+    <!-- Serpent Droit Inférieur -->
+    <path d="M 130,130 Q 180,180 120,210 Q 60,240 80,190" fill="none" stroke="#FCBE0B" stroke-width="4" />
+
+    <!-- 5. TÊTE DE LA GORGONE (Masque Terrifiant au Centre) -->
+    <!-- Structure du Visage -->
+    <path d="M -80,-60 L 80,-60 L 110,20 L 70,120 L 0,160 L -70,120 L -110,20 Z" 
+          fill="#141417" stroke="url(#goldCore)" stroke-width="5" stroke-linejoin="round" />
+
+    <!-- Cornettes / Crête d'Aégis -->
+    <path d="M -80,-60 L -120,-110 L -50,-80 Z" fill="url(#goldCore)" />
+    <path d="M 80,-60 L 120,-110 L 50,-80 Z" fill="url(#goldCore)" />
+
+    <!-- Arcade Sourcilière Menacée -->
+    <path d="M -90,-10 L -20,15 L 0,20 L 20,15 L 90,-10" fill="none" stroke="#FCBE0B" stroke-width="6" stroke-linecap="round" />
+
+    <!-- LES YEUX DE LA GORGONE (Regard de Pierre - Lumineux) -->
+    <polygon points="-75,10 -25,25 -65,40" fill="#FCBE0B" filter="url(#aegisGlow)" />
+    <polygon points="75,10 25,25 65,40" fill="#FCBE0B" filter="url(#aegisGlow)" />
+    <circle cx="-50" cy="22" r="4" fill="#0D0D0E" />
+    <circle cx="50" cy="22" r="4" fill="#0D0D0E" />
+
+    <!-- Nez Angulaire -->
+    <polygon points="0,15 -15,65 0,70 15,65" fill="none" stroke="#FCBE0B" stroke-width="3" />
+
+    <!-- GUEULE OUVERTE & CROCS (Hurlement de Terreur) -->
+    <path d="M -55,85 L 55,85 L 40,125 L 0,135 L -40,125 Z" fill="#0D0D0E" stroke="#FCBE0B" stroke-width="4" />
+    
+    <!-- Crocs Supérieurs -->
+    <polygon points="-40,85 -30,105 -20,85" fill="#FCBE0B" />
+    <polygon points="40,85 30,105 20,85" fill="#FCBE0B" />
+    
+    <!-- Crocs Inférieurs -->
+    <polygon points="-25,125 -15,105 -5,125" fill="#FCBE0B" />
+    <polygon points="25,125 15,105 5,125" fill="#FCBE0B" />
+
+    <!-- Langue Tirée Mythologique (Gorgonéion classique) -->
+    <path d="M -10,105 Q 0,140 10,105 Z" fill="#E63946" opacity="0.9" />
+
+    <!-- Fissure centrale d'Energie -->
+    <path d="M 0,-240 L 0,-110" stroke="#FCBE0B" stroke-width="3" opacity="0.6" stroke-dasharray="6,4" />
+    <path d="M 0,160 L 0,240" stroke="#FCBE0B" stroke-width="3" opacity="0.6" stroke-dasharray="6,4" />
+  </g>
+</svg>

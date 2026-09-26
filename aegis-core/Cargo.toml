@@ -1,0 +1,125 @@
+[package]
+name = "aegis-core"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib", "staticlib"]
+
+[dependencies]
+# --- Sécurité mémoire & crypto classique / post-quantique ---
+zeroize = { version = "1.7", features = ["alloc", "derive"] }
+getrandom = "0.2"
+argon2 = "0.5"
+chacha20poly1305 = "0.10"
+aes-gcm = "0.10"
+sha2 = { version = "0.10", features = ["force-soft"] }
+hkdf = "0.12"
+x25519-dalek = { version = "2.0", features = ["static_secrets"] }
+ed25519-dalek = "2.1"
+pqcrypto-mlkem = "0.1"
+pqcrypto-traits = "0.3"
+bip39 = "2.0"
+hex = "0.4"
+rand = "0.8"
+thiserror = "1.0"
+
+# --- JNI : pont Kotlin <-> Rust ---
+jni = "0.21"
+
+# --- FFI bas niveau (libc, errno, etc.) ---
+libc = "0.2"
+
+# --- Hardening système, BDD, signaux OS ---
+signal-hook = "0.3"
+ffi-support = "0.4"
+rusqlite = { version = "0.31", features = ["bundled"] }
+tempfile = "3.8"
+
+# --- Réseau asynchrone, P2P, Tor embarqué ---
+tokio = { version = "1.35", features = ["full"] }
+libp2p = { version = "0.53", default-features = false, features = ["tcp", "noise", "yamux", "tokio", "mdns", "kad", "macros"] }
+arti-client = { version = "0.18", default-features = false, features = ["tokio", "rustls"] }
+tor-rtcompat = { version = "0.18", default-features = false, features = ["tokio", "rustls"] }
+subtle = "2.6.1"
+lazy_static = "1.5.0"
+futures = "0.3.34"
+
+# --- Vérification d'attestation Android (Niveau 3) ---
+# Parsing des chaînes de certificats X.509 retournées par Android KeyStore.
+# Utilisé par aegis_verify_attestation_chain() dans lib.rs.
+# La feature `verify` (activée par défaut) apporte la vérification
+# cryptographique des signatures ECDSA P-256 via `ring`.
+x509-parser = "0.16"
+# Vérification cryptographique des signatures (ECDSA P-256, RSA).
+# Déjà présent transitivement via rustls 0.23 / arti-client, on le déclare
+# explicitement pour l'utiliser directement dans notre code.
+ring = "0.17"
+# Décodage base64 pour les extensions d'attestation (OID ASN.1).
+base64 = "0.22"
+
+# --- Décodage/encodage image pour le rendu VRAM réel (viewer/decoder.rs) ---
+# Utilisé par :
+#   • aegis_decode_and_blit_file()   → JPEG/PNG disque → RGBA → VRAM
+#   • aegis_seal_ram_to_disk()       → YUV420 → RGBA → JPEG q85 → disque
+#
+# default-features = false → uniquement jpeg + png (exclut webp/tiff/avif/gif/bmp)
+# afin de limiter la taille du .so final sur arm64-v8a.
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+
+# NOTE : pas de dépendance `ndk-sys` / `ndk`.
+# Les symboles ANativeWindow_* de libandroid.so sont déclarés inline dans
+# `src/viewer/stream_pipe.rs` via `#[link(name = "android")]`.
+# Cela évite une dépendance transitive lourde pour seulement 2 fonctions.
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.52", features = ["Win32_System_Memory"] }
+
+[target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
+tss-esapi = { version = "7.3", optional = true }
+
+# =========================================================================
+# PROFILS DE COMPILATION
+# =========================================================================
+
+# --- Profil Release : durcissement anti-forensics & réduction d'empreinte ---
+[profile.release]
+opt-level = "z"     # Taille minimale du binaire natif
+lto = true          # Link-Time Optimization
+codegen-units = 1   # Optimisations maximales
+panic = "abort"     # CRITIQUE : pas d'unwinding à travers la frontière FFI
+strip = true        # Efface symboles et tables de débogage
+
+# Surcote locale : le décodeur JPEG/PNG est une boucle chaude en VRAM.
+# En O3 pour éviter les micro-lags d'affichage sur 1080p.
+# Coût : ~30-50 Ko sur libaegis_core.so.
+#
+# NOTE : `image 0.25` utilise `zune-jpeg` (pas `jpeg-decoder`), confirmé par
+# les logs de build. La surcote sur `jpeg-decoder` a été retirée (crate absent
+# → warning Cargo silencieux).
+[profile.release.package.image]
+opt-level = 3
+[profile.release.package.zune-jpeg]
+opt-level = 3
+[profile.release.package.png]
+opt-level = 3
+
+# =========================================================================
+# DEV / LINT / FEATURES
+# =========================================================================
+
+[dev-dependencies]
+proptest = "1.4"
+rusty-fork = "0.3"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(kani)'] }
+
+[features]
+default = ["software_alpha_shields"]
+software_alpha_shields = []
+
+# DESIGN CONCEPTUEL NON COMPILÉ PAR DÉFAUT (PHASE 9 B2G)
+b2g_phase9_soc = ["efuse_access", "hw_zeroization_mesh"]
+efuse_access = []
+hw_zeroization_mesh = []

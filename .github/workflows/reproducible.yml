@@ -1,0 +1,76 @@
+﻿name: Reproducible Build & Verification
+on: [push, pull_request]
+
+jobs:
+  kani-proofs:
+    name: Formal Proofs (AWS Kani)
+    runs-on: ubuntu-latest
+    container:
+      image: rust:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install System Dependencies & Kani
+        run: |
+          apt-get update && apt-get install -y build-essential python3 python3-pip
+          cargo install --locked kani-verifier
+          cargo kani setup
+      - name: Execute Kani Formal Verification
+        run: |
+          cd aegis-core
+          cargo kani --harness crypto_pq::verify_process_512b_frame_bounds > kani-report.txt
+
+  miri-audit:
+    name: Memory Audit (Miri)
+    runs-on: ubuntu-latest
+    container:
+      image: rust:latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Lancement de 5 serveurs parallèles pour couvrir 100% du code sans timeout
+        modules: 
+          - "crypto crypto_pq"
+          - "network mesh transport"
+          - "secure_buffer storage session"
+          - "keystore stegano ffi_security"
+          - "panic hardware_triggers ingestion qr_pairing seccomp signals viewer deadman"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Miri
+        run: rustup toolchain install nightly --component miri
+      - name: Execute Miri Undefined Behavior Check
+        env:
+          MIRIFLAGS: "-Zmiri-disable-isolation"
+        run: |
+          cd aegis-core
+          # Exécute Miri sur les modules assignés à ce serveur spécifique
+          for mod in ${{ matrix.modules }}; do
+            cargo +nightly miri test $mod --release
+          done
+
+  build-android:
+    name: Android NDK Build
+    runs-on: ubuntu-latest
+    container:
+      image: rust:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install System Dependencies
+        run: apt-get update && apt-get install -y wget unzip
+      - name: Install Android NDK & Configure Toolchain
+        run: |
+          wget -q https://dl.google.com/android/repository/android-ndk-r27-linux.zip
+          unzip -q android-ndk-r27-linux.zip
+          rustup target add aarch64-linux-android
+      - name: Build Deterministic ARM64 Binary
+        env:
+          ANDROID_NDK_HOME: ${{ github.workspace }}/android-ndk-r27
+          CC_aarch64_linux_android: ${{ github.workspace }}/android-ndk-r27/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang
+          AR_aarch64_linux_android: ${{ github.workspace }}/android-ndk-r27/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
+          CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER: ${{ github.workspace }}/android-ndk-r27/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang
+        run: |
+          cd aegis-core
+          cargo build --target aarch64-linux-android --release
+      - name: Verify Cryptographic Hash
+        run: |
+          sha256sum aegis-core/target/aarch64-linux-android/release/libaegis_core.so

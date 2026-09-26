@@ -1,0 +1,11 @@
+﻿homepage: "https://github.com/aegis-project/aegis-core"
+main_repo: "https://github.com/aegis-project/aegis-core"
+language: rust
+fuzzing_engines:
+  - libfuzzer
+sanitizers:
+  - address
+  - undefined
+architectures:
+  - x86_64
+  - aarch64

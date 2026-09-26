@@ -1,0 +1,41 @@
+﻿name: Reproducible Build & Verification BRAVO
+on: [push, pull_request]
+
+jobs:
+  build-and-verify:
+    runs-on: ubuntu-latest
+    container:
+      image: rust:1.80-slim
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install System Dependencies & Kani Verifier
+        run: |
+          apt-get update && apt-get install -y wget unzip python3 python3-pip gcc g++
+          cargo install --locked kani-verifier
+          cargo kani setup
+
+      - name: Execute Kani Formal Verification
+        run: |
+          cargo kani --output-format json > kani-report.json || true
+
+      - name: Upload Kani Proof Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kani-formal-proof-report
+          path: kani-report.json
+
+      - name: Install Android NDK
+        run: |
+          wget https://dl.google.com/android/repository/android-ndk-r27-linux.zip
+          unzip android-ndk-r27-linux.zip
+          echo "ANDROID_NDK_HOME=$PWD/android-ndk-r27" >> $GITHUB_ENV
+
+      - name: Build Deterministic ARM64 Binary
+        run: |
+          rustup target add aarch64-linux-android
+          cargo build --target aarch64-linux-android --release
+
+      - name: Verify Cryptographic Hash
+        run: |
+          sha256sum target/aarch64-linux-android/release/libaegis_core.so

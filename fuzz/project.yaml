@@ -1,0 +1,9 @@
+﻿homepage: "https://github.com/AresMaxima/aegis-p2p"
+language: rust
+primary_contact: "security@aegis-p2p.org"
+main_repo: "https://github.com/AresMaxima/aegis-p2p"
+fuzzing_engines:
+  - libfuzzer
+sanitizers:
+  - address
+  - undefined

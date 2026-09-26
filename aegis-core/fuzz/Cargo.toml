@@ -1,0 +1,18 @@
+﻿[package]
+name = "aegis-core-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+aegis-core = { path = ".." }
+
+[[bin]]
+name = "fuzz_ingest_frame"
+path = "fuzz_targets/fuzz_ingest_frame.rs"
+test = false
+doc = false

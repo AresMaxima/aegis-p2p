@@ -1,0 +1,93 @@
+# 1. SECURITE ET RISQUES COMMERCIAUX
+*.jks
+*.keystore
+*.pem
+*.key
+.env
+
+# 2. SECRETS FLUTTER / ANDROID (CRITIQUE)
+aegis_app/android/local.properties
+aegis_app/android/key.properties
+aegis_app/android/.gradle/
+
+# 3. BINAIRES COMMERCIAUX (Ce que vous vendez)
+*.apk
+*.aab
+*.idsig
+*.so
+**/*.so
+
+# 4. DOSSIERS DE COMPILATION & CACHES
+aegis-core/target/
+aegis_app/build/
+aegis_app/.dart_tool/
+.idea/
+.vscode/
+
+# 5. CACHES PYTHON ET SYSTEME
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+Thumbs.db
+
+# 6. AUDIT
+audit_private.key
+!audit_public.pem
+
+# 7. ARTIFACTS DE BENCHMARK ET RAPPORTS
+*.jpeg
+*.png
+*.pdf
+*.docx
+*.zip
+*.csv
+*.txt
+aegis-core/coverage-report/
+aegis-core/llvm-cov.toml
+
+# 7. ARTIFACTS DE BENCHMARK ET RAPPORTS
+*.jpeg
+*.png
+*.pdf
+*.docx
+*.zip
+*.csv
+*.txt
+aegis-core/coverage-report/
+aegis-core/llvm-cov.toml
+
+# ============================================================
+# 8. FIX 26/09/2026 — nettoyage pre-commit v3.0
+# ============================================================
+
+# Outils offensifs (F4)
+frida_hook.js
+frida*.js
+
+# Logs (partout, tous formats)
+*.log
+audit/
+logs/
+ndk_build*.log
+check*.log
+flutter_build*.log
+
+# Heap dumps
+*.hprof
+aegis_heap.hprof
+
+# Backups locaux
+*.before_*
+translations_before_mojibake_fix.dart
+
+# ============================================================
+# 9. FIX 26/09/2026 — exclusions avant commit v3.0
+# ============================================================
+
+# Ancien .git (backup local)
+.git.old*
+.git.old_*/
+
+# Clone OSS-Fuzz (repo tiers Google, pas AEGIS)
+oss-fuzz/
