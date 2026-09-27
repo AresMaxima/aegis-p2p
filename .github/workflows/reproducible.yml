@@ -84,3 +84,47 @@ jobs:
       - name: Verify Cryptographic Hash
         run: |
           sha256sum aegis-core/target/aarch64-linux-android/release/libaegis_core.so
+
+  # ============================================================
+  # JOB 4 — Preuve mmap/mprotect (Valgrind sur Linux natif)
+  # Couvre ce que Miri ne peut PAS vérifier : mmap(PROT_NONE) +
+  # mprotect(PROT_READ|PROT_WRITE). Valgrind exécute le binaire
+  # natif instrumenté et détecte tout accès hors bornes.
+  # ============================================================
+  linux-mmap-proof:
+    name: Linux mmap/mprotect proof (Valgrind)
+    runs-on: ubuntu-latest
+    container:
+      image: rust:1.93-bookworm     # même image que Kani/Miri (cohérence)
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Valgrind
+        run: |
+          apt-get update
+          apt-get install -y valgrind
+
+      - name: Build tests (no-run, debug profile)
+        run: |
+          cd aegis-core
+          cargo test --lib polymorphic --no-run
+
+      - name: Execute Valgrind on polymorphic_ram
+        run: |
+          cd aegis-core
+          # Localiser le binaire de test le plus récent
+          BIN=$(find target/debug/deps -maxdepth 1 -type f -executable -name 'aegis_core-*' | head -n 1)
+          if [ -z "$BIN" ]; then
+            echo "ERREUR: binaire de test introuvable"
+            exit 1
+          fi
+          echo "Test binary: $BIN"
+
+          # Lancer Valgrind : échec CI si accès hors bornes détecté
+          valgrind \
+            --error-exitcode=1 \
+            --leak-check=full \
+            --show-leak-kinds=definite \
+            --track-origins=yes \
+            --errors-for-leak-kinds=definite \
+            "$BIN" polymorphic --test-threads=1

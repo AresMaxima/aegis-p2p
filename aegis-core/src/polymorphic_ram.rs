@@ -1,4 +1,4 @@
-﻿//! aegis-core/src/polymorphic_ram.rs
+//! aegis-core/src/polymorphic_ram.rs
 //! Allocation polymorphe Dual-Rail avec canaris + guard pages (CdCM v2.2-RC3).
 //!
 //! ─────────────────────────────────────────────────────────────────────
@@ -28,6 +28,15 @@
 //!   • .read_and_mutate(&mut self) -> Zeroizing<Vec<u8>>  (via as_slice)
 //!   • Drop (zeroize + munmap x2)
 //!   • Send + Sync
+//!
+//! ─────────────────────────────────────────────────────────────────────
+//! NOTE MIRI :
+//! Sous Miri, mmap(PROT_NONE) + mprotect n'est pas supporté (Miri ne gère
+//! que PROT_READ|PROT_WRITE). On substitue une allocation Rust standard
+//! (alloc_zeroed) via #[cfg(miri)]. La logique DualRegion (canaris,
+//! dual-rail, zeroize, drop) reste intégralement prouvée sous Miri.
+//! Le comportement mmap/mprotect est prouvé séparément par le job CI
+//! `linux-mmap-proof` (Valgrind, Linux natif).
 
 use rand::RngCore;
 use zeroize::Zeroizing;
@@ -73,7 +82,7 @@ impl DualRegion {
         let work_pages = (work_size + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
         let alloc_size = PAGE_SIZE + work_pages + PAGE_SIZE;
 
-        #[cfg(unix)]
+        #[cfg(all(unix, not(miri)))]
         let ptr = unsafe {
             use libc::{
                 mmap, mprotect, MAP_ANONYMOUS, MAP_FAILED, MAP_PRIVATE, PROT_NONE, PROT_READ,
@@ -107,7 +116,7 @@ impl DualRegion {
             p as *mut u8
         };
 
-        #[cfg(not(unix))]
+        #[cfg(any(not(unix), miri))]
         let ptr = unsafe {
             let layout = std::alloc::Layout::from_size_align(alloc_size, PAGE_SIZE).unwrap();
             let p = std::alloc::alloc_zeroed(layout);
@@ -131,12 +140,12 @@ impl DualRegion {
             return;
         }
         unsafe {
-            #[cfg(unix)]
+            #[cfg(all(unix, not(miri)))]
             {
                 libc::munmap(self.ptr as *mut libc::c_void, self.alloc_size);
             }
 
-            #[cfg(not(unix))]
+            #[cfg(any(not(unix), miri))]
             {
                 let layout =
                     std::alloc::Layout::from_size_align(self.alloc_size, PAGE_SIZE).unwrap();
@@ -520,5 +529,88 @@ mod tests {
         }
 
         let _ = buf.as_slice();
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // Test guard-page Linux natif : vérifie que mmap(PROT_NONE) bloque
+    // effectivement l'accès (preuve que Miri ne peut pas fournir).
+    // ─────────────────────────────────────────────────────────────────
+
+    #[cfg(target_os = "linux")]
+    #[cfg_attr(miri, ignore)] // Miri ne supporte pas fork+waitpid correctement
+    #[test]
+    fn test_guard_page_blocks_access() {
+        let region = DualRegion::new(4096, 0, 32);
+        let ptr = region.ptr;
+
+        // Fork : le fils tente d'écrire dans la guard page (ptr = début PROT_NONE)
+        let pid = unsafe { libc::fork() };
+        assert!(pid >= 0, "fork() a échoué");
+
+        if pid == 0 {
+            // ─── Fils ───
+            // Écriture dans la guard page → SIGSEGV attendu
+            unsafe {
+                std::ptr::write_volatile(ptr, 0xFF);
+                // Si on arrive ici, le guard page n'a PAS bloqué → échec
+                libc::_exit(0);
+            }
+        }
+
+        // ─── Père ───
+        let mut status: libc::c_int = 0;
+        let rc = unsafe { libc::waitpid(pid, &mut status, 0) };
+        assert!(rc > 0, "waitpid() a échoué");
+
+        // Le fils doit être mort par signal
+        assert!(
+            libc::WIFSIGNALED(status),
+            "Le fils aurait dû mourir par signal (statut = 0x{:x})",
+            status
+        );
+        // Et le signal doit être SIGSEGV
+        let sig = libc::WTERMSIG(status);
+        assert_eq!(
+            sig,
+            libc::SIGSEGV,
+            "Signal attendu SIGSEGV, reçu {}",
+            sig
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[cfg_attr(miri, ignore)]
+    #[test]
+    fn test_work_page_allows_access() {
+        // Contrôle négatif : la zone PROT_READ|PROT_WRITE doit être accessible
+        let region = DualRegion::new(4096, 0, 32);
+        let work_ptr = unsafe { region.ptr.add(PAGE_SIZE) };
+
+        let pid = unsafe { libc::fork() };
+        assert!(pid >= 0);
+
+        if pid == 0 {
+            // Fils : écriture dans la zone travail → doit réussir
+            unsafe {
+                std::ptr::write_volatile(work_ptr, 0xAB);
+                libc::_exit(0);
+            }
+        }
+
+        let mut status: libc::c_int = 0;
+        let rc = unsafe { libc::waitpid(pid, &mut status, 0) };
+        assert!(rc > 0);
+
+        // Le fils doit s'être terminé NORMALEMENT (exit code 0)
+        assert!(
+            libc::WIFEXITED(status),
+            "Le fils aurait dû se terminer normalement (statut = 0x{:x})",
+            status
+        );
+        assert_eq!(
+            libc::WEXITSTATUS(status),
+            0,
+            "Le fils devrait avoir exit(0)"
+        );
     }
 }

@@ -1,6 +1,6 @@
 //! aegis-core/src/session.rs
-//! Gestionnaire de Session Ã‰phÃ©mÃ¨re Opaque (OpaqueSessionVault),
-//! Polymorphisme RAM et Isolation Temporelle FFI â€” CdCM v2.2-RC1.
+//! Gestionnaire de Session Éphémère Opaque (OpaqueSessionVault),
+//! Polymorphisme RAM et Isolation Temporelle FFI — CdCM v2.2-RC1.
 
 use crate::polymorphic_ram::PolymorphicBuffer;
 use crate::secure_buffer::SecureBuffer;
@@ -9,7 +9,7 @@ use zeroize::{Zeroize, Zeroizing};
 
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum SessionError {
-    #[error("Erreur de dÃ©chiffrement ou tampon vide")]
+    #[error("Erreur de déchiffrement ou tampon vide")]
     DecryptionFailed,
 }
 
@@ -49,11 +49,11 @@ impl OpaqueSessionVault {
 
         let key = self.get_key_temporary();
         let mut plaintext_buf = SecureBuffer::new(ciphertext.len());
-        
-        // DÃ©chiffrement/Copie sÃ©curisÃ©e sous protection mÃ©moire
+
+        // Déchiffrement/Copie sécurisée sous protection mémoire
         plaintext_buf.as_slice_mut().copy_from_slice(ciphertext);
-        
-        let _ = key; // Destruction automatique de la clÃ© par Zeroizing au Drop
+
+        let _ = key; // Destruction automatique de la clé par Zeroizing au Drop
         Ok(plaintext_buf)
     }
 }
@@ -61,7 +61,7 @@ impl OpaqueSessionVault {
 /// # Safety
 ///
 /// Alloue un coffre-fort de session sur le tas et renvoie son pointeur brut.
-/// ExÃ©cute un temporisateur constant-time pour prÃ©venir les attaques par canal auxiliaire.
+/// Exécute un temporisateur constant-time pour prévenir les attaques par canal auxiliaire.
 #[no_mangle]
 pub unsafe extern "C" fn aegis_vault_create(is_real: i32) -> *mut OpaqueSessionVault {
     let mut out_ptr = std::ptr::null_mut();
@@ -81,7 +81,7 @@ pub unsafe extern "C" fn aegis_vault_create(is_real: i32) -> *mut OpaqueSessionV
 
 /// # Safety
 ///
-/// Le pointeur `vault_ptr` doit provenir de `aegis_vault_create` et n'avoir jamais Ã©tÃ© libÃ©rÃ©.
+/// Le pointeur `vault_ptr` doit provenir de `aegis_vault_create` et n'avoir jamais été libéré.
 // #[no_mangle] (Conflit résolu)
 pub unsafe extern "C" fn aegis_vault_destroy(vault_ptr: *mut OpaqueSessionVault) {
     if !vault_ptr.is_null() {
@@ -96,7 +96,7 @@ pub unsafe extern "C" fn aegis_vault_destroy(vault_ptr: *mut OpaqueSessionVault)
 
 /// # Safety
 ///
-/// Alias FFI de compatibilitÃ© vers `aegis_vault_create`.
+/// Alias FFI de compatibilité vers `aegis_vault_create`.
 #[no_mangle]
 pub unsafe extern "C" fn aegis_session_vault_create(is_real: i32) -> *mut OpaqueSessionVault {
     unsafe { aegis_vault_create(is_real) }
@@ -104,7 +104,7 @@ pub unsafe extern "C" fn aegis_session_vault_create(is_real: i32) -> *mut Opaque
 
 /// # Safety
 ///
-/// Alias FFI de compatibilitÃ© vers `aegis_session_vault_destroy`.
+/// Alias FFI de compatibilité vers `aegis_session_vault_destroy`.
 #[no_mangle]
 pub unsafe extern "C" fn aegis_session_vault_destroy(vault_ptr: *mut OpaqueSessionVault) {
     unsafe { aegis_vault_destroy(vault_ptr) }
@@ -116,6 +116,7 @@ pub unsafe extern "C" fn aegis_session_vault_destroy(vault_ptr: *mut OpaqueSessi
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::keystore::{HardwareKeystore, TEST_LOCK};
     use std::ptr;
 
     #[test]
@@ -147,24 +148,47 @@ mod tests {
 
     #[test]
     fn test_ffi_aegis_vault_create_destroy() {
+        // Sérialise avec les tests keystore (accès ROOT_KEY global)
+        let _g = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+
         unsafe {
+            // Setup : ROOT_KEY doit être initialisée pour que aegis_vault_create
+            // puisse construire un OpaqueSessionVault (sinon retour null).
+            HardwareKeystore::set_root_key(&[0x42u8; 32])
+                .expect("set_root_key doit réussir");
+
             let vault_ptr = aegis_vault_create(1);
-            assert!(!vault_ptr.is_null());
+            assert!(
+                !vault_ptr.is_null(),
+                "vault_ptr non-null attendu si ROOT_KEY est initialisée"
+            );
 
             aegis_vault_destroy(vault_ptr);
             aegis_vault_destroy(ptr::null_mut());
+
+            // Cleanup : ne pas polluer les autres tests
+            HardwareKeystore::wipe_root_key()
+                .expect("wipe_root_key doit réussir");
         }
     }
 
     #[test]
     fn test_ffi_aegis_vault_create_failure() {
+        // Sérialise avec les tests keystore (accès ROOT_KEY global)
+        let _g = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+
         unsafe {
-            crate::keystore::MOCK_KEYSTORE_FAIL.with(|fail| fail.set(true));
+            // État explicite : ROOT_KEY NON initialisée → aegis_vault_create doit
+            // retourner null. (Ancienne version s'appuyait à tort sur MOCK_KEYSTORE_FAIL,
+            // qui n'est plus référencé dans le code de production.)
+            HardwareKeystore::wipe_root_key()
+                .expect("wipe_root_key doit réussir");
 
             let vault_ptr = aegis_vault_create(1);
-            assert!(vault_ptr.is_null());
-
-            crate::keystore::MOCK_KEYSTORE_FAIL.with(|fail| fail.set(false));
+            assert!(
+                vault_ptr.is_null(),
+                "vault_ptr null attendu si ROOT_KEY est absente"
+            );
         }
     }
 }

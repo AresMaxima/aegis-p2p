@@ -50,6 +50,11 @@ static ROOT_KEY: Mutex<Option<SecureBuffer>> = Mutex::new(None);
 /// `None` tant que `derive_master_key()` n'a pas été appelée.
 static MASTER_KEY: Mutex<Option<SecureBuffer>> = Mutex::new(None);
 
+/// Lock partagé pour sérialiser tous les tests qui touchent ROOT_KEY/MASTER_KEY.
+/// Accessible depuis session.rs::tests via `crate::keystore::TEST_LOCK`.
+#[cfg(test)]
+pub(crate) static TEST_LOCK: Mutex<()> = Mutex::new(());
+
 // =========================================================================
 // BURN — Utilisé sur les chemins critiques (à conserver)
 // =========================================================================
@@ -370,9 +375,6 @@ mod tests {
     use ed25519_dalek::{Signer, SigningKey};
     use std::ffi::CString;
     use std::ptr;
-
-    // Sérialise les tests qui touchent aux Mutex globaux
-    static TEST_LOCK: Mutex<()> = Mutex::new(());
 
     fn reset_state() {
         let _ = HardwareKeystore::wipe_root_key();
