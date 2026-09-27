@@ -9,7 +9,7 @@
 //!
 //! F4 en cours (28/09/2026) — Objectif : Signal Double Ratchet complet
 //!   Étape 1/7 : infra DH ratchet (DhRatchet + kdf_root)                ✅
-//!   Étape 2/7 : header v3 (dh_pubkey, pn, n) + AEAD-AD                 ⏳
+//!   Étape 2/7 : header v3 (dh_pubkey, pn, n) + AEAD-AD                 ✅
 //!   Étape 3/7 : skipped keys scoped par chaîne + bornes cumulatives     ⏳
 //!   Étape 4/7 : DH ratchet step (cœur PCS)                             ⏳
 //!   Étape 5/7 : PCS renforcé (multi-compromissions + state replay)     ⏳
@@ -20,15 +20,16 @@
 //! PCS formel : Cohn-Gordon et al., EuroS&P 2017 ;
 //!              Cheval-Jacomme-Richards, IEEE S&P 2026.
 //!
-//! État actuel (post-étape 1) :
-//!   • Symmetric ratchet opérationnel (chaînes send/recv).
-//!   • Infra DH ratchet posée (DhRatchet, kdf_root) — intégration étape 4.
-//!   • PCS non encore prouvé : sera couvert par test_double_ratchet_pcs_recovery.
+//! Wire format v3 :
+//!   [header 40 octets] [ciphertext N+16 octets]
+//!   header = dh_pubkey(32 LE) || pn(4 LE) || n(4 LE)
+//!   Le header est fourni en Associated Data à ChaCha20-Poly1305 :
+//!   toute modification du header invalide le tag d'authentification.
 //!
 //! Compat : pad_payload / unpad_payload conservés (utilisés par blindspots_test).
 
 use chacha20poly1305::{
-    aead::{Aead, KeyInit},
+    aead::{Aead, KeyInit, Payload},
     ChaCha20Poly1305, Nonce,
 };
 use hkdf::Hkdf;
@@ -41,9 +42,8 @@ use zeroize::Zeroize;
 /// Nombre maximum de clés de messages skipés avant rejet (anti-DoS).
 const MAX_SKIP: u32 = 1000;
 
-/// Taille du header en bytes : seq_num u32 (4 octets).
-/// NOTE : sera remplacé par HEADER_V3_SIZE = 40 en étape 2.
-const HEADER_SIZE: usize = 4;
+/// Taille du header v3 : dh_pubkey(32) + pn(4) + n(4) = 40 octets.
+pub const HEADER_V3_SIZE: usize = 40;
 
 // =============================================================================
 // PADDING ANTI-ANALYSE DE TRAFIC (conservé — utilisé par blindspots_test)
@@ -93,6 +93,50 @@ pub fn unpad_payload(padded: &[u8]) -> Result<Vec<u8>, &'static str> {
 }
 
 // =============================================================================
+// HEADER v3 — Étape F4.2
+// =============================================================================
+
+/// Header Signal Double Ratchet v3.
+///
+/// Wire format : `dh_pubkey(32 LE) || pn(4 LE) || n(4 LE)` = 40 octets.
+///
+///   • `dh_pubkey` : clé publique X25519 courante de l'émetteur (DH ratchet)
+///   • `pn`        : nombre de messages dans la chaîne d'envoi PRÉCÉDENTE
+///   • `n`         : numéro de message dans la chaîne d'envoi COURANTE
+///
+/// Le header entier est fourni en Associated Data à ChaCha20-Poly1305.
+/// Toute modification du header (même 1 bit) invalide le tag Poly1305.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HeaderV3 {
+    pub dh_pubkey: [u8; 32],
+    pub pn: u32,
+    pub n: u32,
+}
+
+impl HeaderV3 {
+    /// Sérialise le header en 40 octets LE.
+    pub fn to_bytes(&self) -> [u8; HEADER_V3_SIZE] {
+        let mut out = [0u8; HEADER_V3_SIZE];
+        out[..32].copy_from_slice(&self.dh_pubkey);
+        out[32..36].copy_from_slice(&self.pn.to_le_bytes());
+        out[36..40].copy_from_slice(&self.n.to_le_bytes());
+        out
+    }
+
+    /// Désérialise un header depuis un slice. Retourne `None` si trop court.
+    pub fn from_bytes(b: &[u8]) -> Option<Self> {
+        if b.len() < HEADER_V3_SIZE {
+            return None;
+        }
+        let mut dh_pubkey = [0u8; 32];
+        dh_pubkey.copy_from_slice(&b[..32]);
+        let pn = u32::from_le_bytes([b[32], b[33], b[34], b[35]]);
+        let n = u32::from_le_bytes([b[36], b[37], b[38], b[39]]);
+        Some(Self { dh_pubkey, pn, n })
+    }
+}
+
+// =============================================================================
 // DH RATCHET — Étape F4.1
 // =============================================================================
 
@@ -127,7 +171,7 @@ impl DhRatchet {
     }
 
     /// Retourne la clé publique en bytes (32 octets) — pour sérialisation
-    /// dans le header v3 (étape 2).
+    /// dans le header v3.
     pub fn public_bytes(&self) -> [u8; 32] {
         self.public.to_bytes()
     }
@@ -153,11 +197,11 @@ impl DhRatchet {
 ///   • 1 root key (partagé avec l'autre partie au handshake).
 ///   • 2 chaînes symétriques (envoi / réception), ratchetées par message.
 ///   • 1 store de clés skipées (pour messages hors-ordre).
+///   • 1 paire DH locale (DhRatchet) — rotation prévue étape 4/7.
+///   • 1 clé DH distante (None jusqu'à 1er message reçu).
 ///
-/// Wire format (chaque message) :
-///   `[header (4 octets)] [ciphertext (N octets)]`
-///   header = seq_num (u32 LE)
-///   ciphertext = ChaCha20-Poly1305 sur `pad_payload(plaintext, 512)`
+/// Wire format v3 (chaque message) :
+///   `[header 40 octets] [ciphertext N+16 octets]`
 pub struct RatchetSession {
     // --- Root key (pour dérivation d'extension future) ---
     #[allow(dead_code)]
@@ -166,10 +210,15 @@ pub struct RatchetSession {
     // --- Chaîne d'envoi ---
     send_chain_key: [u8; 32],
     send_seq: u32,
+    prev_n: u32, // NEW : messages dans chaîne d'envoi précédente
 
     // --- Chaîne de réception ---
     recv_chain_key: [u8; 32],
     recv_seq: u32,
+
+    // --- DH ratchet (étape 4/7 activera la rotation) ---
+    dh_self: DhRatchet,
+    dh_remote: Option<X25519PublicKey>,
 
     // --- Clés skipées : seq_num → message_key ---
     skipped_keys: HashMap<u32, [u8; 32]>,
@@ -216,8 +265,11 @@ impl RatchetSession {
             root_key,
             send_chain_key,
             send_seq: 0,
+            prev_n: 0,
             recv_chain_key,
             recv_seq: 0,
+            dh_self: DhRatchet::generate(),
+            dh_remote: None, // sera initialisé au premier message reçu
             skipped_keys: HashMap::new(),
         }
     }
@@ -252,15 +304,26 @@ impl RatchetSession {
             root_key,
             send_chain_key,
             send_seq: 0,
+            prev_n: 0,
             recv_chain_key,
             recv_seq: 0,
+            dh_self: DhRatchet::generate(),
+            dh_remote: None, // sera initialisé au premier message reçu
             skipped_keys: HashMap::new(),
         }
     }
 
-    /// Chiffre un message : pad → header → ChaCha20-Poly1305.
+    /// Chiffre un message : pad → header v3 → ChaCha20-Poly1305 (AAD = header).
     pub fn encrypt(&mut self, plaintext: &[u8]) -> Result<Vec<u8>, String> {
         let padded_plaintext = pad_payload(plaintext, 512).map_err(|e| e.to_string())?;
+
+        // Header v3 : (dh_self.public, prev_n, n = send_seq)
+        let header = HeaderV3 {
+            dh_pubkey: self.dh_self.public_bytes(),
+            pn: self.prev_n,
+            n: self.send_seq,
+        };
+        let header_bytes = header.to_bytes();
 
         // Dériver message_key || next_chain_key depuis la chaîne d'envoi
         let (message_key, next_chain_key) = kdf_chain(&self.send_chain_key, self.send_seq);
@@ -273,12 +336,16 @@ impl RatchetSession {
         nonce_bytes[..4].copy_from_slice(&self.send_seq.to_le_bytes());
         let nonce = Nonce::from_slice(&nonce_bytes);
 
+        // Header v3 lié au ciphertext via AEAD-AD
         let ciphertext = cipher
-            .encrypt(nonce, padded_plaintext.as_slice())
+            .encrypt(
+                nonce,
+                Payload {
+                    msg: padded_plaintext.as_slice(),
+                    aad: &header_bytes,
+                },
+            )
             .map_err(|_| "Échec du chiffrement du message".to_string())?;
-
-        // Header minimal : seq_num (4 octets LE)
-        let header = self.send_seq.to_le_bytes();
 
         // Avancer la chaîne
         self.send_chain_key.zeroize();
@@ -286,55 +353,80 @@ impl RatchetSession {
         self.send_seq += 1;
 
         // Assembler header + ciphertext
-        let mut out = Vec::with_capacity(HEADER_SIZE + ciphertext.len());
-        out.extend_from_slice(&header);
+        let mut out = Vec::with_capacity(HEADER_V3_SIZE + ciphertext.len());
+        out.extend_from_slice(&header_bytes);
         out.extend_from_slice(&ciphertext);
 
         Ok(out)
     }
 
-    /// Déchiffre un message : parse header → skip → unpad.
+    /// Déchiffre un message : parse header v3 → vérif dh_remote → skip → unpad.
     pub fn decrypt(&mut self, message: &[u8]) -> Result<Vec<u8>, String> {
-        if message.len() < HEADER_SIZE {
-            return Err("Message trop court".to_string());
+        if message.len() < HEADER_V3_SIZE {
+            return Err(format!(
+                "Message trop court (attendu >= {}, reçu {})",
+                HEADER_V3_SIZE,
+                message.len()
+            ));
         }
 
-        let seq_num = u32::from_le_bytes([
-            message[0], message[1], message[2], message[3],
-        ]);
-        let ciphertext = &message[HEADER_SIZE..];
+        let header = HeaderV3::from_bytes(&message[..HEADER_V3_SIZE])
+            .ok_or_else(|| "Header v3 invalide".to_string())?;
+        let header_bytes = &message[..HEADER_V3_SIZE];
+        let ciphertext = &message[HEADER_V3_SIZE..];
 
-        // --- 1. Skip les clés jusqu'à seq_num (stocke les intermédiaires) ---
-        self.skip_message_keys_until(seq_num)
+        // --- 0. Vérifier / initialiser dh_remote ---
+        // NOTE étape 2 : pas encore de rotation DH. Le DH ratchet step
+        // complet (avec réinitialisation des chaînes) est prévu étape 4/7.
+        match self.dh_remote {
+            None => {
+                self.dh_remote = Some(X25519PublicKey::from(header.dh_pubkey));
+            }
+            Some(known) => {
+                if known.to_bytes() != header.dh_pubkey {
+                    return Err(
+                        "dh_pubkey mismatch — DH ratchet step prévu étape 4/7".to_string()
+                    );
+                }
+            }
+        }
+
+        // --- 1. Skip les clés jusqu'à n (stocke les intermédiaires) ---
+        self.skip_message_keys_until(header.n)
             .map_err(|e| format!("Erreur skip chain: {}", e))?;
 
         // --- 2. Récupérer la message key (skipped ou chain courante) ---
-        let key_to_use = if let Some(k) = self.skipped_keys.remove(&seq_num) {
+        let key_to_use = if let Some(k) = self.skipped_keys.remove(&header.n) {
             k
-        } else if seq_num == self.recv_seq {
-            // Cas normal : c'est la prochaine clé de la chaîne
-            let (mk, next_ck) = kdf_chain(&self.recv_chain_key, seq_num);
+        } else if header.n == self.recv_seq {
+            let (mk, next_ck) = kdf_chain(&self.recv_chain_key, header.n);
             self.recv_chain_key.zeroize();
             self.recv_chain_key = next_ck;
-            self.recv_seq = seq_num + 1;
+            self.recv_seq = header.n + 1;
             mk
         } else {
             return Err(format!(
-                "Clé de message introuvable (seq={})",
-                seq_num
+                "Clé de message introuvable (n={})",
+                header.n
             ));
         };
 
-        // --- 3. Déchiffrer ---
+        // --- 3. Déchiffrer avec AAD = header v3 ---
         let cipher = ChaCha20Poly1305::new_from_slice(&key_to_use)
             .map_err(|e| format!("Erreur d'initialisation du cipher: {}", e))?;
 
         let mut nonce_bytes = [0u8; 12];
-        nonce_bytes[..4].copy_from_slice(&seq_num.to_le_bytes());
+        nonce_bytes[..4].copy_from_slice(&header.n.to_le_bytes());
         let nonce = Nonce::from_slice(&nonce_bytes);
 
         let padded_plaintext = cipher
-            .decrypt(nonce, ciphertext)
+            .decrypt(
+                nonce,
+                Payload {
+                    msg: ciphertext,
+                    aad: header_bytes,
+                },
+            )
             .map_err(|_| "Échec de déchiffrement / MAC invalide".to_string())?;
 
         unpad_payload(&padded_plaintext).map_err(|e| e.to_string())
@@ -482,7 +574,7 @@ mod tests {
 
         let msg1 = b"Message un";
         let enc1 = alice.encrypt(msg1).unwrap();
-        assert!(enc1.len() >= HEADER_SIZE + 512 + 16);
+        assert!(enc1.len() >= HEADER_V3_SIZE + 512 + 16);
         let dec1 = bob.decrypt(&enc1).unwrap();
         assert_eq!(dec1, msg1);
 
@@ -633,5 +725,68 @@ mod tests {
 
         // Propriété : rk' et ck sont distincts (pas de collision interne)
         assert_ne!(rk1, ck1, "rk' et ck doivent être distincts");
+    }
+
+    // =========================================================================
+    // F4 Étape 2/7 — Tests header v3 + AEAD-AD
+    // =========================================================================
+
+    #[test]
+    fn test_header_v3_serialization_roundtrip() {
+        let h = HeaderV3 {
+            dh_pubkey: [0xAA; 32],
+            pn: 0xDEAD_BEEF,
+            n: 0x1234_5678,
+        };
+
+        let bytes = h.to_bytes();
+        assert_eq!(bytes.len(), HEADER_V3_SIZE);
+        assert_eq!(bytes.len(), 40);
+
+        // Vérifier l'ordre LE attendu
+        assert_eq!(&bytes[..32], &[0xAA; 32]);
+        assert_eq!(&bytes[32..36], &0xDEAD_BEEFu32.to_le_bytes());
+        assert_eq!(&bytes[36..40], &0x1234_5678u32.to_le_bytes());
+
+        // Roundtrip
+        let h2 = HeaderV3::from_bytes(&bytes).expect("from_bytes doit réussir");
+        assert_eq!(h2, h);
+
+        // Slice trop court → None
+        assert!(HeaderV3::from_bytes(&bytes[..39]).is_none());
+    }
+
+    #[test]
+    fn test_header_bound_to_ciphertext() {
+        // Propriété : toute modification du header invalide le tag Poly1305,
+        // car le header est fourni en AAD (Associated Data).
+        let (mut alice, mut bob) = handshake();
+
+        let msg = b"secret header-bound";
+        let enc = alice.encrypt(msg).unwrap();
+
+        // Vérifier qu'on peut décrypter en l'état (baseline)
+        // NOTE : on utilise un 2e message pour ne pas "consommer" le premier.
+        // On refait donc un handshake propre.
+        drop(bob);
+        let (mut alice, mut bob) = handshake();
+        let enc = alice.encrypt(msg).unwrap();
+
+        // Tamper : flip 1 bit dans le header (pn, à l'offset 32)
+        let mut tampered = enc.clone();
+        tampered[32] ^= 0x01;
+
+        // Le déchiffrement doit échouer (MAC invalide car AAD différent)
+        let result = bob.decrypt(&tampered);
+        assert!(
+            result.is_err(),
+            "Header tampering (pn) aurait dû invalider le MAC"
+        );
+
+        // Baseline : le message non-tamperé doit passer
+        // (on refait un handshake car bob a déjà consommé un message)
+        let (mut alice, mut bob) = handshake();
+        let enc_ok = alice.encrypt(msg).unwrap();
+        assert_eq!(bob.decrypt(&enc_ok).unwrap(), msg);
     }
 }
