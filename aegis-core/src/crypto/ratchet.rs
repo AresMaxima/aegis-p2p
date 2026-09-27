@@ -7,9 +7,23 @@
 //!   • Ajout store borné (MAX_SKIP = 1000) des clés de messages skipés.
 //!   • Replay protection via fenêtre glissante.
 //!
-//! Limite : PAS de Post-Compromise Security (PCS). Le DH ratchet step
-//! périodique nécessite un vrai handshake Signal avec transmission
-//! de prev_chain_len. À implémenter en v3.1 si nécessaire.
+//! F4 en cours (28/09/2026) — Objectif : Signal Double Ratchet complet
+//!   Étape 1/7 : infra DH ratchet (DhRatchet + kdf_root)                ✅
+//!   Étape 2/7 : header v3 (dh_pubkey, pn, n) + AEAD-AD                 ⏳
+//!   Étape 3/7 : skipped keys scoped par chaîne + bornes cumulatives     ⏳
+//!   Étape 4/7 : DH ratchet step (cœur PCS)                             ⏳
+//!   Étape 5/7 : PCS renforcé (multi-compromissions + state replay)     ⏳
+//!   Étape 6/7 : X3DH 4-DH + ML-KEM-1024 (HKDF-SHA384)                  ⏳
+//!   Étape 7/7 : rotation forcée (MAX_CHAIN_LENGTH) + zéroisation       ⏳
+//!
+//! Référence : Signal Double Ratchet (Perrin-Marlinspike 2016).
+//! PCS formel : Cohn-Gordon et al., EuroS&P 2017 ;
+//!              Cheval-Jacomme-Richards, IEEE S&P 2026.
+//!
+//! État actuel (post-étape 1) :
+//!   • Symmetric ratchet opérationnel (chaînes send/recv).
+//!   • Infra DH ratchet posée (DhRatchet, kdf_root) — intégration étape 4.
+//!   • PCS non encore prouvé : sera couvert par test_double_ratchet_pcs_recovery.
 //!
 //! Compat : pad_payload / unpad_payload conservés (utilisés par blindspots_test).
 
@@ -18,6 +32,7 @@ use chacha20poly1305::{
     ChaCha20Poly1305, Nonce,
 };
 use hkdf::Hkdf;
+use rand::rngs::OsRng;
 use sha2::Sha256;
 use std::collections::HashMap;
 use x25519_dalek::{PublicKey as X25519PublicKey, StaticSecret as X25519StaticSecret};
@@ -27,6 +42,7 @@ use zeroize::Zeroize;
 const MAX_SKIP: u32 = 1000;
 
 /// Taille du header en bytes : seq_num u32 (4 octets).
+/// NOTE : sera remplacé par HEADER_V3_SIZE = 40 en étape 2.
 const HEADER_SIZE: usize = 4;
 
 // =============================================================================
@@ -74,6 +90,57 @@ pub fn unpad_payload(padded: &[u8]) -> Result<Vec<u8>, &'static str> {
     }
 
     Ok(padded[2..2 + payload_len].to_vec())
+}
+
+// =============================================================================
+// DH RATCHET — Étape F4.1
+// =============================================================================
+
+/// Paire X25519 éphémère pour le DH ratchet step (Signal Double Ratchet).
+///
+/// Une nouvelle instance est générée à chaque flip de direction de
+/// communication (dans `decrypt`, quand `header.dh_pubkey != dh_remote`).
+///
+/// Propriété PCS : après compromission de l'état, un nouveau `DhRatchet`
+/// produit une paire dont l'adversaire n'a PAS la clé privée → la
+/// sécurité est restaurée (voir étape 4/5).
+///
+/// IMPORTANT : `secret` doit être zéroïsé au Drop (fait par x25519-dalek
+/// via `StaticSecret` qui implémente `ZeroizeOnDrop` depuis v2.0).
+pub struct DhRatchet {
+    secret: X25519StaticSecret,
+    public: X25519PublicKey,
+}
+
+impl DhRatchet {
+    /// Génère une nouvelle paire X25519 aléatoire (OsRng, CSPRNG).
+    pub fn generate() -> Self {
+        let mut rng = OsRng;
+        let secret = X25519StaticSecret::random_from_rng(&mut rng);
+        let public = X25519PublicKey::from(&secret);
+        Self { secret, public }
+    }
+
+    /// Retourne la clé publique (référence).
+    pub fn public_key(&self) -> &X25519PublicKey {
+        &self.public
+    }
+
+    /// Retourne la clé publique en bytes (32 octets) — pour sérialisation
+    /// dans le header v3 (étape 2).
+    pub fn public_bytes(&self) -> [u8; 32] {
+        self.public.to_bytes()
+    }
+
+    /// Effectue DH avec la clé publique distante.
+    ///
+    /// Retourne le shared secret (32 bytes). Doit être effacé après usage
+    /// par l'appelant (`zeroize()`).
+    ///
+    /// Note : DH X25519 est symétrique — DH(a_sec, b_pub) == DH(b_sec, a_pub).
+    pub fn dh(&self, remote: &X25519PublicKey) -> [u8; 32] {
+        self.secret.diffie_hellman(remote).to_bytes()
+    }
 }
 
 // =============================================================================
@@ -308,7 +375,10 @@ impl RatchetSession {
 // HELPERS KDF
 // =============================================================================
 
-/// Dérive le root initial depuis master_secret.
+/// Dérive le root initial depuis master_secret (handshake X3DH).
+///
+/// NOTE : fonction distincte de `kdf_root` (ci-dessous) qui opère sur
+/// les DH ratchet steps. `derive_root` = init ; `kdf_root` = ratchet.
 fn derive_root(master_secret: &[u8]) -> [u8; 32] {
     let hk = Hkdf::<Sha256>::new(Some(b"AEGIS_RATCHET_ROOT_SALT"), master_secret);
     let mut out = [0u8; 32];
@@ -341,6 +411,42 @@ fn kdf_chain(chain_key: &[u8; 32], seq: u32) -> ([u8; 32], [u8; 32]) {
     hk.expand(&info_next, &mut next_ck).expect("HKDF next_chain");
 
     (msg_key, next_ck)
+}
+
+/// KDF_RK — DH ratchet step selon Signal Double Ratchet.
+///
+/// Prend (root_key, dh_output) → (new_root_key, chain_key).
+/// Utilisé à chaque DH ratchet step (intégration prévue en étape 4/7).
+///
+/// Propriété : la nouvelle root_key est dérivée du DH partagé entre la
+/// nouvelle paire X25519 et la clé publique distante. Si l'adversaire
+/// n'a pas la clé privée de la nouvelle paire, il ne peut pas calculer
+/// le DH → la sécurité est restaurée (PCS).
+///
+/// `#[allow(dead_code)]` : sera utilisé dans RatchetSession::decrypt()
+/// à partir de l'étape 4/7 (DH ratchet step).
+#[allow(dead_code)]
+fn kdf_root(root_key: &[u8; 32], dh_output: &[u8; 32]) -> ([u8; 32], [u8; 32]) {
+    // HKDF-SHA256(salt=AEGIS_DR_RK_SALT, ikm=dh_output, info=root_key || tag)
+    let hk = Hkdf::<Sha256>::new(Some(b"AEGIS_DR_RK_SALT"), dh_output);
+
+    // info = root_key (32) || "AEGIS_DR_RK" (11) = 43 octets
+    let mut info = [0u8; 43];
+    info[..32].copy_from_slice(root_key);
+    info[32..].copy_from_slice(b"AEGIS_DR_RK");
+
+    let mut okm = [0u8; 64];
+    hk.expand(&info, &mut okm).expect("HKDF kdf_root");
+
+    let mut new_rk = [0u8; 32];
+    let mut ck = [0u8; 32];
+    new_rk.copy_from_slice(&okm[..32]);
+    ck.copy_from_slice(&okm[32..]);
+
+    // Zeroize du buffer intermédiaire
+    okm.zeroize();
+
+    (new_rk, ck)
 }
 
 // =============================================================================
@@ -466,5 +572,66 @@ mod tests {
         assert_eq!(padded.len(), 512);
         let unpadded = unpad_payload(&padded).unwrap();
         assert_eq!(unpadded, data);
+    }
+
+    // =========================================================================
+    // F4 Étape 1/7 — Tests infra DH ratchet
+    // =========================================================================
+
+    #[test]
+    fn test_dh_ratchet_generates_valid_pair() {
+        // Génère 2 paires indépendantes
+        let a = DhRatchet::generate();
+        let b = DhRatchet::generate();
+
+        // Propriété 1 : les clés publiques sont distinctes (avec overwhelming proba)
+        assert_ne!(
+            a.public_bytes(),
+            b.public_bytes(),
+            "Deux DhRatchet::generate() doivent produire des clés distinctes"
+        );
+
+        // Propriété 2 : DH est symétrique
+        let ab = a.dh(b.public_key());
+        let ba = b.dh(a.public_key());
+        assert_eq!(ab, ba, "DH X25519 doit être symétrique");
+
+        // Propriété 3 : le shared secret n'est pas trivial (pas tout-à-zéro)
+        assert!(
+            ab.iter().any(|&x| x != 0),
+            "Le DH ne doit pas produire un secret tout-à-zéro"
+        );
+
+        // Propriété 4 : DH avec une clé distante différente → résultat différent
+        let c = DhRatchet::generate();
+        let ac = a.dh(c.public_key());
+        assert_ne!(ab, ac, "DH avec un pair différent doit donner un secret différent");
+    }
+
+    #[test]
+    fn test_root_chain_kdf_determinism() {
+        let rk = [0xAAu8; 32];
+        let dh = [0xBBu8; 32];
+
+        // Déterminisme : même (rk, dh) → même (rk', ck)
+        let (rk1, ck1) = kdf_root(&rk, &dh);
+        let (rk2, ck2) = kdf_root(&rk, &dh);
+        assert_eq!(rk1, rk2, "Même (rk, dh) → même rk'");
+        assert_eq!(ck1, ck2, "Même (rk, dh) → même ck");
+
+        // Sensibilité à dh : dh différent → résultat différent
+        let dh_other = [0xCCu8; 32];
+        let (rk3, ck3) = kdf_root(&rk, &dh_other);
+        assert_ne!(rk1, rk3, "dh différent → rk' différent");
+        assert_ne!(ck1, ck3, "dh différent → ck différent");
+
+        // Sensibilité à rk : rk différent → résultat différent
+        let rk_other = [0xDDu8; 32];
+        let (rk4, ck4) = kdf_root(&rk_other, &dh);
+        assert_ne!(rk1, rk4, "rk différent → rk' différent");
+        assert_ne!(ck1, ck4, "rk différent → ck différent");
+
+        // Propriété : rk' et ck sont distincts (pas de collision interne)
+        assert_ne!(rk1, ck1, "rk' et ck doivent être distincts");
     }
 }
