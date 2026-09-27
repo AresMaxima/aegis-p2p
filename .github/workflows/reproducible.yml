@@ -128,3 +128,33 @@ jobs:
             --track-origins=yes \
             --errors-for-leak-kinds=definite \
             "$BIN" polymorphic --test-threads=1
+
+  # ============================================================
+  # JOB 5 — Preuve TPM : compilation de tpm.rs avec la feature `tpm`
+  # Ce job est la PREUVE que le module TPM est compilable et testable
+  # (mock uniquement — les tests hardware sont `#[ignore]`).
+  # Sans ce job, tpm.rs n'est jamais validé par la CI (absent de Miri
+  # car #![cfg(not(miri))], absent d'Android car target_os != linux).
+  # ============================================================
+  tpm-feature-proof:
+    name: TPM feature compilation proof
+    runs-on: ubuntu-latest
+    container:
+      image: rust:1.93-bookworm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install libtss2 (TPM2-TSS)
+        run: |
+          apt-get update
+          apt-get install -y libtss2-dev pkg-config
+
+      - name: Compile aegis-core with tpm feature
+        run: |
+          cd aegis-core
+          cargo check --features tpm --tests
+
+      - name: Run TPM mock tests (hardware tests ignored)
+        run: |
+          cd aegis-core
+          cargo test --features tpm --lib tpm:: -- --test-threads=1

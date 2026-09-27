@@ -6,7 +6,6 @@ use aegis_core::{
         keys::{derive_keys_from_mnemonic, generate_mnemonic},
         memory::{prevent_core_dumps, purge_all_secrets, MaskedSecret, ProtectedBuffer},
         ratchet::{pad_payload, unpad_payload},
-        tpm::AegisTpmManager,
     },
     crypto_pq::HybridKeyExchange,
     deadman::DeadMansSwitch,
@@ -30,6 +29,12 @@ use aegis_core::{
     storage::{db::AegisDatabase, vault::AegisVault},
     transport::{DynamicTransportRouter, TransportMode},
 };
+
+// Import TPM — uniquement si la feature `tpm` est activée.
+// Sans elle, le module `crypto::tpm` n'existe pas dans le crate
+// (voir crypto/mod.rs — `#[cfg(feature = "tpm")] pub mod tpm;`).
+#[cfg(feature = "tpm")]
+use aegis_core::crypto::tpm::AegisTpmManager;
 
 #[test]
 fn test_blindspots_full_26_modules_sweep() {
@@ -95,8 +100,11 @@ fn test_blindspots_full_26_modules_sweep() {
         let _ = unpad_payload(&padded);
     }
 
-    let _ = AegisTpmManager::verify_kernel_integrity();
-    let _ = AegisTpmManager::unseal_master_secret(&[0u8; 32]);
+    #[cfg(feature = "tpm")]
+    {
+        let _ = AegisTpmManager::verify_kernel_integrity();
+        let _ = AegisTpmManager::unseal_master_secret(&[0u8; 32]);
+    }
 
     let _ = SneakernetMesh::ingest_packet([0u8; 512], 1);
     let _ = SneakernetMesh::export_gossip_bundle();

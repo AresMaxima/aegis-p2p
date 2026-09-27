@@ -1,4 +1,4 @@
-﻿#![cfg(not(miri))]
+#![cfg(not(miri))]
 use std::process::abort;
 
 #[cfg(all(target_os = "linux", not(kani)))]
@@ -160,6 +160,10 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg_attr(
+        target_os = "linux",
+        ignore = "requires real TPM device (Linux CI has no /dev/tpm0)"
+    )]
     fn test_tpm_nominal_pipeline() {
         let res = AegisTpmManager::verify_kernel_integrity();
         assert!(res.is_ok());
@@ -194,4 +198,3 @@ mod tests {
         AegisTpmManager::trigger_emergency_abort();
     }
 }
-

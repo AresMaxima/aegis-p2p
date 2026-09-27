@@ -119,6 +119,12 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(kani)'] }
 default = ["software_alpha_shields"]
 software_alpha_shields = []
 
+# Feature TPM — compilée uniquement à la demande (nécessite libtss2-dev).
+# Non-default car : (1) libtss2 n'est pas disponible sur Windows/Android,
+# (2) requiert un device TPM réel pour les tests natifs.
+# Preuve de compilation : job CI `tpm-feature-proof`.
+tpm = ["dep:tss-esapi"]
+
 # DESIGN CONCEPTUEL NON COMPILÉ PAR DÉFAUT (PHASE 9 B2G)
 b2g_phase9_soc = ["efuse_access", "hw_zeroization_mesh"]
 efuse_access = []
