@@ -12,6 +12,11 @@
 //!
 //!   La nouvelle implémentation parse réellement la structure JPEG et
 //!   reconstruit un Vec<u8> ne contenant que les segments conservés.
+//!
+//!   Q-CI FIX 2026-09-27 : correction de l'APP1 du test unitaire. La
+//!   longueur déclarée (0x10 = 16) était incohérente avec les 16 octets
+//!   de données fournies (parser attendait 14 octets de data), ce qui
+//!   déclenchait le fail-safe et laissait passer le segment COM.
 //! ─────────────────────────────────────────────────────────────────────
 
 use crate::secure_buffer::SecureBuffer;
@@ -415,17 +420,23 @@ mod tests {
     fn test_jpeg_stripping_removes_app_segments() {
         // Faux JPEG minimal :
         //   SOI (FF D8)
-        //   APP1 (FF E1 00 10 <14 bytes "EXIF\0\0fake-exif!" >)
+        //   APP1 (FF E1 00 08 <6 bytes "EXIF\0\0">)
         //   APP0 (FF E0 00 04 <2 bytes>)
-        //   SOS (FF DA 00 02)
+        //   COM  (FF FE 00 06 <4 bytes "hell">)
+        //   SOS  (FF DA 00 02)
         //   data entropique (2 bytes quelconques)
         //   EOI (FF D9)
         let mut jpeg: Vec<u8> = Vec::new();
         jpeg.extend_from_slice(&[0xFF, 0xD8]); // SOI
 
         // APP1 EXIF (à supprimer)
-        jpeg.extend_from_slice(&[0xFF, 0xE1, 0x00, 0x10]);
-        jpeg.extend_from_slice(b"EXIF\x00\x00fake-exif!"); // 14 octets
+        // Q-CI FIX 2026-09-27 : longueur = 8 (2 len + 6 data "EXIF\0\0").
+        // L'ancienne valeur 0x10 = 16 avec 16 octets de data était INCORRECTE :
+        // le parser attendait 14 octets de data et terminait le segment 2 octets
+        // trop tôt, déclenchant le fail-safe qui copiait tout le reste
+        // (y compris le segment COM suivant).
+        jpeg.extend_from_slice(&[0xFF, 0xE1, 0x00, 0x08]);
+        jpeg.extend_from_slice(b"EXIF\x00\x00"); // 6 octets de data
 
         // APP0 JFIF (à conserver)
         jpeg.extend_from_slice(&[0xFF, 0xE0, 0x00, 0x04, 0x4A, 0x46]);
