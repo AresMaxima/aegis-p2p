@@ -1,34 +1,40 @@
-﻿name: Reproducible Build & Verification
+name: Reproducible Build & Verification
 on: [push, pull_request]
 
 jobs:
+  # ============================================================
+  # JOB 1 — Kani (pin rust:1.93 pour compatibilité Kani 0.67.0)
+  # ============================================================
   kani-proofs:
     name: Formal Proofs (AWS Kani)
     runs-on: ubuntu-latest
     container:
-      image: rust:latest
+      image: rust:1.93-bookworm     # PIN compatible Kani 0.67.0
     steps:
       - uses: actions/checkout@v4
       - name: Install System Dependencies & Kani
         run: |
           apt-get update && apt-get install -y build-essential python3 python3-pip
-          cargo install --locked kani-verifier
+          cargo install --locked kani-verifier --version 0.67.0
           cargo kani setup
       - name: Execute Kani Formal Verification
         run: |
           cd aegis-core
           cargo kani --harness crypto_pq::verify_process_512b_frame_bounds > kani-report.txt
 
+  # ============================================================
+  # JOB 2 — Miri (idem, pin rust:1.93 pour stabilité)
+  # ============================================================
   miri-audit:
     name: Memory Audit (Miri)
     runs-on: ubuntu-latest
     container:
-      image: rust:latest
+      image: rust:1.93-bookworm     # PIN compatible Miri stable
     strategy:
       fail-fast: false
       matrix:
         # Lancement de 5 serveurs parallèles pour couvrir 100% du code sans timeout
-        modules: 
+        modules:
           - "crypto crypto_pq"
           - "network mesh transport"
           - "secure_buffer storage session"
@@ -37,7 +43,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Miri
-        run: rustup toolchain install nightly --component miri
+        run: rustup toolchain install nightly-2026-09-01 --component miri
       - name: Execute Miri Undefined Behavior Check
         env:
           MIRIFLAGS: "-Zmiri-disable-isolation"
@@ -45,14 +51,18 @@ jobs:
           cd aegis-core
           # Exécute Miri sur les modules assignés à ce serveur spécifique
           for mod in ${{ matrix.modules }}; do
-            cargo +nightly miri test $mod --release
+            cargo +nightly-2026-09-01 miri test $mod --release
           done
 
+  # ============================================================
+  # JOB 3 — Build Android (NE PAS TOUCHER = rust:latest = 1.98.1)
+  # Même version que le cargo local de l'opérateur = reproducible build
+  # ============================================================
   build-android:
     name: Android NDK Build
     runs-on: ubuntu-latest
     container:
-      image: rust:latest
+      image: rust:latest            # INTACT : 1.98.1 = même que cargo local
     steps:
       - uses: actions/checkout@v4
       - name: Install System Dependencies
