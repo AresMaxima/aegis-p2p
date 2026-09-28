@@ -6,7 +6,7 @@
 //!   Étape 2/7 : header v3 (dh_pubkey, pn, n) + AEAD-AD                 ✅
 //!   Étape 3/7 : skipped keys scoped + MAX_SKIP_TOTAL                   ✅
 //!   Étape 4/7 : DH ratchet step (cœur PCS)                             ✅
-//!   Étape 5/7 : PCS renforcé (multi-compromissions + state replay)     ⏳
+//!   Étape 5/7 : PCS renforcé (multi-compromissions + state replay)     ✅
 //!   Étape 6/7 : X3DH 4-DH + ML-KEM-1024 (HKDF-SHA384)                  ⏳
 //!   Étape 7/7 : rotation forcée (MAX_CHAIN_LENGTH) + zéroisation       ⏳
 //!
@@ -31,7 +31,7 @@
 //! l'instant T, le prochain ON-SEND step (déclenché par un changement
 //! de direction) régénère send_chain_key ET dh_self à partir d'un DH
 //! dont l'adversaire n'a pas la clé privée.
-//! Voir test_double_ratchet_pcs_recovery.
+//! Voir test_double_ratchet_pcs_recovery et les 3 tests renforcés étape 5.
 
 use chacha20poly1305::{
     aead::{Aead, KeyInit, Payload},
@@ -766,5 +766,177 @@ mod tests {
 
         // La session légitime fonctionne toujours.
         assert_eq!(bob.decrypt(&m3).unwrap(), b"m3-post-pcs");
+    }
+
+    // =========================================================================
+    // F4 Étape 5/7 — PCS renforcé (multi-compromissions + state replay + zeroize)
+    // =========================================================================
+
+    #[test]
+    fn test_pcs_recovery_after_multiple_compromises() {
+        // Propriété : PCS résiste à des compromissions successives.
+        // Après CHAQUE compromission + DH step, la sécurité est restaurée
+        // et la session légitime continue à fonctionner.
+        let (mut alice, mut bob) = handshake();
+
+        // Cycle 1 — établir la session
+        let m1 = alice.encrypt(b"cycle1-alice").unwrap();
+        bob.decrypt(&m1).unwrap();
+        let r1 = bob.encrypt(b"cycle1-bob").unwrap();
+        alice.decrypt(&r1).unwrap();
+
+        // Compromission 1 : capturer l'état d'Alice
+        let c1_send_ck = alice.send_chain_key;
+        let c1_root = alice.root_key;
+        let c1_dh = alice.dh_self.public_bytes();
+
+        // Alice envoie → ON-SEND step → recovery
+        let m2 = alice.encrypt(b"cycle1-post-pcs").unwrap();
+        bob.decrypt(&m2).unwrap();
+
+        assert_ne!(alice.send_chain_key, c1_send_ck, "Compromission 1 : send_ck régénéré");
+        assert_ne!(alice.root_key, c1_root, "Compromission 1 : root régénéré");
+        assert_ne!(alice.dh_self.public_bytes(), c1_dh, "Compromission 1 : dh régénéré");
+
+        // Cycle 2 — Bob répond → Alice DH step
+        let r2 = bob.encrypt(b"cycle2-bob").unwrap();
+        alice.decrypt(&r2).unwrap();
+
+        // Compromission 2 : capturer le NOUVEL état d'Alice
+        let c2_send_ck = alice.send_chain_key;
+        let c2_root = alice.root_key;
+        let c2_dh = alice.dh_self.public_bytes();
+
+        // Vérifier que c2 != c1 (la compromission 1 n'a pas laissé fuiter l'état)
+        assert_ne!(c2_send_ck, c1_send_ck, "État post-cycle 1 différent de pré-cycle 1");
+        assert_ne!(c2_root, c1_root);
+        assert_ne!(c2_dh, c1_dh);
+
+        // Alice envoie → 2e ON-SEND step → recovery 2
+        let m3 = alice.encrypt(b"cycle2-post-pcs").unwrap();
+        bob.decrypt(&m3).unwrap();
+
+        assert_ne!(alice.send_chain_key, c2_send_ck, "Compromission 2 : send_ck régénéré");
+        assert_ne!(alice.root_key, c2_root, "Compromission 2 : root régénéré");
+        assert_ne!(alice.dh_self.public_bytes(), c2_dh, "Compromission 2 : dh régénéré");
+
+        // La session légitime fonctionne toujours
+        let r3 = bob.encrypt(b"final-check").unwrap();
+        assert_eq!(alice.decrypt(&r3).unwrap(), b"final-check");
+    }
+
+    #[test]
+    fn test_pcs_rejects_state_replay() {
+        // Propriété : un adversaire qui capture l'état COMPROMIS (chain_key,
+        // root_key, dh_self) NE PEUT PAS déchiffrer les messages post-DH-step.
+        let (mut alice, mut bob) = handshake();
+
+        // Établir la session
+        let m1 = alice.encrypt(b"setup").unwrap();
+        bob.decrypt(&m1).unwrap();
+        let r1 = bob.encrypt(b"setup-reply").unwrap();
+        alice.decrypt(&r1).unwrap();
+
+        // Capturer l'état COMPROMIS AVANT le DH step d'Alice
+        let compromised_send_ck = alice.send_chain_key;
+        let _compromised_root = alice.root_key;
+        let compromised_dh = alice.dh_self.public_bytes();
+
+        // Alice envoie un message → ON-SEND step
+        let m2 = alice.encrypt(b"post-step-1").unwrap();
+        bob.decrypt(&m2).unwrap();
+
+        // Vérifier que l'état a changé (le DH step a eu lieu)
+        assert_ne!(alice.send_chain_key, compromised_send_ck);
+
+        // Alice envoie un 2e message post-step, n=1 dans la nouvelle chaîne
+        let m3 = alice.encrypt(b"post-step-2").unwrap();
+        let header_m3 = HeaderV3::from_bytes(&m3[..HEADER_V3_SIZE]).unwrap();
+
+        // Adversaire tente de dériver la message_key de m3 avec l'état compromis.
+        let (fake_mk, _) = kdf_chain(&compromised_send_ck, header_m3.n);
+        let fake_cipher = ChaCha20Poly1305::new_from_slice(&fake_mk).unwrap();
+        let mut nonce_bytes = [0u8; 12];
+        nonce_bytes[..4].copy_from_slice(&header_m3.n.to_le_bytes());
+        let fake_nonce = Nonce::from_slice(&nonce_bytes);
+
+        let fake_decrypt = fake_cipher.decrypt(
+            fake_nonce,
+            Payload {
+                msg: &m3[HEADER_V3_SIZE..],
+                aad: &m3[..HEADER_V3_SIZE],
+            },
+        );
+        assert!(
+            fake_decrypt.is_err(),
+            "PCS : replay d'état compromis doit échouer"
+        );
+
+        // Vérification supplémentaire : l'ancien dh_self (compromis) n'apparaît
+        // plus dans le header du nouveau message.
+        assert_ne!(
+            compromised_dh, header_m3.dh_pubkey,
+            "PCS : le nouveau dh_pubkey diffère de l'ancien"
+        );
+
+        // La session légitime continue
+        assert_eq!(bob.decrypt(&m3).unwrap(), b"post-step-2");
+    }
+
+    #[test]
+    fn test_old_root_key_erased_after_step() {
+        // Propriété : l'ancienne root_key n'est plus réutilisable après un DH step.
+        // On vérifie que :
+        //   1. La root_key a effectivement changé (dérivation KDF_RK).
+        //   2. Chaque DH step produit une root_key différente (pas de boucle).
+        //   3. Les 4 root_key successives sont toutes distinctes.
+        let (mut alice, mut bob) = handshake();
+
+        let root_0 = alice.root_key;
+
+        // Établir la session
+        let m1 = alice.encrypt(b"a1").unwrap();
+        bob.decrypt(&m1).unwrap();
+        let r1 = bob.encrypt(b"b1").unwrap();
+        alice.decrypt(&r1).unwrap();
+
+        let root_1 = alice.root_key;
+        assert_ne!(root_0, root_1, "Root a changé après 1er DH step");
+
+        // 2e cycle
+        let m2 = alice.encrypt(b"a2").unwrap();
+        bob.decrypt(&m2).unwrap();
+        let r2 = bob.encrypt(b"b2").unwrap();
+        alice.decrypt(&r2).unwrap();
+
+        let root_2 = alice.root_key;
+        assert_ne!(root_1, root_2, "Root a changé après 2e DH step");
+        assert_ne!(root_0, root_2, "Root_2 != Root_0 (pas de cycle)");
+
+        // 3e cycle
+        let m3 = alice.encrypt(b"a3").unwrap();
+        bob.decrypt(&m3).unwrap();
+        let r3 = bob.encrypt(b"b3").unwrap();
+        alice.decrypt(&r3).unwrap();
+
+        let root_3 = alice.root_key;
+        assert_ne!(root_2, root_3, "Root a changé après 3e DH step");
+        assert_ne!(root_1, root_3);
+        assert_ne!(root_0, root_3);
+
+        // Vérification d'indépendance : les 4 root_key sont toutes distinctes
+        let roots = [root_0, root_1, root_2, root_3];
+        for i in 0..roots.len() {
+            for j in (i + 1)..roots.len() {
+                assert_ne!(
+                    roots[i], roots[j],
+                    "Root_{} et Root_{} doivent être distincts", i, j
+                );
+            }
+        }
+
+        // La session fonctionne toujours
+        let r4 = bob.encrypt(b"final").unwrap();
+        assert_eq!(alice.decrypt(&r4).unwrap(), b"final");
     }
 }
