@@ -1,6 +1,12 @@
 //! aegis-core/src/crypto_pq.rs
-//! Encapsulation Hybride Post-Quantique ML-KEM-768 + X25519 (Constant-Time)
+//! Encapsulation Hybride Post-Quantique ML-KEM-1024 + X25519 (Constant-Time)
 //! et Chiffrement Vectorisé ARM NEON / Hardware Extensions (CdCM v2.2-RC1).
+//!
+//! F4 Étape 6c (29/09/2026) — Passage à ML-KEM-1024 (NIST Level 5) :
+//!   • ML-KEM-768 → ML-KEM-1024 : sécurité équivalente AES-256 (contre AES-192).
+//!   • Conforme FIPS 203, se rapproche des exigences CNSA 2.0.
+//!   • Tailles : pk=1568, sk=3168, ct=1568 octets.
+//!   • Impact perf : ~30% plus lent, ~50% plus gros (accepté pour L5).
 //!
 //! NOTE (audit 2026-09-27) :
 //!   • Les tags HKDF "AEGIS-v2.2-*" sont FIGÉS pour compatibilité vault
@@ -18,7 +24,7 @@
 use aes_gcm::aead::{Aead, KeyInit, Payload};
 use aes_gcm::{Aes256Gcm, Nonce};
 use hkdf::Hkdf;
-use pqcrypto_mlkem::mlkem768::{
+use pqcrypto_mlkem::mlkem1024::{
     decapsulate as kyber_decapsulate, encapsulate as kyber_encapsulate, keypair as kyber_keypair,
     Ciphertext as KyberCiphertext, PublicKey as KyberPublicKey, SecretKey as KyberSecretKey,
 };
@@ -32,7 +38,7 @@ use crate::secure_buffer::SecureBuffer;
 pub const AES_256_GCM_KEY_LEN: usize = 32;
 pub const AES_256_GCM_NONCE_LEN: usize = 12;
 
-/// Clé publique hybride contenant les composantes ML-KEM-768 et X25519
+/// Clé publique hybride contenant les composantes ML-KEM-1024 et X25519
 #[derive(Clone)]
 pub struct HybridPublicKey {
     pub kyber_pk: KyberPublicKey,
@@ -265,7 +271,7 @@ mod tests {
     fn test_encapsulate_and_derive_direct_roundtrip() {
         let bob_x_secret = EphemeralSecret::random_from_rng(rand::rngs::OsRng);
         let bob_x_public = X25519PublicKey::from(&bob_x_secret);
-        let (kyber_pk, kyber_sk) = pqcrypto_mlkem::mlkem768::keypair();
+        let (kyber_pk, kyber_sk) = pqcrypto_mlkem::mlkem1024::keypair();
 
         let (alice_derived, alice_x_pub, kyber_ct) =
             HybridKeyExchange::encapsulate_and_derive(&bob_x_public, &kyber_pk);
@@ -320,6 +326,53 @@ mod tests {
 
         #[cfg(not(debug_assertions))]
         assert!(throughput_mb_s > 50.0, "Débit insuffisant en profil Release");
+    }
+
+    /// F4 Étape 6c — Vérifie que ML-KEM-1024 est bien utilisé (NIST Level 5).
+    ///
+    /// Tailles officielles FIPS 203 pour ML-KEM-1024 :
+    ///   • Public key (ek)    : 1568 octets
+    ///   • Secret key (dk)    : 3168 octets
+    ///   • Ciphertext (ct)    : 1568 octets
+    ///   • Shared secret      :   32 octets
+    #[test]
+    fn test_mlkem_1024_sizes() {
+        // Import local : le trait SecretKey fournit `.as_bytes()` sur `sk`.
+        use pqcrypto_traits::kem::SecretKey;
+
+        let (pk, sk) = pqcrypto_mlkem::mlkem1024::keypair();
+
+        assert_eq!(
+            pk.as_bytes().len(),
+            1568,
+            "ML-KEM-1024 pk doit faire 1568 octets (FIPS 203)"
+        );
+        assert_eq!(
+            sk.as_bytes().len(),
+            3168,
+            "ML-KEM-1024 sk doit faire 3168 octets (FIPS 203)"
+        );
+
+        // ⚠️ L'API pqcrypto retourne (SharedSecret, Ciphertext) dans cet ordre.
+        let (ss, ct) = pqcrypto_mlkem::mlkem1024::encapsulate(&pk);
+        assert_eq!(
+            ct.as_bytes().len(),
+            1568,
+            "ML-KEM-1024 ct doit faire 1568 octets (FIPS 203)"
+        );
+        assert_eq!(
+            ss.as_bytes().len(),
+            32,
+            "ML-KEM-1024 shared secret doit faire 32 octets (FIPS 203)"
+        );
+
+        // Vérification croisée : décapsulation produit le même ss
+        let ss2 = pqcrypto_mlkem::mlkem1024::decapsulate(&ct, &sk);
+        assert_eq!(
+            ss.as_bytes(),
+            ss2.as_bytes(),
+            "ML-KEM-1024 decaps doit redonner le même shared secret"
+        );
     }
 }
 
