@@ -10,7 +10,7 @@
 //! F4 en cours (28/09/2026) — Objectif : Signal Double Ratchet complet
 //!   Étape 1/7 : infra DH ratchet (DhRatchet + kdf_root)                ✅
 //!   Étape 2/7 : header v3 (dh_pubkey, pn, n) + AEAD-AD                 ✅
-//!   Étape 3/7 : skipped keys scoped par chaîne + bornes cumulatives     ⏳
+//!   Étape 3/7 : skipped keys scoped par chaîne + bornes cumulatives     ✅
 //!   Étape 4/7 : DH ratchet step (cœur PCS)                             ⏳
 //!   Étape 5/7 : PCS renforcé (multi-compromissions + state replay)     ⏳
 //!   Étape 6/7 : X3DH 4-DH + ML-KEM-1024 (HKDF-SHA384)                  ⏳
@@ -26,6 +26,10 @@
 //!   Le header est fourni en Associated Data à ChaCha20-Poly1305 :
 //!   toute modification du header invalide le tag d'authentification.
 //!
+//! Skipped keys (étape 3) : scoped par (dh_pubkey, seq) → plus de
+//! collision possible entre chaînes DH distinctes. Borne cumulée
+//! MAX_SKIP_TOTAL pour anti-DoS cross-chains.
+//!
 //! Compat : pad_payload / unpad_payload conservés (utilisés par blindspots_test).
 
 use chacha20poly1305::{
@@ -39,8 +43,13 @@ use std::collections::HashMap;
 use x25519_dalek::{PublicKey as X25519PublicKey, StaticSecret as X25519StaticSecret};
 use zeroize::Zeroize;
 
-/// Nombre maximum de clés de messages skipés avant rejet (anti-DoS).
+/// Nombre maximum de clés de messages skipés PAR APPEL (anti-DoS).
 const MAX_SKIP: u32 = 1000;
+
+/// Nombre maximum TOTAL de clés skipées (cumul cross-chains).
+/// Anti-DoS : empêche un adversaire de saturer la mémoire en
+/// distribuant les skips sur plusieurs chaînes DH.
+const MAX_SKIP_TOTAL: usize = 2000;
 
 /// Taille du header v3 : dh_pubkey(32) + pn(4) + n(4) = 40 octets.
 pub const HEADER_V3_SIZE: usize = 40;
@@ -188,7 +197,7 @@ impl DhRatchet {
 }
 
 // =============================================================================
-// SESSION DE CLIQUET (SYMMETRIC RATCHET + SKIPPED KEYS)
+// SESSION DE CLIQUET (SYMMETRIC RATCHET + SKIPPED KEYS SCOPED)
 // =============================================================================
 
 /// État d'une session de cliquet P2P.
@@ -196,7 +205,7 @@ impl DhRatchet {
 /// Contient :
 ///   • 1 root key (partagé avec l'autre partie au handshake).
 ///   • 2 chaînes symétriques (envoi / réception), ratchetées par message.
-///   • 1 store de clés skipées (pour messages hors-ordre).
+///   • 1 store de clés skipées scoped par (dh_pubkey, seq).
 ///   • 1 paire DH locale (DhRatchet) — rotation prévue étape 4/7.
 ///   • 1 clé DH distante (None jusqu'à 1er message reçu).
 ///
@@ -210,7 +219,7 @@ pub struct RatchetSession {
     // --- Chaîne d'envoi ---
     send_chain_key: [u8; 32],
     send_seq: u32,
-    prev_n: u32, // NEW : messages dans chaîne d'envoi précédente
+    prev_n: u32,
 
     // --- Chaîne de réception ---
     recv_chain_key: [u8; 32],
@@ -220,8 +229,9 @@ pub struct RatchetSession {
     dh_self: DhRatchet,
     dh_remote: Option<X25519PublicKey>,
 
-    // --- Clés skipées : seq_num → message_key ---
-    skipped_keys: HashMap<u32, [u8; 32]>,
+    // --- Clés skipées : (dh_pubkey, seq) → message_key ---
+    // Scope par dh_pubkey évite les collisions entre chaînes DH distinctes.
+    skipped_keys: HashMap<([u8; 32], u32), [u8; 32]>,
 }
 
 impl Drop for RatchetSession {
@@ -257,7 +267,6 @@ impl RatchetSession {
         let root_key = derive_root(&master_secret);
         master_secret.zeroize();
 
-        // Initiator : envoie sur SEND, reçoit sur RECV.
         let send_chain_key = derive_chain(&root_key, b"AEGIS_CHAIN_SEND");
         let recv_chain_key = derive_chain(&root_key, b"AEGIS_CHAIN_RECV");
 
@@ -269,7 +278,7 @@ impl RatchetSession {
             recv_chain_key,
             recv_seq: 0,
             dh_self: DhRatchet::generate(),
-            dh_remote: None, // sera initialisé au premier message reçu
+            dh_remote: None,
             skipped_keys: HashMap::new(),
         }
     }
@@ -280,7 +289,6 @@ impl RatchetSession {
     ///     DH(static_B, static_A) || DH(static_B, ephemeral_A),
     ///     salt = AEGIS_RATCHET_ROOT_SALT
     /// )
-    /// Note : DH est symétrique, donc le root est identique à celui de l'initiator.
     pub fn new_responder(
         local_static: &X25519StaticSecret,
         remote_static: &X25519PublicKey,
@@ -296,7 +304,6 @@ impl RatchetSession {
         let root_key = derive_root(&master_secret);
         master_secret.zeroize();
 
-        // Responder : envoie sur RECV, reçoit sur SEND (inversé).
         let send_chain_key = derive_chain(&root_key, b"AEGIS_CHAIN_RECV");
         let recv_chain_key = derive_chain(&root_key, b"AEGIS_CHAIN_SEND");
 
@@ -308,7 +315,7 @@ impl RatchetSession {
             recv_chain_key,
             recv_seq: 0,
             dh_self: DhRatchet::generate(),
-            dh_remote: None, // sera initialisé au premier message reçu
+            dh_remote: None,
             skipped_keys: HashMap::new(),
         }
     }
@@ -317,7 +324,6 @@ impl RatchetSession {
     pub fn encrypt(&mut self, plaintext: &[u8]) -> Result<Vec<u8>, String> {
         let padded_plaintext = pad_payload(plaintext, 512).map_err(|e| e.to_string())?;
 
-        // Header v3 : (dh_self.public, prev_n, n = send_seq)
         let header = HeaderV3 {
             dh_pubkey: self.dh_self.public_bytes(),
             pn: self.prev_n,
@@ -325,18 +331,15 @@ impl RatchetSession {
         };
         let header_bytes = header.to_bytes();
 
-        // Dériver message_key || next_chain_key depuis la chaîne d'envoi
         let (message_key, next_chain_key) = kdf_chain(&self.send_chain_key, self.send_seq);
 
         let cipher = ChaCha20Poly1305::new_from_slice(&message_key)
             .map_err(|e| format!("Erreur d'initialisation du cipher: {}", e))?;
 
-        // Nonce déterministe : seq_num (u32 LE) || 0u64 → unique par (chain_key, seq)
         let mut nonce_bytes = [0u8; 12];
         nonce_bytes[..4].copy_from_slice(&self.send_seq.to_le_bytes());
         let nonce = Nonce::from_slice(&nonce_bytes);
 
-        // Header v3 lié au ciphertext via AEAD-AD
         let ciphertext = cipher
             .encrypt(
                 nonce,
@@ -347,12 +350,10 @@ impl RatchetSession {
             )
             .map_err(|_| "Échec du chiffrement du message".to_string())?;
 
-        // Avancer la chaîne
         self.send_chain_key.zeroize();
         self.send_chain_key = next_chain_key;
         self.send_seq += 1;
 
-        // Assembler header + ciphertext
         let mut out = Vec::with_capacity(HEADER_V3_SIZE + ciphertext.len());
         out.extend_from_slice(&header_bytes);
         out.extend_from_slice(&ciphertext);
@@ -376,8 +377,6 @@ impl RatchetSession {
         let ciphertext = &message[HEADER_V3_SIZE..];
 
         // --- 0. Vérifier / initialiser dh_remote ---
-        // NOTE étape 2 : pas encore de rotation DH. Le DH ratchet step
-        // complet (avec réinitialisation des chaînes) est prévu étape 4/7.
         match self.dh_remote {
             None => {
                 self.dh_remote = Some(X25519PublicKey::from(header.dh_pubkey));
@@ -391,12 +390,13 @@ impl RatchetSession {
             }
         }
 
-        // --- 1. Skip les clés jusqu'à n (stocke les intermédiaires) ---
-        self.skip_message_keys_until(header.n)
+        // --- 1. Skip les clés jusqu'à n (scoped par dh_pubkey) ---
+        self.skip_message_keys_until(&header.dh_pubkey, header.n)
             .map_err(|e| format!("Erreur skip chain: {}", e))?;
 
         // --- 2. Récupérer la message key (skipped ou chain courante) ---
-        let key_to_use = if let Some(k) = self.skipped_keys.remove(&header.n) {
+        let skip_key = (header.dh_pubkey, header.n);
+        let key_to_use = if let Some(k) = self.skipped_keys.remove(&skip_key) {
             k
         } else if header.n == self.recv_seq {
             let (mk, next_ck) = kdf_chain(&self.recv_chain_key, header.n);
@@ -433,28 +433,49 @@ impl RatchetSession {
     }
 
     /// Skip les clés de la chaîne jusqu'à atteindre le numéro `until` (exclusif).
-    /// Stocke les clés intermédiaires dans `skipped_keys` pour usage ultérieur.
-    fn skip_message_keys_until(&mut self, until: u32) -> Result<(), String> {
+    ///
+    /// Stocke les clés intermédiaires dans `skipped_keys` avec la clé
+    /// composée `(dh_pubkey, seq)` pour éviter les collisions inter-chaînes.
+    ///
+    /// Vérifie deux bornes :
+    ///   • `MAX_SKIP` par appel (delta max sur une seule chaîne)
+    ///   • `MAX_SKIP_TOTAL` cumulé (total mémoire cross-chains)
+    fn skip_message_keys_until(
+        &mut self,
+        dh_pubkey: &[u8; 32],
+        until: u32,
+    ) -> Result<(), String> {
         if until <= self.recv_seq {
             return Ok(()); // rien à skip
         }
 
         let to_skip = until - self.recv_seq;
+
+        // Borne 1 : delta par appel
         if to_skip > MAX_SKIP {
             return Err(format!(
-                "Trop de messages skipés ({} > MAX_SKIP={})",
+                "Trop de messages skipés en un appel ({} > MAX_SKIP={})",
                 to_skip, MAX_SKIP
+            ));
+        }
+
+        // Borne 2 : cumul cross-chains
+        if self.skipped_keys.len() + (to_skip as usize) > MAX_SKIP_TOTAL {
+            return Err(format!(
+                "Limite cumulée de clés skipées dépassée ({} + {} > MAX_SKIP_TOTAL={})",
+                self.skipped_keys.len(),
+                to_skip,
+                MAX_SKIP_TOTAL
             ));
         }
 
         let mut ck = self.recv_chain_key;
         for seq in self.recv_seq..until {
             let (mk, next_ck) = kdf_chain(&ck, seq);
-            self.skipped_keys.insert(seq, mk);
+            self.skipped_keys.insert((*dh_pubkey, seq), mk);
             ck.zeroize();
             ck = next_ck;
         }
-        // Avancer l'état de la chaîne
         self.recv_chain_key.zeroize();
         self.recv_chain_key = ck;
         self.recv_seq = until;
@@ -468,9 +489,6 @@ impl RatchetSession {
 // =============================================================================
 
 /// Dérive le root initial depuis master_secret (handshake X3DH).
-///
-/// NOTE : fonction distincte de `kdf_root` (ci-dessous) qui opère sur
-/// les DH ratchet steps. `derive_root` = init ; `kdf_root` = ratchet.
 fn derive_root(master_secret: &[u8]) -> [u8; 32] {
     let hk = Hkdf::<Sha256>::new(Some(b"AEGIS_RATCHET_ROOT_SALT"), master_secret);
     let mut out = [0u8; 32];
@@ -510,19 +528,12 @@ fn kdf_chain(chain_key: &[u8; 32], seq: u32) -> ([u8; 32], [u8; 32]) {
 /// Prend (root_key, dh_output) → (new_root_key, chain_key).
 /// Utilisé à chaque DH ratchet step (intégration prévue en étape 4/7).
 ///
-/// Propriété : la nouvelle root_key est dérivée du DH partagé entre la
-/// nouvelle paire X25519 et la clé publique distante. Si l'adversaire
-/// n'a pas la clé privée de la nouvelle paire, il ne peut pas calculer
-/// le DH → la sécurité est restaurée (PCS).
-///
 /// `#[allow(dead_code)]` : sera utilisé dans RatchetSession::decrypt()
 /// à partir de l'étape 4/7 (DH ratchet step).
 #[allow(dead_code)]
 fn kdf_root(root_key: &[u8; 32], dh_output: &[u8; 32]) -> ([u8; 32], [u8; 32]) {
-    // HKDF-SHA256(salt=AEGIS_DR_RK_SALT, ikm=dh_output, info=root_key || tag)
     let hk = Hkdf::<Sha256>::new(Some(b"AEGIS_DR_RK_SALT"), dh_output);
 
-    // info = root_key (32) || "AEGIS_DR_RK" (11) = 43 octets
     let mut info = [0u8; 43];
     info[..32].copy_from_slice(root_key);
     info[32..].copy_from_slice(b"AEGIS_DR_RK");
@@ -535,7 +546,6 @@ fn kdf_root(root_key: &[u8; 32], dh_output: &[u8; 32]) -> ([u8; 32], [u8; 32]) {
     new_rk.copy_from_slice(&okm[..32]);
     ck.copy_from_slice(&okm[32..]);
 
-    // Zeroize du buffer intermédiaire
     okm.zeroize();
 
     (new_rk, ck)
@@ -595,7 +605,6 @@ mod tests {
         let e2 = alice.encrypt(m2).unwrap();
         let e3 = alice.encrypt(m3).unwrap();
 
-        // Réception dans le désordre : 3, 1, 2
         assert_eq!(bob.decrypt(&e3).unwrap(), m3);
         assert_eq!(bob.decrypt(&e1).unwrap(), m1);
         assert_eq!(bob.decrypt(&e2).unwrap(), m2);
@@ -610,7 +619,6 @@ mod tests {
 
         assert_eq!(bob.decrypt(&enc).unwrap(), msg);
 
-        // Replay : doit échouer (clé déjà consommée)
         let result = bob.decrypt(&enc);
         assert!(result.is_err(), "Replay aurait dû être rejeté");
     }
@@ -619,7 +627,6 @@ mod tests {
     fn test_ratchet_many_messages() {
         let (mut alice, mut bob) = handshake();
 
-        // 100 messages in-order
         for i in 0..100u32 {
             let msg = format!("msg {}", i);
             let enc = alice.encrypt(msg.as_bytes()).unwrap();
@@ -632,8 +639,10 @@ mod tests {
     fn test_ratchet_max_skip_protection() {
         let (mut _alice, mut bob) = handshake();
 
-        // Tenter un skip > MAX_SKIP directement
-        let result = bob.skip_message_keys_until(MAX_SKIP + 100);
+        // Tenter un skip > MAX_SKIP directement.
+        // Note : on utilise un dh_pubkey factice pour éviter d'initialiser dh_remote.
+        let fake_pub = [0xEEu8; 32];
+        let result = bob.skip_message_keys_until(&fake_pub, MAX_SKIP + 100);
         assert!(result.is_err(), "Skip > MAX_SKIP doit être rejeté");
     }
 
@@ -641,17 +650,14 @@ mod tests {
     fn test_ratchet_bidirectional() {
         let (mut alice, mut bob) = handshake();
 
-        // A → B
         let m_ab = b"Alice vers Bob";
         let e_ab = alice.encrypt(m_ab).unwrap();
         assert_eq!(bob.decrypt(&e_ab).unwrap(), m_ab);
 
-        // B → A
         let m_ba = b"Bob vers Alice";
         let e_ba = bob.encrypt(m_ba).unwrap();
         assert_eq!(alice.decrypt(&e_ba).unwrap(), m_ba);
 
-        // A → B (2e message)
         let m_ab2 = b"Encore un";
         let e_ab2 = alice.encrypt(m_ab2).unwrap();
         assert_eq!(bob.decrypt(&e_ab2).unwrap(), m_ab2);
@@ -672,29 +678,24 @@ mod tests {
 
     #[test]
     fn test_dh_ratchet_generates_valid_pair() {
-        // Génère 2 paires indépendantes
         let a = DhRatchet::generate();
         let b = DhRatchet::generate();
 
-        // Propriété 1 : les clés publiques sont distinctes (avec overwhelming proba)
         assert_ne!(
             a.public_bytes(),
             b.public_bytes(),
             "Deux DhRatchet::generate() doivent produire des clés distinctes"
         );
 
-        // Propriété 2 : DH est symétrique
         let ab = a.dh(b.public_key());
         let ba = b.dh(a.public_key());
         assert_eq!(ab, ba, "DH X25519 doit être symétrique");
 
-        // Propriété 3 : le shared secret n'est pas trivial (pas tout-à-zéro)
         assert!(
             ab.iter().any(|&x| x != 0),
             "Le DH ne doit pas produire un secret tout-à-zéro"
         );
 
-        // Propriété 4 : DH avec une clé distante différente → résultat différent
         let c = DhRatchet::generate();
         let ac = a.dh(c.public_key());
         assert_ne!(ab, ac, "DH avec un pair différent doit donner un secret différent");
@@ -705,25 +706,21 @@ mod tests {
         let rk = [0xAAu8; 32];
         let dh = [0xBBu8; 32];
 
-        // Déterminisme : même (rk, dh) → même (rk', ck)
         let (rk1, ck1) = kdf_root(&rk, &dh);
         let (rk2, ck2) = kdf_root(&rk, &dh);
         assert_eq!(rk1, rk2, "Même (rk, dh) → même rk'");
         assert_eq!(ck1, ck2, "Même (rk, dh) → même ck");
 
-        // Sensibilité à dh : dh différent → résultat différent
         let dh_other = [0xCCu8; 32];
         let (rk3, ck3) = kdf_root(&rk, &dh_other);
         assert_ne!(rk1, rk3, "dh différent → rk' différent");
         assert_ne!(ck1, ck3, "dh différent → ck différent");
 
-        // Sensibilité à rk : rk différent → résultat différent
         let rk_other = [0xDDu8; 32];
         let (rk4, ck4) = kdf_root(&rk_other, &dh);
         assert_ne!(rk1, rk4, "rk différent → rk' différent");
         assert_ne!(ck1, ck4, "rk différent → ck différent");
 
-        // Propriété : rk' et ck sont distincts (pas de collision interne)
         assert_ne!(rk1, ck1, "rk' et ck doivent être distincts");
     }
 
@@ -743,50 +740,120 @@ mod tests {
         assert_eq!(bytes.len(), HEADER_V3_SIZE);
         assert_eq!(bytes.len(), 40);
 
-        // Vérifier l'ordre LE attendu
         assert_eq!(&bytes[..32], &[0xAA; 32]);
         assert_eq!(&bytes[32..36], &0xDEAD_BEEFu32.to_le_bytes());
         assert_eq!(&bytes[36..40], &0x1234_5678u32.to_le_bytes());
 
-        // Roundtrip
         let h2 = HeaderV3::from_bytes(&bytes).expect("from_bytes doit réussir");
         assert_eq!(h2, h);
 
-        // Slice trop court → None
         assert!(HeaderV3::from_bytes(&bytes[..39]).is_none());
     }
 
     #[test]
     fn test_header_bound_to_ciphertext() {
-        // Propriété : toute modification du header invalide le tag Poly1305,
-        // car le header est fourni en AAD (Associated Data).
-        let (mut alice, mut bob) = handshake();
+        let (mut alice, _bob) = handshake();
 
         let msg = b"secret header-bound";
         let enc = alice.encrypt(msg).unwrap();
 
-        // Vérifier qu'on peut décrypter en l'état (baseline)
-        // NOTE : on utilise un 2e message pour ne pas "consommer" le premier.
-        // On refait donc un handshake propre.
-        drop(bob);
-        let (mut alice, mut bob) = handshake();
-        let enc = alice.encrypt(msg).unwrap();
-
-        // Tamper : flip 1 bit dans le header (pn, à l'offset 32)
+        // Tamper : flip 1 bit dans le header (pn, offset 32)
         let mut tampered = enc.clone();
         tampered[32] ^= 0x01;
 
-        // Le déchiffrement doit échouer (MAC invalide car AAD différent)
-        let result = bob.decrypt(&tampered);
+        // On refait un handshake pour avoir un bob frais
+        let (mut alice2, mut bob2) = handshake();
+        let enc_ok = alice2.encrypt(msg).unwrap();
+        assert_eq!(bob2.decrypt(&enc_ok).unwrap(), msg);
+
+        // Tamper doit échouer
+        let (mut alice3, mut bob3) = handshake();
+        let enc_tamper = {
+            let mut e = alice3.encrypt(msg).unwrap();
+            e[32] ^= 0x01;
+            e
+        };
         assert!(
-            result.is_err(),
+            bob3.decrypt(&enc_tamper).is_err(),
             "Header tampering (pn) aurait dû invalider le MAC"
         );
+    }
 
-        // Baseline : le message non-tamperé doit passer
-        // (on refait un handshake car bob a déjà consommé un message)
+    // =========================================================================
+    // F4 Étape 3/7 — Tests skipped keys scoped + bornes cumulatives
+    // =========================================================================
+
+    #[test]
+    fn test_skipped_keys_scoped_per_chain() {
+        // Propriété : deux chaînes DH distinctes ne partagent PAS leurs
+        // clés skipées, même si elles ont le même seq_num.
+        //
+        // Sans le scope (dh_pubkey, seq), un adversaire pourrait faire
+        // collisionner seq=5 de la chaîne A avec seq=5 de la chaîne B.
         let (mut alice, mut bob) = handshake();
-        let enc_ok = alice.encrypt(msg).unwrap();
-        assert_eq!(bob.decrypt(&enc_ok).unwrap(), msg);
+
+        // Alice envoie 3 messages sur sa 1ʳᵉ chaîne (dh_self = D1)
+        let m1 = alice.encrypt(b"chaine-1-msg-0").unwrap();
+        let m2 = alice.encrypt(b"chaine-1-msg-1").unwrap();
+        let m3 = alice.encrypt(b"chaine-1-msg-2").unwrap();
+
+        // Bob reçoit m3 en premier → 0 et 1 sont skipées sous D1
+        bob.decrypt(&m3).unwrap();
+
+        // Vérifier que les 2 clés skipées sont bien scoped sous D1 (dh_pubkey alice)
+        let alice_pub = alice.dh_self.public_bytes();
+        let skip_key_0 = (alice_pub, 0u32);
+        let skip_key_1 = (alice_pub, 1u32);
+        assert!(
+            bob.skipped_keys.contains_key(&skip_key_0),
+            "La clé skipée seq=0 doit être scoped sous (dh_pubkey_alice, 0)"
+        );
+        assert!(
+            bob.skipped_keys.contains_key(&skip_key_1),
+            "La clé skipée seq=1 doit être scoped sous (dh_pubkey_alice, 1)"
+        );
+
+        // Vérifier qu'une clé avec une AUTRE dh_pubkey + même seq n'existe pas
+        let fake_pub = [0x99u8; 32];
+        let fake_key = (fake_pub, 0u32);
+        assert!(
+            !bob.skipped_keys.contains_key(&fake_key),
+            "Pas de collision cross-chain : (fake_pub, 0) ne doit pas exister"
+        );
+
+        // Les messages originaux se déchiffrent correctement (FIFO skipped)
+        assert_eq!(bob.decrypt(&m1).unwrap(), b"chaine-1-msg-0");
+        assert_eq!(bob.decrypt(&m2).unwrap(), b"chaine-1-msg-1");
+    }
+
+    #[test]
+    fn test_global_skipped_keys_limit() {
+        // Propriété : la borne MAX_SKIP_TOTAL est vérifiée cumulativement.
+        // On force plusieurs skips de taille MAX_SKIP jusqu'à dépasser
+        // MAX_SKIP_TOTAL.
+        let (_alice, mut bob) = handshake();
+        let fake_pub = [0xAAu8; 32];
+
+        // 1er skip : 1000 clés
+        bob.skip_message_keys_until(&fake_pub, 1000).unwrap();
+        assert_eq!(bob.skipped_keys.len(), 1000);
+
+        // 2e skip : 1000 clés → 2000 total (limite atteinte, OK car <=)
+        bob.skip_message_keys_until(&fake_pub, 2000).unwrap();
+        assert_eq!(bob.skipped_keys.len(), 2000);
+
+        // 3e skip : tenter +1000 → dépasserait MAX_SKIP_TOTAL=2000
+        let result = bob.skip_message_keys_until(&fake_pub, 3000);
+        assert!(
+            result.is_err(),
+            "Dépasser MAX_SKIP_TOTAL doit être rejeté (2000 + 1000 > 2000)"
+        );
+
+        // Vérifier que la taille n'a PAS augmenté après le rejet
+        assert_eq!(
+            bob.skipped_keys.len(),
+            2000,
+            "La taille ne doit pas changer après un rejet"
+        );
     }
 }
