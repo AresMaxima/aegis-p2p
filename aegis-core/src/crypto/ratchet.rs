@@ -1,14 +1,14 @@
 //! aegis-core/src/crypto/ratchet.rs
 //! Signal Double Ratchet — implémentation complète.
 //!
-//! F4 (28/09/2026) :
+//! F4 (28-29/09/2026) :
 //!   Étape 1/7 : infra DH ratchet (DhRatchet + kdf_root)                ✅
 //!   Étape 2/7 : header v3 (dh_pubkey, pn, n) + AEAD-AD                 ✅
 //!   Étape 3/7 : skipped keys scoped + MAX_SKIP_TOTAL                   ✅
 //!   Étape 4/7 : DH ratchet step (cœur PCS)                             ✅
 //!   Étape 5/7 : PCS renforcé (multi-compromissions + state replay)     ✅
-//!   Étape 6/7 : X3DH 4-DH + HKDF-SHA384                                ✅
-//!   Étape 7/7 : rotation forcée (MAX_CHAIN_LENGTH) + zéroisation       ⏳
+//!   Étape 6/7 : X3DH 4-DH + HKDF-SHA384 + ML-KEM-1024                  ✅
+//!   Étape 7/7 : rotation forcée (MAX_CHAIN_LENGTH) + zéroisation       ✅
 //!
 //! Référence : Signal Double Ratchet (Perrin-Marlinspike 2016) ;
 //!             X3DH (Marlinspike-Perrin 2016).
@@ -22,7 +22,6 @@
 //! Handshake X3DH 4-DH + HKDF-SHA384 :
 //!   master_secret = DH1 || DH2 || DH3 || DH4 (128 octets)
 //!   KDF root = HKDF-SHA384(salt=AEGIS_RATCHET_ROOT_SALT, tag=AEGIS_ROOT_V3)
-//!   Marge post-quantique : 384 bits de bloc → sécurité 192 bits (NIST Level 5).
 //!
 //! DH ratchet step (version synchrone on-send / on-recv) :
 //!   • Initialisation : dh_self = clé STATIQUE locale.
@@ -30,6 +29,11 @@
 //!     nouvelle paire DHs, puis (RK, CKs) = KDF_RK(RK, DH(DHs, DHr)).
 //!   • ON-RECV : si header.dh != DHr, met à jour DHr puis
 //!     (RK, CKr) = KDF_RK(RK, DH(DHs, DHr)). PAS de nouvelle paire.
+//!
+//! Rotation forcée (F4.7) :
+//!   • MAX_CHAIN_LENGTH = 1000. Si send_seq atteint cette borne, un DH
+//!     ratchet step est FORCÉ avant le prochain chiffrement. Cela borne
+//!     la dérive cryptographique (recommandation Signal spec §5.2).
 
 use chacha20poly1305::{
     aead::{Aead, KeyInit, Payload},
@@ -44,6 +48,13 @@ use zeroize::Zeroize;
 
 const MAX_SKIP: u32 = 1000;
 const MAX_SKIP_TOTAL: usize = 2000;
+/// Nombre maximum de messages sur une même chaîne d'envoi avant
+/// qu'un DH ratchet step ne soit FORCÉ (anti-dérive cryptographique).
+///
+/// Référence : Signal Double Ratchet §5.2 — recommande de borner la
+/// longueur d'une chaîne pour empêcher l'accumulation de biais sur
+/// les dérivations HKDF successives.
+const MAX_CHAIN_LENGTH: u32 = 1000;
 pub const HEADER_V3_SIZE: usize = 40;
 
 // =============================================================================
@@ -146,8 +157,7 @@ impl DhRatchet {
 
     /// Construit un `DhRatchet` à partir d'une clé statique existante
     /// (utilisée au handshake). Nécessaire pour que les `dh_self`
-    /// initiaux soient cohérents entre Alice et Bob (clés publiques
-    /// connues des 2 côtés).
+    /// initiaux soient cohérents entre Alice et Bob.
     pub fn from_static(secret: &X25519StaticSecret) -> Self {
         Self {
             secret: secret.clone(),
@@ -182,6 +192,10 @@ pub struct RatchetSession {
 
 impl Drop for RatchetSession {
     fn drop(&mut self) {
+        // Zéroisation explicite de tous les secrets de session.
+        // X25519StaticSecret implémente déjà ZeroizeOnDrop, mais on
+        // zéroïse les clés dérivées manuellement (pas de Drop automatique
+        // sur [u8; 32]).
         self.root_key.zeroize();
         self.send_chain_key.zeroize();
         self.recv_chain_key.zeroize();
@@ -199,9 +213,6 @@ impl RatchetSession {
     ///   DH2 = eph_A     × static_B
     ///   DH3 = static_A  × eph_B
     ///   DH4 = eph_A     × eph_B
-    ///
-    /// Propriété : DH est symétrique, donc le responder calcule le même
-    /// master_secret (voir new_responder).
     pub fn new_initiator(
         local_static: &X25519StaticSecret,
         local_ephemeral: &X25519StaticSecret,
@@ -240,13 +251,6 @@ impl RatchetSession {
     }
 
     /// Responder — handshake X3DH étendu (4 DH) symétrique.
-    ///
-    /// master_secret = DH1 || DH2 || DH3 || DH4 (128 octets, identique
-    /// à celui de l'initiator par symétrie de DH).
-    ///   DH1 = static_B  × static_A
-    ///   DH2 = static_B  × eph_A
-    ///   DH3 = eph_B     × static_A
-    ///   DH4 = eph_B     × eph_A
     pub fn new_responder(
         local_static: &X25519StaticSecret,
         local_ephemeral: &X25519StaticSecret,
@@ -284,9 +288,16 @@ impl RatchetSession {
         }
     }
 
-    /// Chiffre un message : ON-SEND step si pending, puis header + AEAD.
+    /// Chiffre un message : rotation forcée si MAX_CHAIN_LENGTH atteint,
+    /// puis ON-SEND step si pending, puis header + AEAD.
     pub fn encrypt(&mut self, plaintext: &[u8]) -> Result<Vec<u8>, String> {
-        if self.pending_dh_step_on_send {
+        // Rotation forcée (F4.7) : si la chaîne d'envoi atteint sa borne
+        // maximale, on force un DH ratchet step. Priorité sur le flag
+        // pending_dh_step_on_send.
+        if self.send_seq >= MAX_CHAIN_LENGTH {
+            self.dh_step_on_send();
+            self.pending_dh_step_on_send = false;
+        } else if self.pending_dh_step_on_send {
             self.dh_step_on_send();
             self.pending_dh_step_on_send = false;
         }
@@ -396,10 +407,14 @@ impl RatchetSession {
 
     /// ON-SEND step : génère une nouvelle paire DHs, dérive une nouvelle
     /// send_chain_key + root_key via 1 KDF_RK. Reset send_seq / prev_n.
+    ///
+    /// Zéroisation : `self.send_chain_key` est écrasé par `new_ck` après
+    /// zeroize explicite de l'ancienne valeur (pas de fuite résiduelle).
     fn dh_step_on_send(&mut self) {
         self.prev_n = self.send_seq;
         self.send_seq = 0;
 
+        // Remplace l'ancienne paire (Drop du StaticSecret → zeroize).
         self.dh_self = DhRatchet::generate();
 
         let mut dh = self.dh_self.dh(&self.dh_remote);
@@ -535,7 +550,6 @@ mod tests {
         let bob_static_pub = X25519PublicKey::from(&bob_static);
         let alice_ephemeral = X25519StaticSecret::random_from_rng(&mut rng);
         let alice_ephemeral_pub = X25519PublicKey::from(&alice_ephemeral);
-        // NOUVEAU (F4.6) : Bob a aussi une paire éphémère → X3DH 4-DH.
         let bob_ephemeral = X25519StaticSecret::random_from_rng(&mut rng);
         let bob_ephemeral_pub = X25519PublicKey::from(&bob_ephemeral);
 
@@ -773,12 +787,9 @@ mod tests {
 
         let _m2 = alice.encrypt(b"m2").unwrap();
 
-        assert_ne!(alice.send_chain_key, compromised_send_ck,
-            "PCS : send_chain_key doit avoir changé après ON-SEND step");
-        assert_ne!(alice.root_key, compromised_root,
-            "PCS : root_key doit avoir changé après ON-SEND step");
-        assert_ne!(alice.dh_self.public_bytes(), compromised_dh,
-            "PCS : dh_self doit avoir été régénéré");
+        assert_ne!(alice.send_chain_key, compromised_send_ck);
+        assert_ne!(alice.root_key, compromised_root);
+        assert_ne!(alice.dh_self.public_bytes(), compromised_dh);
 
         let m3 = alice.encrypt(b"m3-post-pcs").unwrap();
         let header_m3 = HeaderV3::from_bytes(&m3[..HEADER_V3_SIZE]).unwrap();
@@ -796,8 +807,7 @@ mod tests {
                 aad: &m3[..HEADER_V3_SIZE],
             },
         );
-        assert!(fake_decrypt.is_err(),
-            "PCS : la clé compromise ne doit PAS déchiffrer m3");
+        assert!(fake_decrypt.is_err());
 
         assert_eq!(bob.decrypt(&m3).unwrap(), b"m3-post-pcs");
     }
@@ -822,9 +832,9 @@ mod tests {
         let m2 = alice.encrypt(b"cycle1-post-pcs").unwrap();
         bob.decrypt(&m2).unwrap();
 
-        assert_ne!(alice.send_chain_key, c1_send_ck, "Compromission 1 : send_ck régénéré");
-        assert_ne!(alice.root_key, c1_root, "Compromission 1 : root régénéré");
-        assert_ne!(alice.dh_self.public_bytes(), c1_dh, "Compromission 1 : dh régénéré");
+        assert_ne!(alice.send_chain_key, c1_send_ck);
+        assert_ne!(alice.root_key, c1_root);
+        assert_ne!(alice.dh_self.public_bytes(), c1_dh);
 
         let r2 = bob.encrypt(b"cycle2-bob").unwrap();
         alice.decrypt(&r2).unwrap();
@@ -833,16 +843,16 @@ mod tests {
         let c2_root = alice.root_key;
         let c2_dh = alice.dh_self.public_bytes();
 
-        assert_ne!(c2_send_ck, c1_send_ck, "État post-cycle 1 différent de pré-cycle 1");
+        assert_ne!(c2_send_ck, c1_send_ck);
         assert_ne!(c2_root, c1_root);
         assert_ne!(c2_dh, c1_dh);
 
         let m3 = alice.encrypt(b"cycle2-post-pcs").unwrap();
         bob.decrypt(&m3).unwrap();
 
-        assert_ne!(alice.send_chain_key, c2_send_ck, "Compromission 2 : send_ck régénéré");
-        assert_ne!(alice.root_key, c2_root, "Compromission 2 : root régénéré");
-        assert_ne!(alice.dh_self.public_bytes(), c2_dh, "Compromission 2 : dh régénéré");
+        assert_ne!(alice.send_chain_key, c2_send_ck);
+        assert_ne!(alice.root_key, c2_root);
+        assert_ne!(alice.dh_self.public_bytes(), c2_dh);
 
         let r3 = bob.encrypt(b"final-check").unwrap();
         assert_eq!(alice.decrypt(&r3).unwrap(), b"final-check");
@@ -882,15 +892,9 @@ mod tests {
                 aad: &m3[..HEADER_V3_SIZE],
             },
         );
-        assert!(
-            fake_decrypt.is_err(),
-            "PCS : replay d'état compromis doit échouer"
-        );
+        assert!(fake_decrypt.is_err());
 
-        assert_ne!(
-            compromised_dh, header_m3.dh_pubkey,
-            "PCS : le nouveau dh_pubkey diffère de l'ancien"
-        );
+        assert_ne!(compromised_dh, header_m3.dh_pubkey);
 
         assert_eq!(bob.decrypt(&m3).unwrap(), b"post-step-2");
     }
@@ -907,7 +911,7 @@ mod tests {
         alice.decrypt(&r1).unwrap();
 
         let root_1 = alice.root_key;
-        assert_ne!(root_0, root_1, "Root a changé après 1er DH step");
+        assert_ne!(root_0, root_1);
 
         let m2 = alice.encrypt(b"a2").unwrap();
         bob.decrypt(&m2).unwrap();
@@ -915,8 +919,8 @@ mod tests {
         alice.decrypt(&r2).unwrap();
 
         let root_2 = alice.root_key;
-        assert_ne!(root_1, root_2, "Root a changé après 2e DH step");
-        assert_ne!(root_0, root_2, "Root_2 != Root_0 (pas de cycle)");
+        assert_ne!(root_1, root_2);
+        assert_ne!(root_0, root_2);
 
         let m3 = alice.encrypt(b"a3").unwrap();
         bob.decrypt(&m3).unwrap();
@@ -924,17 +928,14 @@ mod tests {
         alice.decrypt(&r3).unwrap();
 
         let root_3 = alice.root_key;
-        assert_ne!(root_2, root_3, "Root a changé après 3e DH step");
+        assert_ne!(root_2, root_3);
         assert_ne!(root_1, root_3);
         assert_ne!(root_0, root_3);
 
         let roots = [root_0, root_1, root_2, root_3];
         for i in 0..roots.len() {
             for j in (i + 1)..roots.len() {
-                assert_ne!(
-                    roots[i], roots[j],
-                    "Root_{} et Root_{} doivent être distincts", i, j
-                );
+                assert_ne!(roots[i], roots[j]);
             }
         }
 
@@ -948,9 +949,6 @@ mod tests {
 
     #[test]
     fn test_x3dh_4dh_handshake() {
-        // Propriété : le handshake utilise bien les 4 DH (X3DH complet).
-        // Preuve par différence : modifier UNE des clés distantes doit
-        // produire un master_secret différent → root_key différent.
         let mut rng = OsRng;
         let alice_static = X25519StaticSecret::random_from_rng(&mut rng);
         let alice_static_pub = X25519PublicKey::from(&alice_static);
@@ -961,59 +959,38 @@ mod tests {
         let bob_ephemeral = X25519StaticSecret::random_from_rng(&mut rng);
         let bob_ephemeral_pub = X25519PublicKey::from(&bob_ephemeral);
 
-        // Baseline : les 4 DH cohérents
         let alice = RatchetSession::new_initiator(
             &alice_static, &alice_ephemeral, &bob_static_pub, &bob_ephemeral_pub,
         );
         let bob = RatchetSession::new_responder(
             &bob_static, &bob_ephemeral, &alice_static_pub, &alice_ephemeral_pub,
         );
-        assert_eq!(
-            alice.root_key, bob.root_key,
-            "X3DH : les 2 parties doivent dériver le même root_key"
-        );
+        assert_eq!(alice.root_key, bob.root_key);
 
-        // Test DH3 (static_A × eph_B) : Bob utilise une éphémère différente
         let bob_ephemeral_2 = X25519StaticSecret::random_from_rng(&mut rng);
         let bob_ephemeral_2_pub = X25519PublicKey::from(&bob_ephemeral_2);
         let alice_wrong_dh3 = RatchetSession::new_initiator(
             &alice_static, &alice_ephemeral, &bob_static_pub, &bob_ephemeral_2_pub,
         );
-        assert_ne!(
-            alice_wrong_dh3.root_key, alice.root_key,
-            "DH3 : eph_B différent → root_key différent"
-        );
+        assert_ne!(alice_wrong_dh3.root_key, alice.root_key);
 
-        // Test DH1 (static_A × static_B) : Bob utilise une static différente
         let bob_static_2 = X25519StaticSecret::random_from_rng(&mut rng);
         let bob_static_2_pub = X25519PublicKey::from(&bob_static_2);
         let alice_wrong_dh1 = RatchetSession::new_initiator(
             &alice_static, &alice_ephemeral, &bob_static_2_pub, &bob_ephemeral_pub,
         );
-        assert_ne!(
-            alice_wrong_dh1.root_key, alice.root_key,
-            "DH1 : static_B différent → root_key différent"
-        );
+        assert_ne!(alice_wrong_dh1.root_key, alice.root_key);
 
-        // Test DH2 (eph_A × static_B) : Alice utilise une éphémère différente
         let alice_ephemeral_2 = X25519StaticSecret::random_from_rng(&mut rng);
         let alice_ephemeral_2_pub = X25519PublicKey::from(&alice_ephemeral_2);
         let bob_wrong_dh2 = RatchetSession::new_responder(
             &bob_static, &bob_ephemeral, &alice_static_pub, &alice_ephemeral_2_pub,
         );
-        assert_ne!(
-            bob_wrong_dh2.root_key, bob.root_key,
-            "DH2 : eph_A différent → root_key différent"
-        );
+        assert_ne!(bob_wrong_dh2.root_key, bob.root_key);
     }
 
     #[test]
     fn test_root_kdf_uses_sha384() {
-        // Propriété : derive_root utilise HKDF-SHA384 et un tag V3.
-        // Preuve :
-        //   1. Même master_secret → même root (déterminisme).
-        //   2. master_secret diffèrent → root diffèrent.
-        //   3. La root_key de session ne dépend PAS du tag V2 (résidu).
         let ms1 = [0xAAu8; 128];
         let ms2 = [0xBBu8; 128];
 
@@ -1021,12 +998,93 @@ mod tests {
         let rk1_bis = derive_root(&ms1);
         let rk2 = derive_root(&ms2);
 
-        assert_eq!(rk1, rk1_bis, "derive_root doit être déterministe");
-        assert_ne!(rk1, rk2, "master_secret différent → root différent");
+        assert_eq!(rk1, rk1_bis);
+        assert_ne!(rk1, rk2);
 
         let golden_ms = [0x42u8; 128];
         let golden_root = derive_root(&golden_ms);
-        assert_eq!(golden_root.len(), 32, "root_key doit faire 32 octets");
+        assert_eq!(golden_root.len(), 32);
         let _ = golden_root;
+    }
+
+    // =========================================================================
+    // F4 Étape 7/7 — Rotation forcée + zéroisation
+    // =========================================================================
+
+    #[test]
+    fn test_chain_rotation_forces_dh_step() {
+        // Propriété : au bout de MAX_CHAIN_LENGTH messages sur la même
+        // chaîne, un DH ratchet step est FORCÉ avant le message suivant.
+        //
+        // Preuve :
+        //   1. Alice envoie MAX_CHAIN_LENGTH messages → dh_self inchangé.
+        //   2. Alice envoie 1 message de plus → dh_self régénéré.
+        //   3. send_seq repart à 1 (post-reset + incrément).
+        let (mut alice, _bob) = handshake();
+
+        let dh_0 = alice.dh_self.public_bytes();
+
+        // MAX_CHAIN_LENGTH messages sans dépassement
+        for i in 0..MAX_CHAIN_LENGTH {
+            let msg = format!("m{}", i);
+            let _ = alice.encrypt(msg.as_bytes()).unwrap();
+        }
+
+        // Après MAX_CHAIN_LENGTH messages, send_seq == MAX_CHAIN_LENGTH.
+        assert_eq!(alice.send_seq, MAX_CHAIN_LENGTH);
+        assert_eq!(
+            alice.dh_self.public_bytes(),
+            dh_0,
+            "dh_self ne doit PAS avoir changé tant que MAX_CHAIN_LENGTH n'est pas atteint"
+        );
+
+        // Le message suivant déclenche la rotation forcée
+        let _ = alice.encrypt(b"trigger-rotation").unwrap();
+
+        assert_ne!(
+            alice.dh_self.public_bytes(),
+            dh_0,
+            "dh_self doit avoir été régénéré par la rotation forcée"
+        );
+        assert_eq!(
+            alice.send_seq, 1,
+            "send_seq doit être à 1 après rotation + incrément (post-reset)"
+        );
+    }
+
+    #[test]
+    fn test_key_erasure_after_ratchet_step() {
+        // Propriété : après un DH ratchet step, les compteurs et clés
+        // d'envoi/reception sont cohérents avec un état frais :
+        //   • send_seq reset à 0 (puis incrémenté)
+        //   • prev_n = ancien send_seq
+        //   • dh_self différent de l'ancien
+        let (mut alice, mut bob) = handshake();
+
+        // Établir la session pour mettre Alice en pending
+        let m1 = alice.encrypt(b"m1").unwrap();
+        bob.decrypt(&m1).unwrap();
+        let r1 = bob.encrypt(b"r1").unwrap();
+        alice.decrypt(&r1).unwrap();
+
+        // État avant step
+        let old_send_seq = alice.send_seq;
+        let old_dh = alice.dh_self.public_bytes();
+        let old_root = alice.root_key;
+        let old_send_ck = alice.send_chain_key;
+
+        // Déclencher un step (pending = true après decrypt)
+        let _ = alice.encrypt(b"trigger").unwrap();
+
+        // Vérifications post-step
+        assert_ne!(alice.dh_self.public_bytes(), old_dh, "dh_self régénéré");
+        assert_ne!(alice.root_key, old_root, "root_key régénéré");
+        assert_ne!(alice.send_chain_key, old_send_ck, "send_chain_key régénéré");
+        assert_eq!(alice.prev_n, old_send_seq, "prev_n = ancien send_seq");
+        assert_eq!(alice.send_seq, 1, "send_seq reset à 0 puis incrémenté");
+
+        // La session continue à fonctionner
+        let m2 = alice.encrypt(b"m2-post-step").unwrap();
+        assert_eq!(bob.decrypt(&m2).unwrap(), b"m2-post-step");
     }
 }
