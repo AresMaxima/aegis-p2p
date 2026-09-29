@@ -336,6 +336,7 @@ mod tests {
     ///   • Ciphertext (ct)    : 1568 octets
     ///   • Shared secret      :   32 octets
     #[test]
+    #[cfg_attr(miri, ignore)] // FFI C (pqcrypto-mlkem) non supporté par Miri
     fn test_mlkem_1024_sizes() {
         // Import local : le trait SecretKey fournit `.as_bytes()` sur `sk`.
         use pqcrypto_traits::kem::SecretKey;
