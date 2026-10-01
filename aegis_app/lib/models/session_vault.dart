@@ -1,9 +1,5 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:typed_data';
-import 'package:cryptography/cryptography.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../services/crypto_service.dart';
+import '../keystore_bridge.dart';
 
 // =========================================================================
 // VALIDATION DE MOT DE PASSE FORT / PHRASE CLÉ
@@ -116,69 +112,103 @@ class SessionResult {
 }
 
 // =========================================================================
-// VAULT DE SESSION
+// VAULT DE SESSION — F6-C (100% Rust)
 // =========================================================================
+//
+// La persistance est intégralement déléguée à Rust :
+//   • vault.json (filesDir) contient { version, salt, verifier }.
+//   • Aucun PIN n'est jamais persisté.
+//   • Le verifier = HMAC-SHA256(MASTER_KEY, salt || TAG).
+//   • MASTER_KEY = HKDF-SHA256(ROOT_KEY || PIN) — ROOT_KEY vit
+//     exclusivement dans le StrongBox.
+//
+// Plus de SharedPreferences, plus de hash PIN côté Dart.
+// Le sel statique `_appSalt` et `CryptoService.deriveKey` ont été retirés
+// (l'ancien hash PIN Dart est remplacé par le verifier HMAC en Rust).
+//
+// IMPORTANT — Ordre d'initialisation (géré par main.dart) :
+//   1. KeystoreBridge.vaultSetDir(docsDir)
+//   2. KeystoreBridge.initializeHardwareSecurity()
+//   3. (PIN saisi par l'utilisateur) → initializeMasterPin / unlockSession
+//
+// L'API publique reste identique pour main.dart :
+//   • isVaultInitialized() -> Future<bool>
+//   • initializeMasterPin(pin) -> Future<bool>
+//   • unlockSession(pin) -> Future<SessionResult>
 
 class SessionVault {
-  final CryptoService _cryptoService = CryptoService();
+  /// Délai minimum de réponse pour l'unlock (protection timing).
+  static const int _unlockMinLatencyMs = 1500;
 
-  static final Uint8List _appSalt = Uint8List.fromList([
-    0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
-    0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10
-  ]);
-
+  /// Vrai si un vault chiffré existe déjà.
   Future<bool> isVaultInitialized() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.containsKey('aegis_master_hash');
+    return KeystoreBridge.vaultIsInitialized();
   }
 
+  /// Initialise le vault avec le PIN choisi.
+  ///
+  /// Vérifications préalables :
+  ///   • Force du PIN (PasswordValidator).
+  ///   • FFI `aegis_vault_init` → true si OK.
+  ///
+  /// Prérequis : `KeystoreBridge.vaultSetDir()` + `initializeHardwareSecurity()`
+  /// doivent avoir réussi AVANT l'appel.
   Future<bool> initializeMasterPin(String chosenPin) async {
-    // Validation stricte : minimum 12 caractères, force >= medium.
     if (!PasswordValidator.isAcceptable(chosenPin)) return false;
-    final prefs = await SharedPreferences.getInstance();
-
-    final SecretKey key = await _cryptoService.deriveKey(chosenPin, _appSalt);
-    final bytes = await key.extractBytes();
-    final hashHex = base64Encode(bytes);
-
-    return await prefs.setString('aegis_master_hash', hashHex);
+    return KeystoreBridge.vaultInit(chosenPin);
   }
 
+  /// Tente de déverrouiller le vault avec le PIN fourni.
+  ///
+  /// Retourne :
+  ///   • `real`               → PIN correct
+  ///   • `decoy`              → PIN incorrect (ou erreur interne)
+  ///   • `needsInitialization`→ aucun vault
   Future<SessionResult> unlockSession(String userPin) async {
     final Stopwatch stopwatch = Stopwatch()..start();
-    final prefs = await SharedPreferences.getInstance();
 
-    if (!prefs.containsKey('aegis_master_hash')) {
-      return SessionResult(
-        type: VaultSessionType.needsInitialization,
-        payload: "VAULT_NOT_INITIALIZED",
-      );
-    }
+    final status = KeystoreBridge.vaultUnlock(userPin);
 
-    final savedHashHex = prefs.getString('aegis_master_hash');
-    final SecretKey derivedKey = await _cryptoService.deriveKey(userPin, _appSalt);
-    final derivedBytes = await derivedKey.extractBytes();
-    final currentHashHex = base64Encode(derivedBytes);
-
-    bool isValid = (savedHashHex == currentHashHex);
-
+    // Latence minimum : évite de révéler par timing si le verifier
+    // est proche du match (le HMAC-SHA256 Rust est déjà constant-time,
+    // ceci est une marge défensive).
     stopwatch.stop();
     final int elapsedMs = stopwatch.elapsedMilliseconds;
-    const int targetMs = 1500;
-    if (elapsedMs < targetMs) {
-      await Future.delayed(Duration(milliseconds: targetMs - elapsedMs));
+    if (elapsedMs < _unlockMinLatencyMs) {
+      await Future.delayed(
+        Duration(milliseconds: _unlockMinLatencyMs - elapsedMs),
+      );
     }
 
-    if (isValid) {
-      return SessionResult(
-        type: VaultSessionType.real,
-        payload: "AEGIS_REAL_CORE_ACTIVE_PAYLOAD",
-      );
-    } else {
-      return SessionResult(
-        type: VaultSessionType.decoy,
-        payload: "DECOY_GENERATED_SESSION",
-      );
+    switch (status) {
+      case VaultUnlockStatus.real:
+        return SessionResult(
+          type: VaultSessionType.real,
+          payload: "AEGIS_REAL_CORE_ACTIVE_PAYLOAD",
+        );
+      case VaultUnlockStatus.decoy:
+        return SessionResult(
+          type: VaultSessionType.decoy,
+          payload: "DECOY_GENERATED_SESSION",
+        );
+      case VaultUnlockStatus.needsInitialization:
+        return SessionResult(
+          type: VaultSessionType.needsInitialization,
+          payload: "VAULT_NOT_INITIALIZED",
+        );
+      case VaultUnlockStatus.error:
+        // En cas d'erreur interne : traiter comme decoy (pas de fuite).
+        return SessionResult(
+          type: VaultSessionType.decoy,
+          payload: "ERROR_FALLBACK",
+        );
     }
+  }
+
+  /// Efface totalement le vault (fichier + clés RAM).
+  ///
+  /// Usage : réinitialisation volontaire par l'utilisateur.
+  Future<bool> wipeVault() async {
+    return KeystoreBridge.vaultWipe();
   }
 }

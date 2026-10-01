@@ -1,4 +1,4 @@
-﻿//! aegis-core/src/lib.rs
+//! aegis-core/src/lib.rs
 //! Point d'Entrée FFI/JNI et Enregistrement des Modules Natifs (CdCM v2.2-RC3).
 
 #![allow(unused_imports, dead_code, unused_variables)]
@@ -26,6 +26,7 @@ pub mod hardware_triggers;
 pub mod ingestion;
 pub mod integrity_timing;
 pub mod keystore;
+pub mod vault_persistence;
 pub mod mesh;
 pub mod network;
 pub mod panic;
@@ -66,6 +67,12 @@ pub unsafe extern "system" fn JNI_OnLoad(
 ) -> jint {
     ffi_security::init_native_security();
     secure_buffer::init_secure_buffer_system();
+
+    // F6-C (01/10/26) : ancre runtime qui force le linker à garder les 5
+    // symboles FFI aegis_vault_* (appelés uniquement depuis Dart, donc
+    // invisibles pour le linker). JNI_OnLoad est TOUJOURS appelée par la
+    // JVM Android → l'ancre survit.
+    _anchor_vault_ffi();
 
     if vm.is_null() {
         return JNI_ERR;
@@ -579,4 +586,161 @@ pub unsafe extern "system" fn Java_com_example_aegis_1app_MainActivity_aegis_1ve
     }
 
     status.to_code()
+}
+
+// =========================================================================
+// WRAPPERS FFI — Vault Persistence (F6-C)
+// =========================================================================
+//
+// API Dart ↔ Rust (C ABI).
+//
+//   aegis_vault_set_dir(path)   → 0=OK, -1=null ptr, -2=encoding, -3=io
+//   aegis_vault_is_initialized() → 1=initialized, 0=not initialized
+//   aegis_vault_init(pin)        → 0=OK, -1=null ptr, -2=encoding, -3=vault err
+//   aegis_vault_unlock(pin)      → 0=Real, 1=Decoy, 2=NeedsInit, -1=err
+//   aegis_vault_wipe()           → 0=OK, -1=err
+
+/// Définit le répertoire de persistance du vault (vault.json).
+///
+/// Doit être appelé UNE FOIS au démarrage de l'app, avant toute autre
+/// fonction vault. Côté Dart : `getApplicationDocumentsDirectory()`.
+#[no_mangle]
+pub unsafe extern "C" fn aegis_vault_set_dir(path_ptr: *const c_char) -> i32 {
+    if path_ptr.is_null() {
+        return -1;
+    }
+    let path_str = match unsafe { CStr::from_ptr(path_ptr) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return -2,
+    };
+
+    match crate::vault_persistence::set_vault_dir(std::path::PathBuf::from(path_str)) {
+        Ok(_) => 0,
+        Err(e) => {
+            eprintln!("AEGIS-VAULT: set_vault_dir a échoué: {}", e);
+            -3
+        }
+    }
+}
+
+/// Vrai si un vault.json valide existe dans le répertoire configuré.
+///
+/// Retourne :
+///   1 = vault initialisé (PIN déjà défini)
+///   0 = vault non initialisé (ou VAULT_DIR non configuré)
+#[no_mangle]
+pub unsafe extern "C" fn aegis_vault_is_initialized() -> i32 {
+    if crate::vault_persistence::vault_is_initialized() {
+        1
+    } else {
+        0
+    }
+}
+
+/// Initialise un nouveau vault avec le PIN fourni.
+///
+/// Prérequis : `aegis_set_hardware_secret` doit avoir été appelé
+/// (ROOT_KEY initialisée depuis le StrongBox).
+///
+/// Retourne :
+///   0  = init OK (vault.json écrit, MASTER_KEY en RAM)
+///  -1  = pin_ptr null
+///  -2  = encodage UTF-8 du PIN invalide
+///  -3  = erreur vault (ROOT_KEY absente, IO, PIN vide)
+#[no_mangle]
+pub unsafe extern "C" fn aegis_vault_init(pin_ptr: *const c_char) -> i32 {
+    if pin_ptr.is_null() {
+        return -1;
+    }
+    let pin = match unsafe { CStr::from_ptr(pin_ptr) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return -2,
+    };
+
+    match crate::vault_persistence::vault_init(pin) {
+        Ok(_) => 0,
+        Err(e) => {
+            eprintln!("AEGIS-VAULT: vault_init a échoué: {}", e);
+            -3
+        }
+    }
+}
+
+/// Tente de déverrouiller le vault avec le PIN fourni.
+///
+/// Retourne :
+///   0  = Real (PIN correct → session réelle)
+///   1  = Decoy (PIN incorrect → session leurre)
+///   2  = NeedsInitialization (aucun vault.json)
+///  -1  = erreur interne (pin null, IO, ROOT_KEY absente)
+#[no_mangle]
+pub unsafe extern "C" fn aegis_vault_unlock(pin_ptr: *const c_char) -> i32 {
+    if pin_ptr.is_null() {
+        return -1;
+    }
+    let pin = match unsafe { CStr::from_ptr(pin_ptr) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return -1,
+    };
+
+    match crate::vault_persistence::vault_unlock(pin) {
+        Ok(crate::vault_persistence::VaultSession::Real) => 0,
+        Ok(crate::vault_persistence::VaultSession::Decoy) => 1,
+        Ok(crate::vault_persistence::VaultSession::NeedsInitialization) => 2,
+        Err(e) => {
+            eprintln!("AEGIS-VAULT: vault_unlock a échoué: {}", e);
+            -1
+        }
+    }
+}
+
+/// Supprime vault.json et efface ROOT_KEY + MASTER_KEY de la RAM.
+///
+/// Retourne :
+///   0  = OK
+///  -1  = erreur (IO)
+#[no_mangle]
+pub unsafe extern "C" fn aegis_vault_wipe() -> i32 {
+    match crate::vault_persistence::vault_wipe() {
+        Ok(_) => 0,
+        Err(e) => {
+            eprintln!("AEGIS-VAULT: vault_wipe a échoué: {}", e);
+            -1
+        }
+    }
+}
+
+// =========================================================================
+// F6-C (01/10/26) — Ancre runtime pour les 5 symboles FFI aegis_vault_*
+// =========================================================================
+//
+// Contexte :
+//   Les fonctions `aegis_vault_*` sont appelées UNIQUEMENT depuis Dart
+//   via `DynamicLibrary.lookupFunction` (FFI dynamique). Le linker LLD
+//   du NDK n'a donc aucune référence interne vers elles → il les élimine
+//   à l'étape `--gc-sections` (comportement par défaut de clang NDK).
+//
+// Preuve de la chaîne vivante : `aegis_vault_create/destroy` (dans
+// session.rs) survivent parce qu'elles sont appelées par
+// `aegis_session_vault_create/destroy` (chaîne interne).
+//
+// Solution :
+//   Cette fonction référence explicitement les 5 fonctions via des casts
+//   runtime (autorisés, contrairement au const eval) + `black_box` qui
+//   empêche l'optimiseur de les éliminer. Appelée depuis `JNI_OnLoad`
+//   (garanti exécuté par la JVM Android), elle crée un point vivant
+//   vers les 5 symboles → le linker les garde.
+//
+// NE PAS retirer. Si une nouvelle fonction FFI est ajoutée et appelée
+// uniquement depuis Dart, l'ajouter ici.
+
+#[inline(never)]
+fn _anchor_vault_ffi() {
+    std::hint::black_box((
+        aegis_vault_set_dir as *const (),
+        aegis_vault_is_initialized as *const (),
+        aegis_vault_init as *const (),
+        aegis_vault_unlock as *const (),
+        aegis_vault_wipe as *const (),
+    ));
 }

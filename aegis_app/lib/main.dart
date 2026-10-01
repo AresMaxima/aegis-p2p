@@ -20,7 +20,7 @@ import 'views/steganography_view.dart'; // NOUVEAU MODULE AJOUTÉ
 import 'widgets/aegis_keyboard.dart'; // Q3.11 : clavier custom anti-IME
 import 'models/session_vault.dart';
 import 'services/global_state.dart'; // ← FIX 1 : état partagé
-import 'keystore_bridge.dart'; // ← N1 (audit 20/09) : clé StrongBox
+import 'keystore_bridge.dart'; // ← N1 (audit 20/09) : clé StrongBox + F6-C vault
 
 // NOTE : les déclarations `activeRamPin`, `globalSteganoRamBuffer` et
 // `isIntentPendingInDart` sont maintenant dans `services/global_state.dart`.
@@ -206,6 +206,24 @@ void main() async {
 
   await deploySnowflake();
 
+  // ============================================================
+  // F6-C (2026-09-30) : configuration du dossier vault (Rust).
+  //
+  // Cette étape DOIT précéder tout appel vault (isInitialized,
+  // initializeMasterPin, unlockSession) et être dans le même
+  // contexte que LockScreen (avant runApp).
+  //
+  // Le dossier utilisé est `getApplicationDocumentsDirectory()`,
+  // sous-dossier private du sandbox Android.
+  // ============================================================
+  try {
+    final docsDir = await getApplicationDocumentsDirectory();
+    final dirOk = KeystoreBridge.vaultSetDir(docsDir.path);
+    debugPrint("AEGIS-VAULT: setVaultDir(${docsDir.path}) = $dirOk");
+  } catch (e) {
+    debugPrint("AEGIS-VAULT: vaultSetDir a échoué: $e");
+  }
+
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   runApp(const AegisApp());
 
@@ -339,14 +357,14 @@ class _UserInactivityWrapperState extends State<UserInactivityWrapper> with Widg
 
   void _lockAndPurge() {
     if (isExternalFlowActive()) return;
-    
+
     // 1. Purge FFI immédiate de la mémoire RAM
     activeRamPin = "";
     _executeEmergencyFfiPurge();
-    
+
     // 2. Écrase la mémoire visuelle Flutter (Snapshot OS) vers le code PIN
-    runApp(const AegisApp()); 
-    
+    runApp(const AegisApp());
+
     // 3. Fermeture instantanée et brutale à la microseconde
     SystemChannels.platform.invokeMethod('SystemNavigator.pop');
     exit(0);
@@ -572,6 +590,8 @@ class _LockScreenState extends State<LockScreen> {
         return;
       }
 
+      // F6-C : initializeMasterPin écrit vault.json (verifier HMAC).
+      // Il dérive aussi la MASTER_KEY en interne (HKDF ROOT_KEY||PIN).
       final success = await _vault.initializeMasterPin(pin);
       if (!mounted) return;
 
@@ -585,7 +605,8 @@ class _LockScreenState extends State<LockScreen> {
       // ============================================================
       // Option 2 (audit 2026-09-20) : dérivation de la master_key.
       // Combine la ROOT_KEY StrongBox (déjà en mémoire Rust) avec le PIN.
-      // Deux facteurs : matériel + connaissance.
+      // Note : `vaultInit` a déjà dérivé la MASTER_KEY en interne,
+      // cet appel est idempotent (même ROOT_KEY + même PIN → même MK).
       // ============================================================
       final masterOk = await KeystoreBridge.deriveMasterKey(pin);
       if (!mounted) return;
@@ -601,7 +622,6 @@ class _LockScreenState extends State<LockScreen> {
           MaterialPageRoute(builder: (context) => const MainDashboard()),
         );
       } else {
-        // MODIFICATION B : clé i18n (const retiré car AppTranslations.get n'est pas const)
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(AppTranslations.get(context, 'toast_master_fail')),
@@ -634,7 +654,6 @@ class _LockScreenState extends State<LockScreen> {
           MaterialPageRoute(builder: (context) => const MainDashboard()),
         );
       } else {
-        // MODIFICATION B : clé i18n (2e occurrence)
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(AppTranslations.get(context, 'toast_master_fail')),
@@ -665,8 +684,6 @@ class _LockScreenState extends State<LockScreen> {
       );
     }
 
-    // MODIFICATION A — Q1 FIX (2026-09-21) : plus de branchement manuel par langue.
-    // AppTranslations gère le fallback pour toutes les locales.
     final String displayHint = _isVaultInitialized!
         ? AppTranslations.get(context, 'pin_hint')
         : AppTranslations.get(context, 'create_pin_hint');
@@ -883,10 +900,10 @@ class MainDashboard extends StatefulWidget {
 }
 
 class _MainDashboardState extends State<MainDashboard> {
-  int _currentIndex = 0; 
+  int _currentIndex = 0;
   final TextEditingController _recipientController = TextEditingController();
   final TextEditingController _chatController = TextEditingController();
-  
+
   String _networkMode = "t_auto";
   String _connectedPeer = "";
   final String _myEphemeralKey = "AEGIS-P2P-v2.2-GA-4F8B12E9903A7C12D";
@@ -906,7 +923,6 @@ class _MainDashboardState extends State<MainDashboard> {
     super.dispose();
   }
 
-  // FIX 3 : utilise `beginExternalFlow()` / `endExternalFlow()` (compteur + flag)
   Future<void> _pickFileZeroDisk() async {
     beginExternalFlow();
     try {
@@ -922,7 +938,6 @@ class _MainDashboardState extends State<MainDashboard> {
           final success = await ingestFileZeroDisk(path);
           if (!mounted) return;
 
-          // MODIFICATION C : toasts i18n (ingestion réussie / échouée)
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(success
@@ -943,10 +958,6 @@ class _MainDashboardState extends State<MainDashboard> {
         }
       }
     } catch (e, stackTrace) {
-      // MODIFICATION G (AEGIS-Q1 SEC 2026-09-21) :
-      // $e n'est PLUS affiché à l'utilisateur. Il peut contenir chemins absolus,
-      // identifiants de content provider, sandbox paths → vecteur d'info leak.
-      // Redirigé vers debugPrint (logcat debug visible, strippable release).
       debugPrint('[AEGIS-FILE-PICKER] $e\n$stackTrace');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -957,20 +968,14 @@ class _MainDashboardState extends State<MainDashboard> {
     }
   }
 
-  /// Ouvre l'aperçu caméra LIVE puis amène l'utilisateur sur le Vault
-  /// avec les frames RAM déjà capturées (DÉPURER/AFFICHER actifs).
-  //
-  // FIX 3 : utilise `beginExternalFlow()` / `endExternalFlow()` (compteur + flag)
   Future<void> _startCameraFromVault() async {
     beginExternalFlow();
     try {
-      // 1) Permission caméra
       var status = await Permission.camera.status;
       if (!status.isGranted) {
         status = await Permission.camera.request();
         if (!status.isGranted) {
           if (!mounted) return;
-          // MODIFICATION D : toast i18n (const retiré)
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(AppTranslations.get(context, 'toast_camera_denied')),
@@ -983,7 +988,6 @@ class _MainDashboardState extends State<MainDashboard> {
 
       if (!mounted) return;
 
-      // 2) Aperçu live + capture
       final captured = await Navigator.push<bool>(
         context,
         MaterialPageRoute(
@@ -995,7 +999,6 @@ class _MainDashboardState extends State<MainDashboard> {
       if (!mounted) return;
       if (captured != true) return;
 
-      // 3) Ouvre le Vault en mode RAM capture
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -1015,7 +1018,6 @@ class _MainDashboardState extends State<MainDashboard> {
 
     if (!status.isGranted) {
       if (mounted) {
-        // MODIFICATION E : toast i18n (const retiré)
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(AppTranslations.get(context, 'toast_camera_required'))),
         );
@@ -1173,7 +1175,7 @@ class _MainDashboardState extends State<MainDashboard> {
     return ListView(
       padding: const EdgeInsets.all(16.0),
       children: [
-        const SteganographyView(), 
+        const SteganographyView(),
         const Divider(height: 40, color: Color(0xFF2C2C2E)),
         Text(AppTranslations.get(context, 'chat_title'), style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white54)),
         const SizedBox(height: 8),
@@ -1229,11 +1231,10 @@ class _MainDashboardState extends State<MainDashboard> {
           const Icon(Icons.folder_special, size: 80, color: Colors.white12),
           const SizedBox(height: 24),
 
-          // Bouton 1 : CAPTURE NDK (aperçu live + capture RAM)
           ElevatedButton.icon(
             onPressed: _startCameraFromVault,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFD4AF37), // matteGold
+              backgroundColor: const Color(0xFFD4AF37),
               foregroundColor: Colors.black,
               minimumSize: const Size(double.infinity, 56),
             ),
@@ -1246,7 +1247,6 @@ class _MainDashboardState extends State<MainDashboard> {
 
           const SizedBox(height: 12),
 
-          // Bouton 2 : INGÉRER FICHIER (RAM)
           ElevatedButton.icon(
             onPressed: _pickFileZeroDisk,
             style: ElevatedButton.styleFrom(
@@ -1262,7 +1262,6 @@ class _MainDashboardState extends State<MainDashboard> {
           ),
 
           const SizedBox(height: 16),
-          // MODIFICATION F (AEGIS-Q1 2026-09-21) : clé i18n
           Text(
             AppTranslations.get(context, 'vault_ingestion_note'),
             textAlign: TextAlign.center,

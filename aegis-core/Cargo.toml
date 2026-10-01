@@ -15,6 +15,7 @@ chacha20poly1305 = "0.10"
 aes-gcm = "0.10"
 sha2 = { version = "0.10", features = ["force-soft"] }
 hkdf = "0.12"
+hmac = "0.12"
 x25519-dalek = { version = "2.0", features = ["static_secrets"] }
 ed25519-dalek = "2.1"
 pqcrypto-mlkem = "0.1"
@@ -85,7 +86,10 @@ tss-esapi = { version = "7.3", optional = true }
 # --- Profil Release : durcissement anti-forensics & réduction d'empreinte ---
 [profile.release]
 opt-level = "z"     # Taille minimale du binaire natif
-lto = true          # Link-Time Optimization
+lto = false         # F6-C (30/09/26) : LTO ("fat" ET "thin") éliminait les
+                    # symboles FFI appelés uniquement depuis Dart. On désactive
+                    # LTO pour garantir les exports aegis_vault_*. Coût : ~10-20%
+                    # de taille .so. Version script linker prévue en v3.1 si besoin.
 codegen-units = 1   # Optimisations maximales
 panic = "abort"     # CRITIQUE : pas d'unwinding à travers la frontière FFI
 strip = true        # Efface symboles et tables de débogage

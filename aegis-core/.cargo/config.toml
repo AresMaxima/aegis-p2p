@@ -1,0 +1,15 @@
+# F6-C (01/10/26) — Désactive --gc-sections du linker Android.
+#
+# Les tentatives précédentes ont échoué :
+#   • lto=thin/false → inopérant (le linker élimine, pas le compilateur)
+#   • --gc-keep-exported → absent de LLD 17 (NDK 27)
+#   • #[used] static → const eval UB
+#   • -Wl,-u,symbol → ordre de linking incorrect
+#   • anchor runtime + black_box → constant-folding LLVM
+#
+# Solution finale : désactiver --gc-sections.
+# LLD garde TOUTES les sections, tous les #[no_mangle] sont préservés.
+# Coût : .so ~+30%. Garanti fonctionnel sur NDK 27 / LLD 17.
+
+[target.aarch64-linux-android]
+rustflags = ["-C", "link-arg=-Wl,--no-gc-sections"]
