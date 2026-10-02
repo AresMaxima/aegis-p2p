@@ -14,9 +14,7 @@ use aegis_core::{
     keystore::HardwareKeystore,
     mesh::SneakernetMesh,
     network::{
-        dht::DhtBehaviour,
         hopping::TransportSelector,
-        local::LocalBehaviour,
         p2p_transfer::MetadataStripper,
         tor::secure_wipe_dir,
     },
@@ -109,8 +107,8 @@ fn test_blindspots_full_26_modules_sweep() {
     let _ = SneakernetMesh::ingest_packet([0u8; 512], 1);
     let _ = SneakernetMesh::export_gossip_bundle();
 
-    let _dht_size = std::mem::size_of::<DhtBehaviour>();
-    let _local_size = std::mem::size_of::<LocalBehaviour>();
+    // D47 (02/10/26) : modules dht et local supprimés.
+    // Les tests _dht_size et _local_size ont été retirés avec eux.
     let _ts = TransportSelector::new(30);
 
     let tmp_dir = std::env::temp_dir().join("aegis_tor_test_bs");
