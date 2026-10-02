@@ -39,7 +39,6 @@ tempfile = "3.8"
 
 # --- Réseau asynchrone, P2P, Tor embarqué ---
 tokio = { version = "1.35", features = ["full"] }
-libp2p = { version = "0.53", default-features = false, features = ["tcp", "noise", "yamux", "tokio", "mdns", "kad", "macros"] }
 arti-client = { version = "0.18", default-features = false, features = ["tokio", "rustls"] }
 tor-rtcompat = { version = "0.18", default-features = false, features = ["tokio", "rustls"] }
 subtle = "2.6.1"
@@ -74,7 +73,11 @@ image = { version = "0.25", default-features = false, features = ["jpeg", "png"]
 # Cela évite une dépendance transitive lourde pour seulement 2 fonctions.
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.52", features = ["Win32_System_Memory"] }
+windows-sys = { version = "0.52", features = [
+    "Win32_Foundation",
+    "Win32_System_Memory",
+    "Win32_System_Threading",
+] }
 
 [target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
 tss-esapi = { version = "7.3", optional = true }
