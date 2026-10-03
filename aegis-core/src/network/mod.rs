@@ -3,3 +3,4 @@ pub mod hopping;
 pub mod p2p_transfer;
 pub mod tor;
 pub mod tor_isolation;
+pub mod tor_rotation;
