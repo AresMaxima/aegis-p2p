@@ -1,26 +1,27 @@
 //! aegis-core/src/network/tor.rs
 //!
-//! Client Tor embarqué (Arti) + transport isolé par contact.
+//! Client Tor embarqué (Arti) + transport isolé par contact + rotation.
 //!
 //! ─────────────────────────────────────────────────────────────────────
 //! Contenu :
 //!
 //!   1. `AegisTorClient` (legacy) — envoi d'un fichier unique via bootstrap.
 //!
-//!   2. `TorTransport` (P0-A.1d.1) — transport Tor persistant avec :
+//!   2. `TorTransport` (P0-A.1d.1 + d.3) — transport Tor persistant avec :
 //!        • Un client de base (bootstrap unique)
 //!        • Un `HashMap<contact_id, TorClient>` isolé par contact
 //!        • Un `HashMap<contact_id, Arc<Mutex<DataStream>>>` stream persistant
+//!        • Un `HashMap<contact_id, TorCircuitRotation>` gestionnaire de rotation
 //!
 //!   3. `TorTransportPerContact` (P0-A.1d.2) — wrapper qui implémente
 //!      `EncryptedTransport` :
-//!        • Pipeline send : strip → Ratchet::encrypt → prefix_len → pack → write
-//!        • Pipeline recv : read → concat → strip_prefix → Ratchet::decrypt
+//!        • Pipeline send : rotate? → strip → encrypt → prefix_len → pack → write
+//!        • Pipeline recv : rotate? → read → concat → strip_prefix → decrypt
 //!
 //!   4. `secure_wipe_dir` — utilitaire partagé (wipe fichiers avant Drop).
 //!
 //! ─────────────────────────────────────────────────────────────────────
-//! Décisions actées (02-04/10/2026) :
+//! Décisions actées (02-05/10/2026) :
 //!
 //!   • D40   : Chiffrement applicatif obligatoire (fail-closed)
 //!   • D42   : un TorClient par contact (isolation par circuit)
@@ -33,6 +34,8 @@
 //!   • D56   : `P2PFramePacker::pack_payload` APRÈS `Ratchet::encrypt`
 //!   • D58   : FRAME_SIZE = 512 B indépendant du transport physique
 //!   • D59   : Stream persistant via `Arc<tokio::sync::Mutex<DataStream>>`
+//!   • D60   : Rotation Tor implicite uniquement (pas de tâche de fond)
+//!   • D61   : apply_rotation drop stream + client isolé (isolation forte)
 //!   • Opt.2  : préfixe `ciphertext_len: u32 BE` avant packing
 //! ─────────────────────────────────────────────────────────────────────
 
@@ -43,6 +46,7 @@ use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::Path;
 use std::sync::Arc;
+use std::time::Instant;
 use tempfile::TempDir;
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -53,6 +57,7 @@ use zeroize::Zeroize;
 use crate::crypto::ratchet::RatchetSession;
 use crate::network::encrypted_transport::{EncryptedTransport, TransportError};
 use crate::network::p2p_transfer::{MetadataStripper, P2PFramePacker, FRAME_SIZE, HEADER_SIZE};
+use crate::network::tor_rotation::{RotationReason, TorCircuitRotation};
 use crate::secure_buffer::SecureBuffer;
 
 // =========================================================================
@@ -101,7 +106,7 @@ impl AegisTorClient {
         }
 
         stream.flush().await?;
-        stream.shutdown().await?;   // D59 : shutdown() tokio au lieu de close() futures
+        stream.shutdown().await?;
 
         Ok(Self {
             client: Some(client),
@@ -126,22 +131,18 @@ impl Drop for AegisTorClient {
 }
 
 // =========================================================================
-// TorTransport — isolation par contact (P0-A.1d.1)
+// TorTransport — isolation par contact + rotation (P0-A.1d.1 + d.3)
 // =========================================================================
 
 /// Type de stream partagé : Arc<Mutex<DataStream>>.
-///
-/// Permet :
-///   • Un stream par contact (isolation réseau)
-///   • Un partage entre `send_encrypted` et `recv_decrypted` (persistance)
-///   • Un accès `&mut` via `lock().await` (contrat `&self` du trait)
 pub type SharedStream = Arc<Mutex<DataStream>>;
 
-/// Transport Tor avec isolation par contact.
+/// Transport Tor avec isolation par contact et rotation événementielle.
 pub struct TorTransport {
     base_client: TorClient<TokioRustlsRuntime>,
     isolated_clients: Arc<RwLock<HashMap<String, TorClient<TokioRustlsRuntime>>>>,
     streams: Arc<RwLock<HashMap<String, SharedStream>>>,
+    rotations: Arc<RwLock<HashMap<String, TorCircuitRotation>>>,
     ram_fs: Option<TempDir>,
 }
 
@@ -173,6 +174,7 @@ impl TorTransport {
             base_client,
             isolated_clients: Arc::new(RwLock::new(HashMap::new())),
             streams: Arc::new(RwLock::new(HashMap::new())),
+            rotations: Arc::new(RwLock::new(HashMap::new())),
             ram_fs: Some(ram_fs),
         })
     }
@@ -203,18 +205,11 @@ impl TorTransport {
     }
 
     /// Récupère (ou ouvre) le stream Tor persistant pour un contact.
-    ///
-    /// Premier appel : ouvre un nouveau stream via `client.connect()`.
-    /// Appels suivants : retourne le `SharedStream` déjà stocké.
-    ///
-    /// Le stream est protégé par un `tokio::sync::Mutex` — accès
-    /// exclusif pendant chaque lecture/écriture.
     pub async fn get_or_create_stream(
         &self,
         contact_id: &str,
         target_onion: &str,
     ) -> Result<SharedStream, TransportError> {
-        // Fast path : stream déjà présent
         {
             let map = self.streams.read().await;
             if let Some(stream) = map.get(contact_id) {
@@ -222,7 +217,6 @@ impl TorTransport {
             }
         }
 
-        // Slow path : ouvrir un nouveau stream
         let client = self
             .get_or_create_isolated_client(contact_id)
             .await
@@ -235,7 +229,6 @@ impl TorTransport {
 
         let shared: SharedStream = Arc::new(Mutex::new(stream));
 
-        // Double-check pour éviter la race
         {
             let mut map = self.streams.write().await;
             if let Some(existing) = map.get(contact_id) {
@@ -247,6 +240,16 @@ impl TorTransport {
         Ok(shared)
     }
 
+    /// Récupère (ou crée) le gestionnaire de rotation pour un contact.
+    ///
+    /// **Helper privé** — crée un `TorCircuitRotation::new()` à la volée
+    /// si absent. Le jitter initial est généré via OsRng.
+    async fn get_or_create_rotation(&self, contact_id: &str) -> () {
+        let mut map = self.rotations.write().await;
+        map.entry(contact_id.to_string())
+            .or_insert_with(TorCircuitRotation::new);
+    }
+
     /// Nombre de contacts ayant un client isolé actif.
     pub async fn isolated_client_count(&self) -> usize {
         self.isolated_clients.read().await.len()
@@ -255,6 +258,11 @@ impl TorTransport {
     /// Nombre de streams actifs.
     pub async fn stream_count(&self) -> usize {
         self.streams.read().await.len()
+    }
+
+    /// Nombre de gestions de rotation actives.
+    pub async fn rotation_count(&self) -> usize {
+        self.rotations.read().await.len()
     }
 
     /// Force le drop du client isolé d'un contact.
@@ -273,6 +281,79 @@ impl TorTransport {
     pub fn base_client(&self) -> &TorClient<TokioRustlsRuntime> {
         &self.base_client
     }
+
+    // =====================================================================
+    // Rotation (P0-A.1d.3)
+    // =====================================================================
+
+    /// Enregistre `n` octets envoyés pour un contact.
+    pub async fn record_bytes_sent(&self, contact_id: &str, n: u64) {
+        self.get_or_create_rotation(contact_id).await;
+        let mut map = self.rotations.write().await;
+        if let Some(rot) = map.get_mut(contact_id) {
+            rot.record_bytes_sent(n);
+        }
+    }
+
+    /// Enregistre une activité pour un contact (reset timer inactivité).
+    pub async fn record_activity(&self, contact_id: &str) {
+        self.get_or_create_rotation(contact_id).await;
+        let now = Instant::now();
+        let mut map = self.rotations.write().await;
+        if let Some(rot) = map.get_mut(contact_id) {
+            rot.record_activity(now);
+        }
+    }
+
+    /// Enregistre une erreur réseau pour un contact.
+    pub async fn record_error(&self, contact_id: &str) {
+        self.get_or_create_rotation(contact_id).await;
+        let mut map = self.rotations.write().await;
+        if let Some(rot) = map.get_mut(contact_id) {
+            rot.record_error();
+        }
+    }
+
+    /// Évalue si une rotation doit avoir lieu pour un contact.
+    pub async fn should_rotate(&self, contact_id: &str) -> Option<RotationReason> {
+        self.get_or_create_rotation(contact_id).await;
+        let map = self.rotations.read().await;
+        map.get(contact_id).and_then(|r| r.should_rotate(Instant::now()))
+    }
+
+    /// Applique une rotation complète pour un contact.
+    ///
+    /// **Ordre fixe** des opérations (anti-deadlock) :
+    ///   1. Drop du stream (ferme le circuit actuel)
+    ///   2. Drop du client isolé (garantit un nouveau circuit Tor au prochain appel)
+    ///   3. Reset du compteur de rotation (nouveau jitter)
+    ///
+    /// La prochaine opération réseau (send ou recv) sur ce contact
+    /// ouvrira un nouveau client isolé + un nouveau stream.
+    pub async fn apply_rotation(&self, contact_id: &str) {
+        // 1. Drop stream
+        {
+            let mut map = self.streams.write().await;
+            map.remove(contact_id);
+        }
+
+        // 2. Drop client isolé
+        {
+            let mut map = self.isolated_clients.write().await;
+            map.remove(contact_id);
+        }
+
+        // 3. Reset compteur
+        {
+            let now = Instant::now();
+            let mut map = self.rotations.write().await;
+            if let Some(rot) = map.get_mut(contact_id) {
+                rot.reset_after_rotation(now);
+            } else {
+                map.insert(contact_id.to_string(), TorCircuitRotation::new());
+            }
+        }
+    }
 }
 
 impl Drop for TorTransport {
@@ -286,7 +367,7 @@ impl Drop for TorTransport {
 }
 
 // =========================================================================
-// TorTransportPerContact — impl EncryptedTransport (P0-A.1d.2)
+// TorTransportPerContact — impl EncryptedTransport (P0-A.1d.2 + d.3)
 // =========================================================================
 
 /// Wrapper par contact qui implémente `EncryptedTransport`.
@@ -325,44 +406,58 @@ impl EncryptedTransport for TorTransportPerContact {
         session: &mut RatchetSession,
         plaintext: &[u8],
     ) -> Result<(), TransportError> {
-        // 1. Wrap plaintext dans SecureBuffer
+        // === 1. Vérification rotation (D60) ===
+        if let Some(_reason) = self.transport.should_rotate(&self.contact_id).await {
+            self.transport.apply_rotation(&self.contact_id).await;
+        }
+
+        // === 2. Wrap plaintext dans SecureBuffer ===
         let mut sb = SecureBuffer::new(plaintext.len());
         sb.as_slice_mut().copy_from_slice(plaintext);
 
-        // 2. Strip métadonnées
+        // === 3. Strip métadonnées ===
         let stripped = MetadataStripper::strip_and_normalize(&sb);
 
-        // 3. Chiffrer
+        // === 4. Chiffrer ===
         let ciphertext = session
             .encrypt(stripped.as_slice())
             .map_err(|e| TransportError::EncryptionFailed(e))?;
 
-        // 4. Préfixe length (u32 BE)
+        // === 5. Préfixe length (u32 BE) ===
         let mut prefixed = Vec::with_capacity(4 + ciphertext.len());
         prefixed.extend_from_slice(&(ciphertext.len() as u32).to_be_bytes());
         prefixed.extend_from_slice(&ciphertext);
 
-        // 5. Pack en trames de 512 B
+        // === 6. Pack en trames de 512 B ===
         let frames = P2PFramePacker::pack_payload(&prefixed);
+        let total_bytes: u64 = frames.iter().map(|f| f.len() as u64).sum();
 
-        // 6. Récupérer le stream persistant (Arc<Mutex<DataStream>>)
+        // === 7. Récupérer le stream persistant ===
         let shared = self
             .transport
             .get_or_create_stream(&self.contact_id, &self.target_onion)
             .await?;
 
-        // 7. Lock + envoi trame par trame + flush
-        let mut stream = shared.lock().await;
-        for frame in frames.iter() {
-            stream
-                .write_all(frame)
-                .await
-                .map_err(|e| TransportError::IoError(e.to_string()))?;
-            stream
-                .flush()
-                .await
-                .map_err(|e| TransportError::IoError(e.to_string()))?;
+        // === 8. Lock + envoi trame par trame + flush ===
+        {
+            let mut stream = shared.lock().await;
+            for frame in frames.iter() {
+                stream
+                    .write_all(frame)
+                    .await
+                    .map_err(|e| TransportError::IoError(e.to_string()))?;
+                stream
+                    .flush()
+                    .await
+                    .map_err(|e| TransportError::IoError(e.to_string()))?;
+            }
         }
+
+        // === 9. Tracker bytes + activité ===
+        self.transport
+            .record_bytes_sent(&self.contact_id, total_bytes)
+            .await;
+        self.transport.record_activity(&self.contact_id).await;
 
         Ok(())
     }
@@ -371,6 +466,15 @@ impl EncryptedTransport for TorTransportPerContact {
         &self,
         session: &mut RatchetSession,
     ) -> Result<Vec<u8>, TransportError> {
+        // === 1. Tracker activité (réception = activité) ===
+        self.transport.record_activity(&self.contact_id).await;
+
+        // === 2. Vérification rotation (D60) ===
+        if let Some(_reason) = self.transport.should_rotate(&self.contact_id).await {
+            self.transport.apply_rotation(&self.contact_id).await;
+        }
+
+        // === 3. Récupérer le stream ===
         let shared = self
             .transport
             .get_or_create_stream(&self.contact_id, &self.target_onion)
@@ -378,14 +482,14 @@ impl EncryptedTransport for TorTransportPerContact {
 
         let mut stream = shared.lock().await;
 
-        // 1. Lire la première trame (header)
+        // === 4. Lire la première trame (header) ===
         let mut first_frame = [0u8; FRAME_SIZE];
         stream
             .read_exact(&mut first_frame)
             .await
             .map_err(|e| TransportError::IoError(e.to_string()))?;
 
-        // 2. Parser total_chunks (bytes 4-7)
+        // === 5. Parser total_chunks (bytes 4-7) ===
         let total_chunks = u32::from_be_bytes([
             first_frame[4],
             first_frame[5],
@@ -399,7 +503,7 @@ impl EncryptedTransport for TorTransportPerContact {
             ));
         }
 
-        // 3. Concaténer les payloads (bytes 8.. de chaque trame)
+        // === 6. Concaténer les payloads ===
         let mut prefixed: Vec<u8> = Vec::with_capacity(total_chunks * (FRAME_SIZE - HEADER_SIZE));
         prefixed.extend_from_slice(&first_frame[HEADER_SIZE..]);
 
@@ -412,7 +516,9 @@ impl EncryptedTransport for TorTransportPerContact {
             prefixed.extend_from_slice(&frame[HEADER_SIZE..]);
         }
 
-        // 4. Parser ciphertext_len (bytes 0-3)
+        let total_bytes: u64 = (total_chunks as u64) * (FRAME_SIZE as u64);
+
+        // === 7. Parser ciphertext_len (bytes 0-3) ===
         if prefixed.len() < 4 {
             return Err(TransportError::DecryptionFailed(
                 "prefixed payload too short".to_string(),
@@ -430,13 +536,19 @@ impl EncryptedTransport for TorTransportPerContact {
             )));
         }
 
-        // 5. Extraire ciphertext exact
+        // === 8. Extraire ciphertext exact ===
         let ciphertext = &prefixed[4..4 + ciphertext_len];
 
-        // 6. Déchiffrer
+        // === 9. Déchiffrer ===
         let plaintext = session
             .decrypt(ciphertext)
             .map_err(|e| TransportError::DecryptionFailed(e))?;
+
+        // === 10. Tracker bytes reçus ===
+        drop(stream);
+        self.transport
+            .record_bytes_sent(&self.contact_id, total_bytes)
+            .await;
 
         Ok(plaintext)
     }
@@ -486,7 +598,6 @@ pub fn secure_wipe_dir(path: &Path) {
 mod tests {
     use super::*;
 
-    /// Test hérité de l'ancien tor.rs — vérifie Zeroize sur un buffer 32 B.
     #[test]
     fn test_tor_client_instantiation_and_wipe() {
         let mut dummy_key = [0x42u8; 32];
@@ -495,7 +606,6 @@ mod tests {
         assert_eq!(dummy_key, [0u8; 32]);
     }
 
-    /// Vérifie que le préfixe length u32 BE est bien parsé.
     #[test]
     fn test_length_prefix_parsing_roundtrip() {
         let ciphertext = b"ciphertext_data_example";
@@ -509,7 +619,6 @@ mod tests {
         assert_eq!(&prefixed[4..4 + parsed_len], ciphertext);
     }
 
-    /// Vérifie qu'un ciphertext < 504 B produit 1 seule trame.
     #[test]
     fn test_single_frame_for_small_ciphertext() {
         let small_ciphertext = vec![0x42u8; 100];
@@ -526,7 +635,55 @@ mod tests {
         assert_eq!(total_chunks, 1);
     }
 
-    /// Bootstrap Tor réel — lent, ignoré par défaut.
+    /// Vérifie que le rotation tracker s'initialise correctement.
+    /// **Rapide** — utilise directement TorCircuitRotation.
+    #[test]
+    fn test_rotation_initial_state() {
+        let rot = TorCircuitRotation::new();
+        assert_eq!(rot.bytes_since_rotation(), 0);
+        assert_eq!(rot.consecutive_errors(), 0);
+        assert!(rot.should_rotate(Instant::now()).is_none());
+    }
+
+    /// Vérifie l'accumulation des compteurs de rotation.
+    #[test]
+    fn test_rotation_record_bytes_sent_accumulates() {
+        let mut rot = TorCircuitRotation::new();
+        rot.record_bytes_sent(1024);
+        rot.record_bytes_sent(2048);
+        assert_eq!(rot.bytes_since_rotation(), 3072);
+    }
+
+    /// Vérifie que record_activity reset le timer d'inactivité.
+    #[test]
+    fn test_rotation_record_activity_resets_timer() {
+        let mut rot = TorCircuitRotation::new();
+        let t0 = Instant::now();
+
+        // Avance artificiellement l'instant d'inactivité
+        let t_late = t0 + std::time::Duration::from_secs(20);
+        // Avant : inactivité détectée
+        assert!(rot.should_rotate(t_late).is_some());
+
+        // record_activity avec un instant "maintenant" (t_late)
+        rot.record_activity(t_late);
+
+        // Après : plus d'inactivité (le timer est reset à t_late)
+        let t_after = t_late + std::time::Duration::from_secs(5);
+        assert!(rot.should_rotate(t_after).is_none());
+    }
+
+    /// Vérifie que record_error incrémente le compteur d'erreurs.
+    #[test]
+    fn test_rotation_record_error_increments_counter() {
+        let mut rot = TorCircuitRotation::new();
+        rot.record_error();
+        rot.record_error();
+        assert_eq!(rot.consecutive_errors(), 2);
+    }
+
+    // ===== Tests avec bootstrap Tor (ignorés par défaut) =====
+
     #[tokio::test]
     #[ignore = "slow: requires real Tor network bootstrap (~30-60s)"]
     #[cfg_attr(miri, ignore)]
@@ -535,6 +692,7 @@ mod tests {
         assert!(result.is_ok(), "bootstrap Tor échoué: {:?}", result.err());
         let transport = result.unwrap();
         assert_eq!(transport.isolated_client_count().await, 0);
+        assert_eq!(transport.rotation_count().await, 0);
     }
 
     #[tokio::test]
@@ -581,5 +739,39 @@ mod tests {
         assert_eq!(transport.isolated_client_count().await, 1);
         transport.drop_isolated_client("contact_alice").await;
         assert_eq!(transport.isolated_client_count().await, 0);
+    }
+
+    /// Vérifie que `apply_rotation` drop stream + client + reset compteur.
+    #[tokio::test]
+    #[ignore = "slow: requires real Tor network bootstrap (~30-60s)"]
+    #[cfg_attr(miri, ignore)]
+    async fn test_rotation_apply_rotation_drops_state() {
+        let transport = TorTransport::bootstrap().await.expect("bootstrap");
+
+        // Crée un client isolé + un stream
+        let _client = transport
+            .get_or_create_isolated_client("contact_alice")
+            .await
+            .expect("create alice");
+
+        assert_eq!(transport.isolated_client_count().await, 1);
+        assert_eq!(transport.rotation_count().await, 0);
+
+        // Crée une rotation
+        transport.record_bytes_sent("contact_alice", 1000).await;
+        assert_eq!(transport.rotation_count().await, 1);
+
+        // Applique la rotation
+        transport.apply_rotation("contact_alice").await;
+
+        // Vérifications
+        assert_eq!(transport.isolated_client_count().await, 0);
+        assert_eq!(transport.stream_count().await, 0);
+
+        // Le compteur de rotation doit être reset (mais l'entrée reste)
+        let map = transport.rotations.read().await;
+        let rot = map.get("contact_alice").expect("rotation must exist");
+        assert_eq!(rot.bytes_since_rotation(), 0);
+        assert_eq!(rot.consecutive_errors(), 0);
     }
 }
