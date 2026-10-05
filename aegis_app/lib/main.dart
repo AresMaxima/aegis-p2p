@@ -250,6 +250,16 @@ void main() async {
     } catch (e) {
       debugPrint("AEGIS: initializeHardwareSecurity a échoué: $e");
     }
+
+    // P0-A.1e (D42-bis) : vérification active StrongBox pour Tor.
+    // Résultat transmis à Rust via FFI. Si false → Tor désactivé,
+    // mode dégradé local only (D62, Wi-Fi Direct + BLE).
+    try {
+      final torOk = await KeystoreBridge.setTorStrongboxAvailable();
+      debugPrint("AEGIS: setTorStrongboxAvailable = $torOk");
+    } catch (e) {
+      debugPrint("AEGIS: setTorStrongboxAvailable a échoué: $e");
+    }
   });
 }
 

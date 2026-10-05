@@ -1,4 +1,4 @@
-﻿package com.example.aegis_app
+package com.example.aegis_app
 
 import android.Manifest
 import android.app.Activity
@@ -330,6 +330,15 @@ class MainActivity : FlutterActivity() {
                             Log.e(TAG, "deriveMasterKey a échoué: rc=$rc")
                             result.error("MASTER_ERROR", "rc=$rc", null)
                         }
+                    }
+
+                    "isStrongBoxOperational" -> {
+                        // P0-A.1e (D42-bis) : vérification active StrongBox
+                        // pour Tor. Appelée depuis Dart au démarrage.
+                        // Rust refuse Tor si le résultat est false.
+                        val available = HardwareKeystore.isStrongBoxOperational()
+                        Log.i(TAG, "isStrongBoxOperational = $available")
+                        result.success(available)
                     }
 
                     else -> result.notImplemented()

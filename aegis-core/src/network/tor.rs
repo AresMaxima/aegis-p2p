@@ -25,6 +25,7 @@
 //!
 //!   • D40   : Chiffrement applicatif obligatoire (fail-closed)
 //!   • D42   : un TorClient par contact (isolation par circuit)
+//!   • D42-bis : StrongBox obligatoire pour Tor (fail-closed)
 //!   • D49   : rester sur Arti 0.18
 //!   • D50   : isolation via `base.isolated_client()` + HashMap
 //!   • D51   : `TorIsolationToken` (P0-A.1b) = identifiant sémantique
@@ -36,6 +37,7 @@
 //!   • D59   : Stream persistant via `Arc<tokio::sync::Mutex<DataStream>>`
 //!   • D60   : Rotation Tor implicite uniquement (pas de tâche de fond)
 //!   • D61   : apply_rotation drop stream + client isolé (isolation forte)
+//!   • D62   : mode dégradé local only si StrongBox absent
 //!   • Opt.2  : préfixe `ciphertext_len: u32 BE` avant packing
 //! ─────────────────────────────────────────────────────────────────────
 
@@ -149,6 +151,19 @@ pub struct TorTransport {
 impl TorTransport {
     /// Bootstrap un nouveau `TorTransport`.
     pub async fn bootstrap() -> Result<Self, Box<dyn Error>> {
+        // === P0-A.1e (D42-bis) : fail-closed StrongBox ===
+        //
+        // Refus de démarrer Tor si StrongBox n'est pas disponible.
+        // Le flag est mis à jour depuis Dart au démarrage via la FFI
+        // `aegis_tor_set_strongbox_available`. Valeur par défaut : false
+        // → Tor est refusé tant que l'app n'a pas confirmé StrongBox OK.
+        //
+        // Comportement : Flutter reçoit StrongBoxUnavailable → bascule en
+        // mode dégradé local only (D62, Wi-Fi Direct + BLE uniquement).
+        if !crate::tor_strongbox_is_available() {
+            return Err(Box::new(TransportError::StrongBoxUnavailable));
+        }
+
         let ram_fs = tempfile::tempdir()?;
         let state_dir = ram_fs.path().join("state");
         let cache_dir = ram_fs.path().join("cache");

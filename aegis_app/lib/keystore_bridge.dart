@@ -1,4 +1,4 @@
-﻿import 'dart:ffi';
+import 'dart:ffi';
 import 'dart:io';
 import 'package:ffi/ffi.dart';
 import 'package:flutter/services.dart';
@@ -21,6 +21,10 @@ typedef _VaultUnlockDart = int Function(Pointer<Utf8> pinPtr);
 
 typedef _VaultWipeC = Int32 Function();
 typedef _VaultWipeDart = int Function();
+
+// P0-A.1e — Typedefs StrongBox gate Tor
+typedef _AegisSetTorStrongboxC = Void Function(Bool available);
+typedef _AegisSetTorStrongboxDart = void Function(bool available);
 
 /// Résultat d'un appel `vaultUnlock`.
 ///
@@ -48,6 +52,11 @@ enum VaultUnlockStatus { real, decoy, needsInitialization, error }
 ///   7. vaultWipe()        : efface vault.json + ROOT_KEY + MASTER_KEY.
 ///
 /// Plus aucune donnée vault ne transite par SharedPreferences.
+///
+/// P0-A.1e (2026-10-06) — StrongBox gate Tor (D42-bis + D62) :
+///   8. setTorStrongboxAvailable() : vérifie StrongBox via Kotlin (active
+///      check ~50-200 ms), transmet le résultat à Rust via FFI. Rust refuse
+///      Tor si false (fail-closed). Mode dégradé local only si absent.
 class KeystoreBridge {
   static const MethodChannel _channel = MethodChannel('com.aegis/keystore');
   static DynamicLibrary? _nativeLib;
@@ -120,6 +129,44 @@ class KeystoreBridge {
         {'pin': pin},
       );
       return ok == true;
+    } on PlatformException {
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// P0-A.1e (D42-bis) : vérifie StrongBox au démarrage et transmet le
+  /// résultat à Rust via FFI.
+  ///
+  /// Flux :
+  ///   Dart   → MethodChannel 'com.aegis/keystore' → 'isStrongBoxOperational'
+  ///   Kotlin → HardwareKeystore.isStrongBoxOperational() (active check ~50-200 ms)
+  ///   Dart   → FFI aegis_tor_set_strongbox_available(available: bool)
+  ///   Rust   → TOR_STRONGBOX_AVAILABLE.store(available)
+  ///
+  /// Retourne `true` si le flag a été transmis à Rust (indépendamment de la
+  /// disponibilité réelle de StrongBox). Le résultat de la vérification est
+  /// lu par Rust via `crate::tor_strongbox_is_available()`.
+  ///
+  /// **Sécurité** : si cette méthode échoue (PlatformException, FFI introuvable,
+  /// retour null), Rust garde `TOR_STRONGBOX_AVAILABLE = false` (valeur par
+  /// défaut) → Tor refusé → mode dégradé local only (D62, Wi-Fi Direct + BLE).
+  static Future<bool> setTorStrongboxAvailable() async {
+    try {
+      final bool? available = await _channel.invokeMethod<bool>(
+        'isStrongBoxOperational',
+      );
+      if (available == null) {
+        return false;
+      }
+
+      final nativeFn = _lib
+          .lookupFunction<_AegisSetTorStrongboxC, _AegisSetTorStrongboxDart>(
+            'aegis_tor_set_strongbox_available',
+          );
+      nativeFn(available);
+      return true;
     } on PlatformException {
       return false;
     } catch (e) {

@@ -5,6 +5,7 @@
 
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_void};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::OnceLock;
 
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
@@ -16,6 +17,30 @@ use jni::{
     sys::{jdouble, jint, JNI_ERR, JNI_VERSION_1_6},
     JavaVM, JNIEnv,
 };
+
+// =========================================================================
+// P0-A.1e : StrongBox gate pour Tor (D42-bis + D62)
+// =========================================================================
+//
+// Flag global : StrongBox est-il disponible pour Tor ?
+//
+// Mis à jour depuis Flutter/Dart au démarrage via FFI
+// `aegis_tor_set_strongbox_available(available: bool)`.
+//
+// Valeur par défaut : `false` (fail-closed D42-bis).
+// Si l'app ne met jamais à jour ce flag (erreur, crash),
+// Tor reste désactivé — c'est le comportement voulu.
+static TOR_STRONGBOX_AVAILABLE: AtomicBool = AtomicBool::new(false);
+
+/// Helper public pour les modules internes (notamment `network::tor`).
+///
+/// Lit le flag `TOR_STRONGBOX_AVAILABLE` (mis à jour depuis Dart
+/// via la FFI `aegis_tor_set_strongbox_available`).
+///
+/// Le static reste privé — cette fonction est la seule voie d'accès.
+pub fn tor_strongbox_is_available() -> bool {
+    TOR_STRONGBOX_AVAILABLE.load(Ordering::SeqCst)
+}
 
 pub mod attestation;
 pub mod crypto;
@@ -165,6 +190,35 @@ pub unsafe extern "C" fn aegis_capture_ndk_camera() -> i32 {
 // =========================================================================
 // APPELS FFI EXISTANTS (C ABI — Dart/Flutter)
 // =========================================================================
+
+// =========================================================================
+// P0-A.1e : FFI StrongBox gate pour Tor (D42-bis + D62)
+// =========================================================================
+
+/// FFI appelée depuis Dart au démarrage.
+///
+/// `available = true`  → StrongBox opérationnel, Tor autorisé
+/// `available = false` → StrongBox absent/cassé, Tor refusé (fail-closed)
+///
+/// La vérification réelle (active + cache 30 jours, D64) est faite
+/// côté Kotlin (`HardwareKeystore.isStrongBoxOperational()`).
+/// Rust ne fait que stocker le résultat.
+#[no_mangle]
+pub extern "C" fn aegis_tor_set_strongbox_available(available: bool) {
+    TOR_STRONGBOX_AVAILABLE.store(available, Ordering::SeqCst);
+}
+
+/// FFI de lecture (tests Rust + debug).
+///
+/// Retourne 1 si StrongBox est marqué disponible, 0 sinon.
+#[no_mangle]
+pub extern "C" fn aegis_tor_strongbox_available() -> i32 {
+    if TOR_STRONGBOX_AVAILABLE.load(Ordering::SeqCst) {
+        1
+    } else {
+        0
+    }
+}
 
 // FIX Phase 3.5 : `aegis_set_hardware_secret` enregistre désormais la clé
 // au lieu de tenter de la générer localement (backdoor crypto supprimée).

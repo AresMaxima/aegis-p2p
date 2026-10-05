@@ -56,6 +56,51 @@ object HardwareKeystore {
     private const val PROVIDER = "AndroidKeyStore"
     private val HARDWARE_SALT = "AEGIS_HMAC_STRONGBOX_SALT_V2".toByteArray(Charsets.UTF_8)
 
+    /**
+     * Vérifie si StrongBox est **réellement opérationnel** (P0-A.1e, D42-bis).
+     *
+     * Contrairement à un simple check `PackageManager.FEATURE_STRONGBOX_KEYSTORE`,
+     * cette méthode tente **effectivement** de créer/utiliser une clé StrongBox.
+     *
+     * Précédent connu : SM-G985F (Exynos 990, Android 13) annonce StrongBox mais
+     * `setUnlockedDeviceRequired(true)` le casse (bug v3.0 → v3.1, cf. notes en
+     * tête de fichier). Un check passif n'aurait pas détecté ça.
+     *
+     * Comportement :
+     *   • API < 28 → false (StrongBox indisponible sur cette version)
+     *   • API ≥ 28 → tente `getHardwareSecret(requireStrongBox=true)` :
+     *       - Success → true (StrongBox opérationnel, clé créée/chargée)
+     *       - Failure → false (StrongBox absent/cassé, pas de fallback TEE)
+     *
+     * Coût : ~50-200 ms (création de clé si absente, sinon juste un Mac.init).
+     *
+     * Utilisé par P0-A.1e : Flutter appelle cette méthode au démarrage,
+     * transmet le résultat à Rust via `aegis_tor_set_strongbox_available()`.
+     * Si false → Tor refusé (fail-closed), mode dégradé local only (D62).
+     */
+    @JvmStatic
+    fun isStrongBoxOperational(): Boolean {
+        // 1. API guard : StrongBox requiert API 28+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
+            Log.i(TAG, "isStrongBoxOperational: API ${Build.VERSION.SDK_INT} < 28 → false")
+            return false
+        }
+
+        // 2. Active check : tenter de récupérer un secret StrongBox
+        //    (crée la clé si absente, vérifie qu'elle est bien utilisable).
+        //    requireStrongBox = true → pas de fallback TEE en cas d'échec.
+        return when (val result = getHardwareSecret(isVaultEmpty = false, requireStrongBox = true)) {
+            is HardwareSecretResult.Success -> {
+                Log.i(TAG, "isStrongBoxOperational: OK (niveau=${result.level})")
+                true
+            }
+            is HardwareSecretResult.Failure -> {
+                Log.w(TAG, "isStrongBoxOperational: FAIL (${result.reason}, niveau=${result.lastKnownLevel})")
+                false
+            }
+        }
+    }
+
     enum class SecurityLevel {
         STRONGBOX,
         TEE,
