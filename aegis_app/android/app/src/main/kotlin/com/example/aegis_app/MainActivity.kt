@@ -29,6 +29,7 @@ class MainActivity : FlutterActivity() {
         private const val TEE_UI_CHANNEL   = "com.aegis.p2p/tee_ui"
         private const val CAMERA_CHANNEL   = "com.aegis.p2p/camera"
         private const val CAMERA_PERMISSION_CODE = 1002
+        private const val WIFI_DIRECT_CHANNEL = "com.aegis/wifi_direct"
 
         init {
             System.loadLibrary("aegis_core")
@@ -187,6 +188,15 @@ class MainActivity : FlutterActivity() {
             Log.e(TAG, "aegisRegisterMainActivity a échoué", t)
         }
 
+        // P0-A.2a (2026-10-07) : initialisation du bridge Wi-Fi Direct.
+        // No-op si l'hardware ne supporte pas FEATURE_WIFI_DIRECT.
+        try {
+            val wifiOk = WifiDirectBridge.initialize(this)
+            Log.i(TAG, "WifiDirectBridge.initialize = $wifiOk")
+        } catch (t: Throwable) {
+            Log.e(TAG, "WifiDirectBridge.initialize a échoué", t)
+        }
+
         // ============================================================
         // N3 (audit 2026-09-20) : politique d'attestation automatique.
         // ============================================================
@@ -219,6 +229,7 @@ class MainActivity : FlutterActivity() {
     override fun onDestroy() {
         try { cameraProvider?.unbindAll() } catch (_: Throwable) {}
         try { aegis_release_surface() } catch (_: Throwable) {}
+        try { WifiDirectBridge.shutdown() } catch (_: Throwable) {}
         cameraExecutor.shutdown()
         super.onDestroy()
     }
@@ -361,6 +372,45 @@ class MainActivity : FlutterActivity() {
                     "triggerPanic" -> {
                         protectedConfirmation.triggerCrisisBurn()
                         result.success(true)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+
+        // --- Canal Wi-Fi Direct (P0-A.2a) ---
+        // Manual pairing uniquement (D3). Pas d'auto-discovery.
+        // Les méthodes de découverte/connection sont des stubs jusqu'à P0-A.2b.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, WIFI_DIRECT_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "isSupported" -> {
+                        val supported = WifiDirectBridge.isSupported(this)
+                        result.success(supported)
+                    }
+                    "getState" -> {
+                        val state = WifiDirectBridge.getState()
+                        result.success(state)
+                    }
+                    "startDiscovery" -> {
+                        val code = WifiDirectBridge.startDiscovery()
+                        if (code == 0) result.success(true)
+                        else result.error("NOT_IMPLEMENTED", "code=$code (P0-A.2b)", null)
+                    }
+                    "stopDiscovery" -> {
+                        val code = WifiDirectBridge.stopDiscovery()
+                        if (code == 0) result.success(true)
+                        else result.error("NOT_IMPLEMENTED", "code=$code (P0-A.2b)", null)
+                    }
+                    "connectToPeer" -> {
+                        val addr = call.argument<String>("deviceAddress") ?: ""
+                        val code = WifiDirectBridge.connectToPeer(addr)
+                        if (code == 0) result.success(true)
+                        else result.error("NOT_IMPLEMENTED", "code=$code (P0-A.2b)", null)
+                    }
+                    "disconnect" -> {
+                        val code = WifiDirectBridge.disconnect()
+                        if (code == 0) result.success(true)
+                        else result.error("NOT_IMPLEMENTED", "code=$code (P0-A.2b)", null)
                     }
                     else -> result.notImplemented()
                 }

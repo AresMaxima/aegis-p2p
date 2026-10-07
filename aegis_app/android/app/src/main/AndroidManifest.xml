@@ -1,15 +1,43 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- ─────────────────────────────────────────────────────────────
-         PERMISSIONS CRITIQUES
-         ───────────────────────────────────────────────────────────── -->
+    <!--
+      ================================================================
+      PERMISSIONS CRITIQUES
+      ================================================================
+    -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.CAMERA" />
 
+    <!--
+      ================================================================
+      P0-A.2 (2026-10-07) — Wi-Fi Direct (manual pairing, QR code)
+      ================================================================
+      Access Wi-Fi state (obligatoire pour WifiP2pManager).
+      ACCESS_FINE_LOCATION est requis sur API < 33 pour la discovery.
+      NEARBY_WIFI_DEVICES (API 33+) remplace ACCESS_FINE_LOCATION
+      pour les opérations Wi-Fi Direct, avec neverForLocation.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission
+        android:name="android.permission.ACCESS_FINE_LOCATION"
+        android:maxSdkVersion="32" />
+    <uses-permission
+        android:name="android.permission.NEARBY_WIFI_DEVICES"
+        android:usesPermissionFlags="neverForLocation" />
+
     <uses-feature
         android:name="android.hardware.camera"
+        android:required="false" />
+
+    <!--
+      Wi-Fi Direct est optionnel : certains devices bas de gamme ne
+      l'ont pas. L'app doit démarrer en mode dégradé (BLE + Tor).
+    -->
+    <uses-feature
+        android:name="android.hardware.wifi.direct"
         android:required="false" />
 
     <!--
