@@ -8,7 +8,7 @@ use std::os::raw::{c_char, c_void};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::OnceLock;
 
-use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 
 use jni::{
     objects::{
@@ -218,6 +218,173 @@ pub extern "C" fn aegis_tor_strongbox_available() -> i32 {
     } else {
         0
     }
+}
+
+// =========================================================================
+// P0-A.2b.1 (2026-10-09) : Identité ed25519 P2P (dérivée de master_key)
+// =========================================================================
+//
+// L'utilisateur n'a pas de paire ed25519 persistée. Elle est dérivée
+// à la volée depuis la master_key via HKDF-SHA256 :
+//
+//   ed25519_seed = HKDF-SHA256(
+//       ikm  = master_key,
+//       salt = "AEGIS-ED25519-IDENTITY",
+//       info = "v1"
+//   )
+//
+// Propriétés :
+//   • Déterministe — même master_key → même identité ed25519
+//   • Non-déductible sans master_key (HKDF-SHA256)
+//   • Change si le PIN change (mode decoy = identité distincte)
+//   • Aucun stockage supplémentaire (zéro-persistence respecté)
+//   • Pas de backup (perte device = perte identité, comme le vault)
+//
+// Usage (P0-A.2b) :
+//   • QR code contient deviceName + fingerprint ed25519
+//   • Handshake ed25519 post-connexion Wi-Fi Direct
+//   • Vérification cryptographique du peer (anti-MITM premier contact)
+
+/// Dérive la clé ed25519 d'identité P2P depuis la master_key courante.
+///
+/// Retourne `Err(String)` si la master_key n'est pas disponible
+/// (vault non déverrouillé).
+fn derive_ed25519_identity() -> Result<SigningKey, String> {
+    // 1. Récupérer la master_key
+    let master_key = crate::keystore::HardwareKeystore::get_master_key()
+        .map_err(|e| format!("master_key indisponible: {}", e))?;
+
+    // 2. HKDF-SHA256 : 32 octets de sortie (seed ed25519)
+    let hk = hkdf::Hkdf::<sha2::Sha256>::new(
+        Some(b"AEGIS-ED25519-IDENTITY"),
+        master_key.as_slice(),
+    );
+
+    let mut seed = [0u8; 32];
+    hk.expand(b"v1", &mut seed)
+        .map_err(|e| format!("HKDF expand: {}", e))?;
+
+    // 3. Créer la SigningKey ed25519
+    let signing_key = SigningKey::from_bytes(&seed);
+
+    // 4. Zéroisation du seed intermédiaire
+    use zeroize::Zeroize;
+    seed.zeroize();
+
+    Ok(signing_key)
+}
+
+/// Signe un challenge de 32 octets avec l'identité ed25519 du device.
+///
+/// # Arguments
+/// - `challenge_ptr` : pointeur vers 32 octets (nonce)
+/// - `challenge_len` : doit être exactement 32
+/// - `sig_out_ptr`   : pointeur vers un buffer de 64 octets (sortie)
+///
+/// # Retour
+/// -  0 : signature écrite dans `sig_out_ptr`
+/// - -1 : pointeur null
+/// - -2 : `challenge_len != 32`
+/// - -3 : master_key indisponible (vault verrouillé)
+#[no_mangle]
+pub unsafe extern "C" fn aegis_ed25519_sign(
+    challenge_ptr: *const u8,
+    challenge_len: usize,
+    sig_out_ptr: *mut u8,
+) -> i32 {
+    if challenge_ptr.is_null() || sig_out_ptr.is_null() {
+        return -1;
+    }
+    if challenge_len != 32 {
+        return -2;
+    }
+
+    let signing_key = match derive_ed25519_identity() {
+        Ok(k) => k,
+        Err(_) => return -3,
+    };
+
+    let challenge = unsafe { std::slice::from_raw_parts(challenge_ptr, challenge_len) };
+    let signature = signing_key.sign(challenge);
+    let sig_bytes = signature.to_bytes();
+
+    unsafe { std::ptr::copy_nonoverlapping(sig_bytes.as_ptr(), sig_out_ptr, 64) };
+    0
+}
+
+/// Vérifie une signature ed25519.
+///
+/// # Arguments
+/// - `challenge_ptr` : pointeur vers le message
+/// - `challenge_len` : longueur du message
+/// - `pubkey_ptr`    : pointeur vers 32 octets (clé publique ed25519)
+/// - `sig_ptr`       : pointeur vers 64 octets (signature)
+///
+/// # Retour
+/// -  1 : signature valide
+/// -  0 : signature invalide
+/// - -1 : pointeur null
+/// - -2 : format invalide (pubkey ou signature non-parsable)
+#[no_mangle]
+pub unsafe extern "C" fn aegis_ed25519_verify(
+    challenge_ptr: *const u8,
+    challenge_len: usize,
+    pubkey_ptr: *const u8,
+    sig_ptr: *const u8,
+) -> i32 {
+    if challenge_ptr.is_null() || pubkey_ptr.is_null() || sig_ptr.is_null() {
+        return -1;
+    }
+
+    let challenge = unsafe { std::slice::from_raw_parts(challenge_ptr, challenge_len) };
+
+    let pk_arr: [u8; 32] = match unsafe { std::slice::from_raw_parts(pubkey_ptr, 32) }.try_into() {
+        Ok(a) => a,
+        Err(_) => return -2,
+    };
+    let sig_arr: [u8; 64] = match unsafe { std::slice::from_raw_parts(sig_ptr, 64) }.try_into() {
+        Ok(a) => a,
+        Err(_) => return -2,
+    };
+
+    let pubkey = match VerifyingKey::from_bytes(&pk_arr) {
+        Ok(k) => k,
+        Err(_) => return -2,
+    };
+    let signature = Signature::from_bytes(&sig_arr);
+
+    if pubkey.verify(challenge, &signature).is_ok() {
+        1
+    } else {
+        0
+    }
+}
+
+/// Retourne la clé publique ed25519 du device (32 octets).
+///
+/// # Arguments
+/// - `pubkey_out_ptr` : pointeur vers un buffer de 32 octets (sortie)
+///
+/// # Retour
+/// -  0 : clé publique écrite
+/// - -1 : pointeur null
+/// - -3 : master_key indisponible
+#[no_mangle]
+pub unsafe extern "C" fn aegis_ed25519_public_key(pubkey_out_ptr: *mut u8) -> i32 {
+    if pubkey_out_ptr.is_null() {
+        return -1;
+    }
+
+    let signing_key = match derive_ed25519_identity() {
+        Ok(k) => k,
+        Err(_) => return -3,
+    };
+
+    let verifying_key = signing_key.verifying_key();
+    let bytes = verifying_key.as_bytes();
+
+    unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), pubkey_out_ptr, 32) };
+    0
 }
 
 // FIX Phase 3.5 : `aegis_set_hardware_secret` enregistre désormais la clé
@@ -797,4 +964,119 @@ fn _anchor_vault_ffi() {
         aegis_vault_unlock as *const (),
         aegis_vault_wipe as *const (),
     ));
+}
+
+// =========================================================================
+// P0-A.2b.1 : Tests de l'identité ed25519
+// =========================================================================
+
+#[cfg(test)]
+mod ed25519_identity_tests {
+    use super::*;
+    use crate::keystore::{HardwareKeystore, TEST_LOCK};
+
+    fn setup_master_key() {
+        let root_key = [0x42u8; 32];
+        HardwareKeystore::set_root_key(&root_key).expect("set_root_key");
+        HardwareKeystore::derive_master_key("TestPIN-Ed25519Identity")
+            .expect("derive_master_key");
+    }
+
+    fn teardown() {
+        let _ = HardwareKeystore::wipe_all();
+    }
+
+    /// Déterminisme : même master_key → même clé ed25519.
+    #[test]
+    fn test_ed25519_identity_derivation_is_deterministic() {
+        let _g = TEST_LOCK.lock().unwrap();
+        setup_master_key();
+
+        let k1 = derive_ed25519_identity().expect("k1");
+        let k2 = derive_ed25519_identity().expect("k2");
+
+        assert_eq!(
+            k1.verifying_key().as_bytes(),
+            k2.verifying_key().as_bytes(),
+            "même master_key → même clé ed25519"
+        );
+
+        teardown();
+    }
+
+    /// Isolation par PIN : PIN-A → clé A, PIN-B → clé B.
+    #[test]
+    fn test_ed25519_identity_differs_per_master_key() {
+        let _g = TEST_LOCK.lock().unwrap();
+
+        let root_key = [0x42u8; 32];
+        HardwareKeystore::set_root_key(&root_key).expect("root");
+
+        HardwareKeystore::derive_master_key("PIN-A").expect("PIN-A");
+        let k_a = derive_ed25519_identity().expect("k_a");
+
+        HardwareKeystore::derive_master_key("PIN-B").expect("PIN-B");
+        let k_b = derive_ed25519_identity().expect("k_b");
+
+        assert_ne!(
+            k_a.verifying_key().as_bytes(),
+            k_b.verifying_key().as_bytes(),
+            "PIN différents → clés ed25519 différentes"
+        );
+
+        teardown();
+    }
+
+    /// Sign + verify roundtrip.
+    #[test]
+    fn test_ed25519_sign_verify_roundtrip() {
+        let _g = TEST_LOCK.lock().unwrap();
+        setup_master_key();
+
+        let signing_key = derive_ed25519_identity().expect("k");
+        let challenge = b"0123456789abcdef0123456789abcdef";
+        let signature = signing_key.sign(challenge);
+
+        let verifying_key = signing_key.verifying_key();
+        assert!(verifying_key.verify(challenge, &signature).is_ok());
+
+        teardown();
+    }
+
+    /// Une signature valide échoue contre une mauvaise pubkey.
+    #[test]
+    fn test_ed25519_verify_rejects_wrong_pubkey() {
+        let _g = TEST_LOCK.lock().unwrap();
+        setup_master_key();
+
+        let signing_key = derive_ed25519_identity().expect("k");
+        let challenge = b"0123456789abcdef0123456789abcdef";
+        let signature = signing_key.sign(challenge);
+
+        let other_key = SigningKey::from_bytes(&[0x99u8; 32]);
+        let other_pub = other_key.verifying_key();
+
+        assert!(
+            other_pub.verify(challenge, &signature).is_err(),
+            "signature valide contre mauvaise pubkey doit échouer"
+        );
+
+        teardown();
+    }
+
+    /// Sans master_key → erreur (fail-closed).
+    #[test]
+    fn test_ed25519_identity_requires_master_key() {
+        let _g = TEST_LOCK.lock().unwrap();
+        let _ = HardwareKeystore::wipe_all();
+
+        let result = derive_ed25519_identity();
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            err.contains("master_key"),
+            "message d'erreur doit mentionner master_key: {}",
+            err
+        );
+    }
 }
