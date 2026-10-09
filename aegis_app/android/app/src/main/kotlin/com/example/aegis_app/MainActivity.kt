@@ -17,6 +17,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 import java.nio.ByteBuffer
 import java.util.concurrent.Executors
@@ -30,6 +31,7 @@ class MainActivity : FlutterActivity() {
         private const val CAMERA_CHANNEL   = "com.aegis.p2p/camera"
         private const val CAMERA_PERMISSION_CODE = 1002
         private const val WIFI_DIRECT_CHANNEL = "com.aegis/wifi_direct"
+        private const val WIFI_DIRECT_EVENTS_CHANNEL = "com.aegis/wifi_direct_events"
 
         init {
             System.loadLibrary("aegis_core")
@@ -379,7 +381,6 @@ class MainActivity : FlutterActivity() {
 
         // --- Canal Wi-Fi Direct (P0-A.2a) ---
         // Manual pairing uniquement (D3). Pas d'auto-discovery.
-        // Les méthodes de découverte/connection sont des stubs jusqu'à P0-A.2b.
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, WIFI_DIRECT_CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -387,34 +388,53 @@ class MainActivity : FlutterActivity() {
                         val supported = WifiDirectBridge.isSupported(this)
                         result.success(supported)
                     }
+                    "getEphemeralName" -> {
+                        val name = WifiDirectBridge.getEphemeralName()
+                        result.success(name)
+                    }
                     "getState" -> {
                         val state = WifiDirectBridge.getState()
                         result.success(state)
                     }
                     "startDiscovery" -> {
-                        val code = WifiDirectBridge.startDiscovery()
+                        val code = WifiDirectBridge.startDiscovery(null)
                         if (code == 0) result.success(true)
-                        else result.error("NOT_IMPLEMENTED", "code=$code (P0-A.2b)", null)
+                        else result.error("DISCOVERY_ERROR", "code=$code", null)
                     }
                     "stopDiscovery" -> {
                         val code = WifiDirectBridge.stopDiscovery()
                         if (code == 0) result.success(true)
-                        else result.error("NOT_IMPLEMENTED", "code=$code (P0-A.2b)", null)
+                        else result.error("DISCOVERY_ERROR", "code=$code", null)
                     }
                     "connectToPeer" -> {
-                        val addr = call.argument<String>("deviceAddress") ?: ""
-                        val code = WifiDirectBridge.connectToPeer(addr)
+                        val name = call.argument<String>("deviceName") ?: ""
+                        val code = WifiDirectBridge.connectToPeer(name)
                         if (code == 0) result.success(true)
-                        else result.error("NOT_IMPLEMENTED", "code=$code (P0-A.2b)", null)
+                        else result.error("CONNECT_ERROR", "code=$code", null)
                     }
                     "disconnect" -> {
                         val code = WifiDirectBridge.disconnect()
                         if (code == 0) result.success(true)
-                        else result.error("NOT_IMPLEMENTED", "code=$code (P0-A.2b)", null)
+                        else result.error("DISCONNECT_ERROR", "code=$code", null)
                     }
                     else -> result.notImplemented()
                 }
             }
+
+        // --- EventChannel Wi-Fi Direct (P0-A.2b.2) ---
+        // Stream d'événements asynchrones (peers, connection, timeout).
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, WIFI_DIRECT_EVENTS_CHANNEL)
+            .setStreamHandler(object : EventChannel.StreamHandler {
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                    Log.i(TAG, "Wi-Fi Direct EventChannel: onListen")
+                    WifiDirectBridge.setEventSink(events)
+                }
+
+                override fun onCancel(arguments: Any?) {
+                    Log.i(TAG, "Wi-Fi Direct EventChannel: onCancel")
+                    WifiDirectBridge.setEventSink(null)
+                }
+            })
 
         // --- Canal caméra native ---
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CAMERA_CHANNEL)
