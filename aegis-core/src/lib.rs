@@ -391,6 +391,40 @@ pub unsafe extern "C" fn aegis_ed25519_public_key(pubkey_out_ptr: *mut u8) -> i3
     0
 }
 
+/// Retourne la fingerprint SHA-256 de la clé publique ed25519 du device.
+///
+/// Utilisé par Dart pour construire le QR code (P0-A.2b.4).
+///
+/// # Arguments
+/// - `out_ptr` : pointeur vers un buffer de 32 octets (sortie)
+///
+/// # Retour
+/// -  0 : fingerprint écrite
+/// - -1 : pointeur null
+/// - -3 : master_key indisponible
+#[no_mangle]
+pub unsafe extern "C" fn aegis_ed25519_fingerprint(out_ptr: *mut u8) -> i32 {
+    if out_ptr.is_null() {
+        return -1;
+    }
+
+    let signing_key = match derive_ed25519_identity() {
+        Ok(k) => k,
+        Err(_) => return -3,
+    };
+
+    let verifying_key = signing_key.verifying_key();
+    let pubkey_bytes = verifying_key.as_bytes();
+
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    hasher.update(pubkey_bytes);
+    let fingerprint = hasher.finalize();
+
+    unsafe { std::ptr::copy_nonoverlapping(fingerprint.as_ptr(), out_ptr, 32) };
+    0
+}
+
 // =========================================================================
 // P0-A.2b.3a (2026-10-10) : Wi-Fi Direct socket fd (Kotlin → Rust)
 // =========================================================================
@@ -466,6 +500,54 @@ pub unsafe extern "C" fn aegis_wifi_direct_set_fd(fd: i32) -> i32 {
 #[no_mangle]
 pub extern "C" fn aegis_wifi_direct_get_fd() -> i32 {
     WIFI_DIRECT_FD.load(Ordering::SeqCst)
+}
+
+// =========================================================================
+// P0-A.2b.3c (2026-10-11) : Helpers sûrs pour ed25519 (usage interne)
+// =========================================================================
+//
+// Ces wrappers appellent les FFI `aegis_ed25519_*` en isolant le code
+// `unsafe`. Utilisés par `network::wifi_direct` (handshake symétrique).
+
+/// Signe un challenge de 32 octets et retourne la signature.
+pub(crate) fn ed25519_sign_safe(challenge: &[u8; 32]) -> Result<[u8; 64], String> {
+    let mut sig = [0u8; 64];
+    let rc = unsafe {
+        aegis_ed25519_sign(challenge.as_ptr(), 32, sig.as_mut_ptr())
+    };
+    match rc {
+        0 => Ok(sig),
+        -3 => Err("master_key indisponible".to_string()),
+        _ => Err(format!("ed25519_sign rc={}", rc)),
+    }
+}
+
+/// Vérifie une signature ed25519 contre une pubkey.
+pub(crate) fn ed25519_verify_safe(
+    challenge: &[u8; 32],
+    pubkey: &[u8; 32],
+    sig: &[u8; 64],
+) -> bool {
+    let rc = unsafe {
+        aegis_ed25519_verify(
+            challenge.as_ptr(),
+            32,
+            pubkey.as_ptr(),
+            sig.as_ptr(),
+        )
+    };
+    rc == 1
+}
+
+/// Retourne la fingerprint SHA-256 de la pubkey ed25519 du device.
+pub(crate) fn ed25519_fingerprint_safe() -> Result<[u8; 32], String> {
+    let mut fp = [0u8; 32];
+    let rc = unsafe { aegis_ed25519_fingerprint(fp.as_mut_ptr()) };
+    match rc {
+        0 => Ok(fp),
+        -3 => Err("master_key indisponible".to_string()),
+        _ => Err(format!("ed25519_fingerprint rc={}", rc)),
+    }
 }
 
 /// Helper interne : récupère le fd stocké et le remet à -1 (take ownership).
@@ -1072,7 +1154,7 @@ pub unsafe extern "C" fn aegis_vault_wipe() -> i32 {
 // NE PAS retirer. Si une nouvelle fonction FFI est ajoutée et appelée
 // uniquement depuis Dart, l'ajouter ici.
 
-/// P0-A.2b.3a : ancre runtime pour les 3 symboles FFI Wi-Fi Direct.
+/// P0-A.2b.3a : ancre runtime pour les FFI Wi-Fi Direct + ed25519 fingerprint.
 ///
 /// Même mécanisme que `_anchor_vault_ffi` : les FFI appelées via JNI
 /// (Kotlin `external fun`) sont invisibles au linker LLD du NDK.
@@ -1082,6 +1164,7 @@ fn _anchor_wifi_direct_ffi() {
         aegis_wifi_direct_set_fd as *const (),
         aegis_wifi_direct_get_fd as *const (),
         aegis_wifi_direct_close_fd as *const (),
+        aegis_ed25519_fingerprint as *const (),
     ));
 }
 
