@@ -468,6 +468,19 @@ pub extern "C" fn aegis_wifi_direct_get_fd() -> i32 {
     WIFI_DIRECT_FD.load(Ordering::SeqCst)
 }
 
+/// Helper interne : récupère le fd stocké et le remet à -1 (take ownership).
+///
+/// Utilisé par `WifiDirectTransport::from_global_fd()` (P0-A.2b.3b).
+///
+/// **Ne ferme PAS le fd** — le transport prend ownership et le fermera
+/// à son Drop (via le Drop de `TcpStream`).
+///
+/// Retour : fd >= 0 (propriété transférée à l'appelant)
+///         ou -1 (aucun fd disponible)
+pub(crate) fn take_wifi_direct_fd() -> i32 {
+    WIFI_DIRECT_FD.swap(-1, Ordering::SeqCst)
+}
+
 /// Ferme le fd courant et remet le slot à -1.
 ///
 /// Appelé par Kotlin à la déconnexion Wi-Fi Direct.
