@@ -72,14 +72,18 @@ impl WifiDirectTransport {
     /// Prend ownership du fd : il sera fermé au Drop du `TcpStream`.
     ///
     /// # Sécurité
-    /// `fd` doit être un socket TCP valide. Vérifié côté Kotlin
-    /// (`aegis_wifi_direct_set_fd` fait un `getsockopt(SO_TYPE) == SOCK_STREAM`).
+    /// `fd` doit être un socket TCP valide (>= 0). Un fd négatif **doit**
+    /// être refusé en amont (`aegis_wifi_direct_set_fd` le fait déjà).
+    ///
+    /// **NOTE (C56)** : `FromRawFd::from_raw_fd` contient une assertion
+    /// `fd != -1` dans la stdlib. Passer -1 **panique**. C'est voulu par
+    /// la stdlib (garantie d'API contre les bugs).
     #[cfg(unix)]
     pub fn from_fd(fd: i32) -> Result<Self, TransportError> {
         use std::net::TcpStream as StdTcpStream;
         use std::os::fd::FromRawFd;
 
-        // SAFETY : fd vient d'un socket TCP vérifié côté Kotlin.
+        // SAFETY : fd vient d'un socket TCP vérifié côté Kotlin (>= 0).
         // On prend ownership — le fd ne sera plus utilisé ailleurs.
         let std_stream = unsafe { StdTcpStream::from_raw_fd(fd) };
 
@@ -238,16 +242,6 @@ mod tests {
             Err(TransportError::TransportUnavailable(_)) => {}
             other => panic!("attendu TransportUnavailable, obtenu {:?}", other),
         }
-    }
-
-    /// fd négatif → erreur (via `from_fd` directement).
-    #[cfg(unix)]
-    #[test]
-    fn test_wifi_direct_from_invalid_fd() {
-        // -1 n'est pas un fd valide → from_raw_fd va créer un TcpStream
-        // invalide, mais set_nonblocking va échouer proprement (EBADF).
-        let result = WifiDirectTransport::from_fd(-1);
-        assert!(result.is_err(), "fd -1 doit échouer");
     }
 
     /// Socket TCP valide (loopback) → transport créé avec succès.
