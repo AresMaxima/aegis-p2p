@@ -13,12 +13,16 @@ import android.net.wifi.p2p.WifiP2pManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.ParcelFileDescriptor
 import android.util.Log
 import io.flutter.plugin.common.EventChannel
+import java.net.ServerSocket
+import java.net.Socket
 import java.security.SecureRandom
+import java.util.concurrent.Executors
 
 /**
- * P0-A.2 (2026-10-07 → 2026-10-09) — Wi-Fi Direct Bridge (Kotlin ↔ Rust).
+ * P0-A.2 (2026-10-07 → 2026-10-10) — Wi-Fi Direct Bridge (Kotlin ↔ Rust).
  *
  * ─────────────────────────────────────────────────────────────────────
  * Politique de sécurité (D1 = manual pairing, D37 = zéro confiance) :
@@ -28,28 +32,33 @@ import java.security.SecureRandom
  *   • Le nom Wi-Fi Direct du device est ÉPHÉMÈRE et ALÉATOIRE
  *     (12 chars base62, SecureRandom, régénéré à chaque session).
  *   • Un contact est ajouté UNIQUEMENT après un échange OOB validé
- *     (deviceName + fingerprint ed25519).
+ *     (deviceName + fingerprint ed25519 + port).
+ *   • Handshake ed25519 symétrique (bidirectionnel) après connexion
+ *     → résiste au MITM au premier contact.
  *
  * ─────────────────────────────────────────────────────────────────────
- * Architecture cible (P0-A.2 complet) :
+ * Architecture (P0-A.2b.3a) :
  *
- *   [Kotlin] WifiP2pManager → découverte ciblée → négociation → Socket
- *                                     ↓
- *                          ParcelFileDescriptor
- *                                     ↓
- *                          JNI (aegis_wifi_direct_socket_fd)
- *                                     ↓
- *   [Rust]  TcpStream::from_raw_fd(fd) → impl EncryptedTransport
+ *   [Affiche QR]                    [Scanne QR]
+ *   deviceName_A                    deviceName_A (connu)
+ *   fingerprint_A                   fingerprint_A (connu)
+ *   port_A         ───────────────→ port_A (connu)
+ *
+ *   Wi-Fi Direct connect → GO ouvre ServerSocket(port_A)
+ *                        → Client se connecte à GO:port_A
+ *                        → fd transmis à Rust via aegis_wifi_direct_set_fd
+ *                        → handshake ed25519 sur ce socket (P0-A.2b.3c)
  *
  * ─────────────────────────────────────────────────────────────────────
  * Sous-blocs :
  *
  *   • P0-A.2a (fait) : squelette + permissions + canal + init
  *   • P0-A.2b.1 (fait) : FFI ed25519 (Rust)
- *   • P0-A.2b.2 (ce fichier) : implémentation réelle (nom éphémère,
- *     EventChannel, discovery, connect, receiver)
- *   • P0-A.2b.3 : handshake ed25519 post-connexion (Kotlin → Rust FFI)
- *   • P0-A.2b.4 : wifi_direct_bridge.dart (Dart)
+ *   • P0-A.2b.2 (fait) : nom éphémère + EventChannel + discovery
+ *   • P0-A.2b.3a (ce fichier) : socket exchange + JNI fd
+ *   • P0-A.2b.3b : WifiDirectTransport (Rust)
+ *   • P0-A.2b.3c : handshake ed25519 sur socket
+ *   • P0-A.2b.4 : wifi_direct_bridge.dart
  *   • P0-A.2b.5 : tests Android instrumentés (2 devices)
  * ─────────────────────────────────────────────────────────────────────
  */
@@ -66,6 +75,18 @@ object WifiDirectBridge {
 
     /** Timeout de découverte (D4 : 40 s = 30 s + 10 s de marge). */
     private const val DISCOVERY_TIMEOUT_MS = 40_000L
+
+    /** Timeout d'accept() côté GO (attente de connexion du Client). */
+    private const val SOCKET_ACCEPT_TIMEOUT_MS = 15_000
+
+    // === JNI ===
+
+    init {
+        System.loadLibrary("aegis_core")
+    }
+
+    private external fun aegis_wifi_direct_set_fd(fd: Int): Int
+    private external fun aegis_wifi_direct_close_fd(): Int
 
     // =====================================================================
     // État interne
@@ -86,17 +107,21 @@ object WifiDirectBridge {
     @Volatile
     private var initialized: Boolean = false
 
-    /** Nom éphémère courant (12 chars base62). Régénéré à chaque init. */
     @Volatile
     private var ephemeralName: String? = null
 
-    /** Sink EventChannel vers Flutter (rempli quand Flutter s'abonne). */
+    /** Port d'écoute pré-généré (inclus dans le QR code). */
+    @Volatile
+    private var ephemeralPort: Int = 0
+
     @Volatile
     private var eventSink: EventChannel.EventSink? = null
 
-    /** Nom éphémère du peer ciblé (rempli par connectToPeer). */
     @Volatile
     private var expectedPeerName: String? = null
+
+    @Volatile
+    private var expectedPort: Int = 0
 
     @Volatile
     private var discoveryActive: Boolean = false
@@ -107,18 +132,15 @@ object WifiDirectBridge {
     @Volatile
     private var timeoutRunnable: Runnable? = null
 
+    /** Executor dédié aux opérations socket (bloquantes, hors main thread). */
+    private val socketExecutor = Executors.newSingleThreadExecutor()
+
     private val secureRandom = SecureRandom()
 
     // =====================================================================
     // Détection
     // =====================================================================
 
-    /**
-     * Vrai si l'hardware supporte Wi-Fi Direct.
-     *
-     * Sur certains devices bas de gamme, `FEATURE_WIFI_DIRECT` est absent.
-     * Dans ce cas, AEGIS démarre en mode dégradé (BLE + Tor uniquement).
-     */
     fun isSupported(context: Context): Boolean {
         return context.packageManager.hasSystemFeature(
             PackageManager.FEATURE_WIFI_DIRECT
@@ -129,14 +151,6 @@ object WifiDirectBridge {
     // Initialisation / Arrêt
     // =====================================================================
 
-    /**
-     * Initialise le bridge : nom éphémère + WifiP2pManager + Channel + Receiver.
-     *
-     * **Doit être appelé dans MainActivity.onCreate()**, après avoir
-     * vérifié `isSupported()`.
-     *
-     * Retourne `true` si l'initialisation a réussi.
-     */
     fun initialize(context: Context): Boolean {
         if (initialized) {
             Log.w(TAG, "initialize: déjà initialisé, no-op")
@@ -155,7 +169,11 @@ object WifiDirectBridge {
             ephemeralName = generateEphemeralName()
             Log.i(TAG, "Nom éphémère généré (12 chars)")
 
-            // 2. Initialiser WifiP2pManager (main looper obligatoire)
+            // 2. Générer un port d'écoute aléatoire libre
+            ephemeralPort = findFreePort()
+            Log.i(TAG, "Port éphémère généré: $ephemeralPort")
+
+            // 3. Initialiser WifiP2pManager (main looper obligatoire)
             val mgr = context.getSystemService(Context.WIFI_P2P_SERVICE)
                 as? WifiP2pManager
                 ?: run {
@@ -188,36 +206,32 @@ object WifiDirectBridge {
         }
     }
 
-    /**
-     * Relâche toutes les ressources Wi-Fi Direct.
-     *
-     * **Doit être appelé dans MainActivity.onDestroy()**.
-     */
     fun shutdown() {
         if (!initialized) return
 
-        // 1. Annuler le timer
         cancelDiscoveryTimeout()
 
-        // 2. Stopper la découverte si active
         try {
             if (discoveryActive) {
-                channel?.let { ch ->
-                    manager?.stopPeerDiscovery(ch, null)
-                }
+                channel?.let { ch -> manager?.stopPeerDiscovery(ch, null) }
             }
         } catch (t: Throwable) {
             Log.w(TAG, "stopPeerDiscovery a échoué", t)
         }
 
-        // 3. Unregister le receiver
         try {
             unregisterReceiver()
         } catch (t: Throwable) {
             Log.w(TAG, "unregisterReceiver a échoué", t)
         }
 
-        // 4. Reset l'état
+        // Fermer le fd côté Rust (si un socket est ouvert)
+        try {
+            aegis_wifi_direct_close_fd()
+        } catch (t: Throwable) {
+            Log.w(TAG, "close_fd a échoué", t)
+        }
+
         cleanupInternal()
         initialized = false
         Log.i(TAG, "Wi-Fi Direct bridge arrêté")
@@ -229,7 +243,9 @@ object WifiDirectBridge {
         receiver = null
         appContext = null
         ephemeralName = null
+        ephemeralPort = 0
         expectedPeerName = null
+        expectedPort = 0
         discoveryActive = false
         timeoutHandler = null
         timeoutRunnable = null
@@ -239,17 +255,11 @@ object WifiDirectBridge {
     // EventChannel
     // =====================================================================
 
-    /**
-     * Enregistre le sink EventChannel (appelé par MainActivity).
-     *
-     * `null` quand Flutter se désabonne (cancel).
-     */
     fun setEventSink(sink: EventChannel.EventSink?) {
         eventSink = sink
         Log.i(TAG, "EventSink ${if (sink == null) "retiré" else "enregistré"}")
     }
 
-    /** Envoie un événement à Flutter si un sink est actif. */
     private fun notifyEvent(event: Map<String, Any?>) {
         val sink = eventSink ?: return
         try {
@@ -260,7 +270,7 @@ object WifiDirectBridge {
     }
 
     // =====================================================================
-    // BroadcastReceiver — événements Wi-Fi Direct
+    // BroadcastReceiver
     // =====================================================================
 
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
@@ -294,7 +304,6 @@ object WifiDirectBridge {
         return object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
                 when (intent.action) {
-
                     WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION -> {
                         val state = intent.getIntExtra(
                             WifiP2pManager.EXTRA_WIFI_STATE,
@@ -307,19 +316,16 @@ object WifiDirectBridge {
                             "enabled" to enabled,
                         ))
                     }
-
                     WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION -> {
                         Log.i(TAG, "WIFI_P2P_PEERS_CHANGED")
                         requestPeers()
                     }
-
                     WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION -> {
                         Log.i(TAG, "WIFI_P2P_CONNECTION_CHANGED")
                         requestConnectionInfo()
                     }
-
                     WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION -> {
-                        // No-op pour l'instant (nom éphémère géré côté bridge)
+                        // No-op
                     }
                 }
             }
@@ -344,7 +350,6 @@ object WifiDirectBridge {
                 val filtered = if (expected != null) {
                     peers.filter { it.deviceName == expected }
                 } else {
-                    // Aucun nom attendu : ne rien remonter (manual pairing strict)
                     emptyList()
                 }
 
@@ -360,16 +365,13 @@ object WifiDirectBridge {
                             )
                         },
                     ))
-
-                    // Auto-connect sur le premier match
-                    val target = filtered.first()
-                    initiateConnection(target)
+                    initiateConnection(filtered.first())
                 } else if (peers.isNotEmpty()) {
                     Log.i(TAG, "Aucun peer ne matche le nom éphémère attendu")
                 }
             }
         } catch (t: SecurityException) {
-            Log.e(TAG, "requestPeers: SecurityException (permission manquante ?)", t)
+            Log.e(TAG, "requestPeers: SecurityException", t)
             notifyEvent(mapOf(
                 "type" to "error",
                 "code" to "permission_denied",
@@ -389,8 +391,8 @@ object WifiDirectBridge {
             val config = WifiP2pConfig().apply {
                 deviceAddress = device.deviceAddress
                 // WPS-PBC est le mode par défaut d'Android (API 29+).
-                // La sécurité est assurée par le handshake ed25519
-                // (P0-A.2b.3) qui suit la connexion Wi-Fi Direct.
+                // La sécurité est assurée par le handshake ed25519 (P0-A.2b.3c)
+                // qui suit la connexion Wi-Fi Direct.
                 //
                 // NOTE : `WpsInfo` et `wpsSetupConfig` sont deprecated
                 // et retirés du SDK 36. On ne les configure plus.
@@ -438,11 +440,10 @@ object WifiDirectBridge {
                         "goAddr=${info.groupOwnerAddress?.hostAddress}")
 
                 if (info.groupFormed) {
-                    notifyEvent(mapOf(
-                        "type" to "connected",
-                        "isGroupOwner" to info.isGroupOwner,
-                        "groupOwnerAddress" to info.groupOwnerAddress?.hostAddress,
-                    ))
+                    // Ouvrir le socket (bloquant → executor dédié)
+                    socketExecutor.execute {
+                        openSocket(info)
+                    }
                 } else {
                     notifyEvent(mapOf("type" to "disconnected"))
                 }
@@ -455,12 +456,108 @@ object WifiDirectBridge {
     }
 
     // =====================================================================
-    // API publique (exposée à Flutter via MethodChannel)
+    // Socket exchange (P0-A.2b.3a)
     // =====================================================================
 
     /**
-     * État actuel du bridge.
+     * Ouvre le socket TCP après connexion Wi-Fi Direct.
+     *
+     * - GO : ouvre ServerSocket(port_A), attend accept()
+     * - Client : ouvre Socket(GO_address, port_A)
+     *
+     * `port_A` = expectedPort (fourni par connectToPeer, issu du QR code).
+     *
+     * Une fois le socket ouvert, transmet son fd à Rust via JNI.
      */
+    private fun openSocket(info: WifiP2pInfo) {
+        val port = expectedPort
+        if (port <= 0) {
+            Log.e(TAG, "openSocket: expectedPort invalide ($port)")
+            notifyEvent(mapOf(
+                "type" to "socket_error",
+                "reason" to "invalid_port",
+            ))
+            return
+        }
+
+        val socket: Socket = try {
+            if (info.isGroupOwner) {
+                Log.i(TAG, "openSocket: rôle=GO, ServerSocket($port)")
+                val server = ServerSocket(port)
+                server.soTimeout = SOCKET_ACCEPT_TIMEOUT_MS
+                val accepted = server.accept()
+                // Fermer le ServerSocket (n'est plus nécessaire)
+                try { server.close() } catch (_: Throwable) {}
+                accepted
+            } else {
+                val goAddr = info.groupOwnerAddress?.hostAddress
+                    ?: run {
+                        Log.e(TAG, "openSocket: groupOwnerAddress null")
+                        return
+                    }
+                Log.i(TAG, "openSocket: rôle=Client, Socket($goAddr:$port)")
+                Socket(goAddr, port)
+            }
+        } catch (t: Throwable) {
+            Log.e(TAG, "openSocket: échec ouverture socket", t)
+            notifyEvent(mapOf(
+                "type" to "socket_error",
+                "reason" to (t.message ?: t.javaClass.simpleName),
+            ))
+            return
+        }
+
+        // Transmettre le fd à Rust
+        transmitFdToRust(socket)
+    }
+
+    /**
+     * Détache le fd du Socket et le transmet à Rust via JNI.
+     *
+     * Après cette fonction, Kotlin ne doit PLUS toucher au Socket
+     * (le fd appartient à Rust, qui le fermera au Drop).
+     */
+    private fun transmitFdToRust(socket: Socket) {
+        try {
+            val pfd = ParcelFileDescriptor.fromSocket(socket)
+            val fd = pfd.detachFd()
+            try { pfd.close() } catch (_: Throwable) {}
+
+            // NOTE : on ne ferme PAS le Socket — fermer le Socket fermerait
+            // le fd sous-jacent que Rust possède désormais.
+
+            val rc = aegis_wifi_direct_set_fd(fd)
+            if (rc != 0) {
+                Log.e(TAG, "aegis_wifi_direct_set_fd a échoué: rc=$rc")
+                // Le fd n'est pas pris en charge par Rust → on le ferme
+                try { socket.close() } catch (_: Throwable) {}
+                notifyEvent(mapOf(
+                    "type" to "socket_error",
+                    "reason" to "fd_rejected_by_rust",
+                    "code" to rc,
+                ))
+                return
+            }
+
+            Log.i(TAG, "Socket fd transmis à Rust (fd=$fd)")
+            notifyEvent(mapOf(
+                "type" to "socket_ready",
+                "role" to if (expectedPort > 0) "go_or_client" else "unknown",
+            ))
+        } catch (t: Throwable) {
+            Log.e(TAG, "transmitFdToRust a échoué", t)
+            try { socket.close() } catch (_: Throwable) {}
+            notifyEvent(mapOf(
+                "type" to "socket_error",
+                "reason" to (t.message ?: t.javaClass.simpleName),
+            ))
+        }
+    }
+
+    // =====================================================================
+    // API publique (exposée à Flutter via MethodChannel)
+    // =====================================================================
+
     fun getState(): Map<String, Any> {
         val ctx = appContext
         return mapOf(
@@ -471,24 +568,12 @@ object WifiDirectBridge {
         )
     }
 
-    /**
-     * Retourne le nom éphémère courant (12 chars base62).
-     *
-     * Utilisé par Flutter pour construire le QR code (P0-A.2b.4).
-     * `null` si le bridge n'est pas initialisé.
-     */
     fun getEphemeralName(): String? = ephemeralName
 
+    fun getEphemeralPort(): Int = ephemeralPort
+
     /**
-     * Lance une découverte **ciblée** vers un peer spécifique.
-     *
-     * Retourne :
-     *   0  = discovery lancée
-     *  -1  = bridge non initialisé
-     *  -2  = `deviceName` vide
-     *  -3  = discovery déjà active
-     *  -4  = SecurityException (permission manquante)
-     *  -5  = échec framework
+     * Lance une découverte ciblée.
      */
     @SuppressLint("MissingPermission")
     fun startDiscovery(expectedName: String?): Int {
@@ -500,7 +585,6 @@ object WifiDirectBridge {
         val mgr = manager ?: return -1
         val ch = channel ?: return -1
 
-        // Si un nom est fourni (connectToPeer), le mémoriser pour le filtre
         if (!expectedName.isNullOrEmpty()) {
             expectedPeerName = expectedName
         }
@@ -540,10 +624,6 @@ object WifiDirectBridge {
 
     /**
      * Arrête la découverte en cours.
-     *
-     * Retourne :
-     *   0  = stop OK (ou pas de discovery active)
-     *  -1  = bridge non initialisé
      */
     @SuppressLint("MissingPermission")
     fun stopDiscovery(): Int {
@@ -582,30 +662,29 @@ object WifiDirectBridge {
     /**
      * Se connecte à un peer spécifique (manual pairing via QR).
      *
-     * `deviceName` : nom éphémère 12 chars fourni par le QR code.
+     * `deviceName`   : nom éphémère 12 chars fourni par le QR code.
+     * `peerPort`     : port d'écoute du peer (inclus dans son QR).
      *
-     * Retourne :
-     *   0  = discovery lancée (le peer sera connecté automatiquement
-     *        quand il apparaîtra dans onPeersAvailable)
+     * Retour :
+     *   0  = discovery lancée
      *  -1  = bridge non initialisé
-     *  -2  = `deviceName` vide
-     *  -3  = discovery déjà active
-     *  -4  = SecurityException
-     *  -5  = échec framework
+     *  -2  = deviceName vide
+     *  -3  = peerPort invalide (<= 0 ou > 65535)
+     *  -4  = discovery déjà active
+     *  -5  = SecurityException
+     *  -6  = échec framework
      */
-    fun connectToPeer(deviceName: String): Int {
+    fun connectToPeer(deviceName: String, peerPort: Int): Int {
         if (!initialized) return -1
         if (deviceName.isEmpty()) return -2
+        if (peerPort <= 0 || peerPort > 65535) return -3
 
+        expectedPort = peerPort
         return startDiscovery(deviceName)
     }
 
     /**
      * Déconnecte du peer actif et stoppe la discovery.
-     *
-     * Retourne :
-     *   0  = OK
-     *  -1  = bridge non initialisé
      */
     @SuppressLint("MissingPermission")
     fun disconnect(): Int {
@@ -616,6 +695,14 @@ object WifiDirectBridge {
 
         cancelDiscoveryTimeout()
         expectedPeerName = null
+        expectedPort = 0
+
+        // Fermer le fd côté Rust
+        try {
+            aegis_wifi_direct_close_fd()
+        } catch (t: Throwable) {
+            Log.w(TAG, "close_fd a échoué", t)
+        }
 
         return try {
             mgr.removeGroup(ch, object : WifiP2pManager.ActionListener {
@@ -645,17 +732,25 @@ object WifiDirectBridge {
     // Helpers privés
     // =====================================================================
 
-    /** Génère un nom éphémère de 12 chars base62 via SecureRandom. */
     private fun generateEphemeralName(): String {
         val sb = StringBuilder(EPHEMERAL_NAME_LENGTH)
         repeat(EPHEMERAL_NAME_LENGTH) {
-            val idx = secureRandom.nextInt(BASE62.length)
-            sb.append(BASE62[idx])
+            sb.append(BASE62[secureRandom.nextInt(BASE62.length)])
         }
         return sb.toString()
     }
 
-    /** Programme le timeout de découverte (40 s). */
+    /** Trouve un port TCP libre en demandant au noyau. */
+    private fun findFreePort(): Int {
+        return try {
+            ServerSocket(0).use { it.localPort }
+        } catch (t: Throwable) {
+            // Fallback : port aléatoire dans la plage dynamique
+            Log.w(TAG, "findFreePort a échoué, fallback aléatoire", t)
+            49152 + secureRandom.nextInt(16384)
+        }
+    }
+
     private fun scheduleDiscoveryTimeout() {
         cancelDiscoveryTimeout()
         val handler = timeoutHandler ?: return
@@ -663,7 +758,6 @@ object WifiDirectBridge {
         val r = Runnable {
             Log.w(TAG, "Discovery timeout (${DISCOVERY_TIMEOUT_MS / 1000}s)")
             notifyEvent(mapOf("type" to "discovery_timeout"))
-            // Auto-stop
             try {
                 val mgr = manager
                 val ch = channel
@@ -681,7 +775,6 @@ object WifiDirectBridge {
         handler.postDelayed(r, DISCOVERY_TIMEOUT_MS)
     }
 
-    /** Annule le timeout en cours (si présent). */
     private fun cancelDiscoveryTimeout() {
         val handler = timeoutHandler ?: return
         val r = timeoutRunnable ?: return

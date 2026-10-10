@@ -5,7 +5,7 @@
 
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_void};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 use std::sync::OnceLock;
 
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
@@ -98,6 +98,10 @@ pub unsafe extern "system" fn JNI_OnLoad(
     // invisibles pour le linker). JNI_OnLoad est TOUJOURS appelée par la
     // JVM Android → l'ancre survit.
     _anchor_vault_ffi();
+
+    // P0-A.2b.3a : ancre pour les FFI Wi-Fi Direct (appelées via JNI
+    // depuis Kotlin, invisibles pour le linker LLD).
+    _anchor_wifi_direct_ffi();
 
     if vm.is_null() {
         return JNI_ERR;
@@ -384,6 +388,106 @@ pub unsafe extern "C" fn aegis_ed25519_public_key(pubkey_out_ptr: *mut u8) -> i3
     let bytes = verifying_key.as_bytes();
 
     unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), pubkey_out_ptr, 32) };
+    0
+}
+
+// =========================================================================
+// P0-A.2b.3a (2026-10-10) : Wi-Fi Direct socket fd (Kotlin → Rust)
+// =========================================================================
+//
+// Kotlin ouvre un Socket TCP (ServerSocket accept côté GO, Socket côté
+// Client) après connexion Wi-Fi Direct, puis transmet le fd à Rust via
+// ces FFI. Le fd est stocké dans un AtomicI32 — il sera consommé par
+// WifiDirectTransport (P0-A.2b.3b).
+//
+// Cycle de vie du fd :
+//   1. Kotlin : ParcelFileDescriptor.fromSocket(socket).detachFd() → i32
+//   2. Kotlin : aegis_wifi_direct_set_fd(fd) → Rust stocke
+//   3. Rust (b.3b) : from_raw_fd(fd) → TcpStream
+//   4. Rust (b.3b) : Drop du TcpStream → close(fd) automatique
+//   5. Ou : Kotlin appelle aegis_wifi_direct_close_fd() à la déconnexion
+
+static WIFI_DIRECT_FD: AtomicI32 = AtomicI32::new(-1);
+
+/// Stocke le fd du socket Wi-Fi Direct.
+///
+/// Vérifie que le fd est bien un socket TCP (`SOCK_STREAM`).
+///
+/// Retour :
+///   0  = OK
+///  -1  = fd < 0
+///  -2  = fd n'est pas un SOCK_STREAM (pas un socket TCP)
+///  -3  = fd déjà occupé (appeler close_fd avant)
+#[no_mangle]
+pub unsafe extern "C" fn aegis_wifi_direct_set_fd(fd: i32) -> i32 {
+    if fd < 0 {
+        return -1;
+    }
+
+    // Défensif : vérifier que le fd est bien un socket TCP.
+    //
+    // NOTE (C54) : `getsockopt` + `SOL_SOCKET` + `SO_TYPE` + `SOCK_STREAM`
+    // sont POSIX-only. Sur Android/Linux (Unix), la vérification s'exécute.
+    // Sur Windows (dev/CI), elle est sautée — le fd ne sera jamais fourni
+    // par un vrai socket Wi-Fi Direct de toute façon (Android only).
+    #[cfg(unix)]
+    {
+        let mut sock_type: libc::c_int = 0;
+        let mut len: libc::socklen_t = std::mem::size_of::<libc::c_int>() as libc::socklen_t;
+        let ret = unsafe {
+            libc::getsockopt(
+                fd,
+                libc::SOL_SOCKET,
+                libc::SO_TYPE,
+                &mut sock_type as *mut _ as *mut libc::c_void,
+                &mut len,
+            )
+        };
+        if ret != 0 || sock_type != libc::SOCK_STREAM {
+            return -2;
+        }
+    }
+
+    // Refuser si un fd est déjà stocké (pas d'écrasement silencieux)
+    match WIFI_DIRECT_FD.compare_exchange(
+        -1,
+        fd,
+        Ordering::SeqCst,
+        Ordering::SeqCst,
+    ) {
+        Ok(_) => 0,
+        Err(_) => -3,
+    }
+}
+
+/// Lit le fd stocké (tests + debug).
+///
+/// Retour : fd (>= 0) ou -1 si aucun.
+#[no_mangle]
+pub extern "C" fn aegis_wifi_direct_get_fd() -> i32 {
+    WIFI_DIRECT_FD.load(Ordering::SeqCst)
+}
+
+/// Ferme le fd courant et remet le slot à -1.
+///
+/// Appelé par Kotlin à la déconnexion Wi-Fi Direct.
+///
+/// Retour :
+///   0  = OK (fd fermé ou rien à fermer)
+#[no_mangle]
+pub extern "C" fn aegis_wifi_direct_close_fd() -> i32 {
+    let fd = WIFI_DIRECT_FD.swap(-1, Ordering::SeqCst);
+
+    // NOTE (C54) : `libc::close` est POSIX-only.
+    #[cfg(unix)]
+    if fd >= 0 {
+        unsafe { libc::close(fd); }
+    }
+
+    // Éviter un warning `unused_variables` sur Windows.
+    #[cfg(not(unix))]
+    let _ = fd;
+
     0
 }
 
@@ -954,6 +1058,19 @@ pub unsafe extern "C" fn aegis_vault_wipe() -> i32 {
 //
 // NE PAS retirer. Si une nouvelle fonction FFI est ajoutée et appelée
 // uniquement depuis Dart, l'ajouter ici.
+
+/// P0-A.2b.3a : ancre runtime pour les 3 symboles FFI Wi-Fi Direct.
+///
+/// Même mécanisme que `_anchor_vault_ffi` : les FFI appelées via JNI
+/// (Kotlin `external fun`) sont invisibles au linker LLD du NDK.
+#[inline(never)]
+fn _anchor_wifi_direct_ffi() {
+    std::hint::black_box((
+        aegis_wifi_direct_set_fd as *const (),
+        aegis_wifi_direct_get_fd as *const (),
+        aegis_wifi_direct_close_fd as *const (),
+    ));
+}
 
 #[inline(never)]
 fn _anchor_vault_ffi() {

@@ -392,6 +392,10 @@ class MainActivity : FlutterActivity() {
                         val name = WifiDirectBridge.getEphemeralName()
                         result.success(name)
                     }
+                    "getEphemeralPort" -> {
+                        val port = WifiDirectBridge.getEphemeralPort()
+                        result.success(port)
+                    }
                     "getState" -> {
                         val state = WifiDirectBridge.getState()
                         result.success(state)
@@ -408,7 +412,8 @@ class MainActivity : FlutterActivity() {
                     }
                     "connectToPeer" -> {
                         val name = call.argument<String>("deviceName") ?: ""
-                        val code = WifiDirectBridge.connectToPeer(name)
+                        val port = call.argument<Int>("peerPort") ?: 0
+                        val code = WifiDirectBridge.connectToPeer(name, port)
                         if (code == 0) result.success(true)
                         else result.error("CONNECT_ERROR", "code=$code", null)
                     }
@@ -416,6 +421,11 @@ class MainActivity : FlutterActivity() {
                         val code = WifiDirectBridge.disconnect()
                         if (code == 0) result.success(true)
                         else result.error("DISCONNECT_ERROR", "code=$code", null)
+                    }
+                    "closeFd" -> {
+                        val rc = WifiDirectBridge.disconnect()
+                        if (rc == 0) result.success(true)
+                        else result.error("CLOSE_ERROR", "code=$rc", null)
                     }
                     else -> result.notImplemented()
                 }
