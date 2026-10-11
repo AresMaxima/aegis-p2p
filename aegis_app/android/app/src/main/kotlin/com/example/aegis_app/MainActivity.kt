@@ -172,6 +172,9 @@ class MainActivity : FlutterActivity() {
     private val cameraExecutor = Executors.newSingleThreadExecutor()
     private var cameraProvider: ProcessCameraProvider? = null
 
+    // P0-A.3a (2026-10-11) : bridge BLE Mesh (squelette + permissions).
+    private var bleMeshBridge: BleMeshBridge? = null
+
     private var yPool: ByteBuffer? = null
     private var uPool: ByteBuffer? = null
     private var vPool: ByteBuffer? = null
@@ -231,6 +234,10 @@ class MainActivity : FlutterActivity() {
     override fun onDestroy() {
         try { cameraProvider?.unbindAll() } catch (_: Throwable) {}
         try { aegis_release_surface() } catch (_: Throwable) {}
+        // P0-A.3a : arrêt du bridge BLE Mesh (dé-enregistre les canaux
+        // MethodChannel/EventChannel pour éviter les fuites mémoire).
+        try { bleMeshBridge?.destroy() } catch (_: Throwable) {}
+        bleMeshBridge = null
         try { WifiDirectBridge.shutdown() } catch (_: Throwable) {}
         cameraExecutor.shutdown()
         super.onDestroy()
@@ -285,6 +292,12 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         protectedConfirmation = ProtectedConfirmation(this)
+
+        // P0-A.3a (2026-10-11) : bridge BLE Mesh (squelette + permissions).
+        // Instancie les canaux MethodChannel (com.aegis/ble_mesh) et
+        // EventChannel (com.aegis/ble_mesh_events). Les méthodes sont
+        // des stubs pour l'instant (P0-A.3b/c/d les rempliront).
+        bleMeshBridge = BleMeshBridge(this, flutterEngine.dartExecutor.binaryMessenger)
 
         // PlatformView : surface VRAM (BlindView).
         flutterEngine.platformViewsController.registry.registerViewFactory(

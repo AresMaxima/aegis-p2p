@@ -28,6 +28,26 @@
         android:name="android.permission.NEARBY_WIFI_DEVICES"
         android:usesPermissionFlags="neverForLocation" />
 
+    <!--
+      ================================================================
+      P0-A.3 (2026-10-11) — BLE Mesh
+      ================================================================
+      Permissions BLE pour Android 12+ (API 31+) et versions antérieures.
+    -->
+    <!-- API 31+ -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    
+    <!-- API < 31 (legacy) -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <!-- Note: ACCESS_FINE_LOCATION est déjà déclaré pour Wi-Fi Direct (maxSdkVersion="32").
+         Il couvre également le besoin BLE pour API < 31. Ne pas dupliquer. -->
+
+    <!-- Foreground Service pour maintenir le mesh BLE en arrière-plan -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+
     <uses-feature
         android:name="android.hardware.camera"
         android:required="false" />
@@ -39,6 +59,11 @@
     <uses-feature
         android:name="android.hardware.wifi.direct"
         android:required="false" />
+
+    <!-- BLE est requis pour le transport Mesh -->
+    <uses-feature
+        android:name="android.hardware.bluetooth_le"
+        android:required="true" />
 
     <!--
       C17 FIX (2026-09-23) — Auto Backup Android DESACTIVE.
