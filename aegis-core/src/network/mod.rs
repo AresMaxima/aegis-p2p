@@ -1,4 +1,5 @@
 pub mod encrypted_transport;
+pub mod ble_mesh;
 pub mod hopping;
 pub mod p2p_transfer;
 pub mod tor;
