@@ -92,6 +92,13 @@ class MainActivity : FlutterActivity() {
         challenge: ByteArray,
     ): Int
 
+    // ─────────────────────────────────────────────────────────────
+    // P0-A.3c.2 (2026-10-12) — BLE Mesh JNI pipes.
+    // Appelés depuis BleMeshBridge via la classe MainActivity.
+    // ─────────────────────────────────────────────────────────────
+    external fun aegis_ble_mesh_set_pipes(inFd: Int, outFd: Int): Int
+    external fun aegis_ble_mesh_shutdown(): Int
+
     /**
      * Wrapper Kotlin : récupère l'attestation matérielle et la fait
      * vérifier par Rust.
