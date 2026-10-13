@@ -444,7 +444,7 @@ mod unix_reader {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// FFI reader
+// FFI reader (plain-name, appelables via Dart FFI + tests)
 // ─────────────────────────────────────────────────────────────────────
 
 #[no_mangle]
@@ -461,6 +461,28 @@ pub extern "C" fn aegis_ble_mesh_reader_stop() -> i32 {
         Ok(()) => 0,
         Err(e) => e.to_code(),
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// C64 FIX (2026-10-13) — Wrappers JNI pour MainActivity.kt
+// ─────────────────────────────────────────────────────────────────────
+
+#[no_mangle]
+pub unsafe extern "system" fn Java_com_example_aegis_1app_MainActivity_aegis_1ble_1mesh_1reader_1start(
+    _env: jni::JNIEnv,
+    _this: jni::objects::JObject,
+    in_fd: jni::sys::jint,
+    out_fd: jni::sys::jint,
+) -> jni::sys::jint {
+    aegis_ble_mesh_reader_start(in_fd as i32, out_fd as i32) as jni::sys::jint
+}
+
+#[no_mangle]
+pub unsafe extern "system" fn Java_com_example_aegis_1app_MainActivity_aegis_1ble_1mesh_1reader_1stop(
+    _env: jni::JNIEnv,
+    _this: jni::objects::JObject,
+) -> jni::sys::jint {
+    aegis_ble_mesh_reader_stop() as jni::sys::jint
 }
 
 // ─────────────────────────────────────────────────────────────────────

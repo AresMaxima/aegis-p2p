@@ -586,6 +586,37 @@ pub extern "C" fn aegis_wifi_direct_close_fd() -> i32 {
     0
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// C64 FIX (2026-10-13) — Wrappers JNI pour WifiDirectBridge.kt
+//
+// WifiDirectBridge.kt déclare :
+//   private external fun aegis_wifi_direct_set_fd(fd: Int): Int
+//   private external fun aegis_wifi_direct_close_fd(): Int
+//
+// JNI résout ces noms en :
+//   Java_com_example_aegis_1app_WifiDirectBridge_aegis_1wifi_1direct_1set_1fd
+//   Java_com_example_aegis_1app_WifiDirectBridge_aegis_1wifi_1direct_1close_1fd
+//
+// Les fonctions plain-name existantes restent pour usage interne / Dart.
+// ─────────────────────────────────────────────────────────────────────
+
+#[no_mangle]
+pub unsafe extern "system" fn Java_com_example_aegis_1app_WifiDirectBridge_aegis_1wifi_1direct_1set_1fd(
+    _env: jni::JNIEnv,
+    _this: jni::objects::JObject,
+    fd: jni::sys::jint,
+) -> jni::sys::jint {
+    aegis_wifi_direct_set_fd(fd as i32) as jni::sys::jint
+}
+
+#[no_mangle]
+pub unsafe extern "system" fn Java_com_example_aegis_1app_WifiDirectBridge_aegis_1wifi_1direct_1close_1fd(
+    _env: jni::JNIEnv,
+    _this: jni::objects::JObject,
+) -> jni::sys::jint {
+    aegis_wifi_direct_close_fd() as jni::sys::jint
+}
+
 // FIX Phase 3.5 : `aegis_set_hardware_secret` enregistre désormais la clé
 // au lieu de tenter de la générer localement (backdoor crypto supprimée).
 #[no_mangle]

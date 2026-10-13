@@ -136,6 +136,32 @@ pub extern "C" fn aegis_ble_mesh_shutdown() -> i32 {
 }
 
 // ─────────────────────────────────────────────────────────────────────
+// C64 FIX (2026-10-13) — Wrappers JNI pour MainActivity.kt
+//
+// Les fonctions ci-dessus sont appelées via Dart FFI (plain name).
+// MainActivity.kt les appelle via `external fun` → JNI attend des
+// symboles préfixés Java_..._MainActivity_...
+// ─────────────────────────────────────────────────────────────────────
+
+#[no_mangle]
+pub unsafe extern "system" fn Java_com_example_aegis_1app_MainActivity_aegis_1ble_1mesh_1set_1pipes(
+    _env: jni::JNIEnv,
+    _this: jni::objects::JObject,
+    in_fd: jni::sys::jint,
+    out_fd: jni::sys::jint,
+) -> jni::sys::jint {
+    aegis_ble_mesh_set_pipes(in_fd as i32, out_fd as i32) as jni::sys::jint
+}
+
+#[no_mangle]
+pub unsafe extern "system" fn Java_com_example_aegis_1app_MainActivity_aegis_1ble_1mesh_1shutdown(
+    _env: jni::JNIEnv,
+    _this: jni::objects::JObject,
+) -> jni::sys::jint {
+    aegis_ble_mesh_shutdown() as jni::sys::jint
+}
+
+// ─────────────────────────────────────────────────────────────────────
 // Tests
 // ─────────────────────────────────────────────────────────────────────
 
