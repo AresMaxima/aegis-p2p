@@ -84,6 +84,88 @@ jobs:
       - name: Verify Cryptographic Hash
         run: |
           sha256sum aegis-core/target/aarch64-linux-android/release/libaegis_core.so
+      # ──────────────────────────────────────────────────────────
+      # C65 FIX (2026-10-13) — Upload du .so pour le job suivant
+      # (jni-symbols-verification).
+      # ──────────────────────────────────────────────────────────
+      - name: Upload arm64 .so artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libaegis_core-arm64-v8a
+          path: aegis-core/target/aarch64-linux-android/release/libaegis_core.so
+          if-no-files-found: error
+          retention-days: 7
+
+  # ============================================================
+  # JOB 3bis — Vérification des symboles JNI (C64/C65)
+  # ============================================================
+  # Contexte :
+  #   Le 13/10/2026, un audit a révélé que 6 FFI appelées depuis
+  #   Kotlin (external fun) étaient déclarées sans préfixe JNI
+  #   (`Java_com_example_...`). Elles compilaient mais craschaient
+  #   au runtime avec UnsatisfiedLinkError.
+  #
+  #   Ce job vérifie, APRÈS le build, que TOUS les symboles JNI
+  #   attendus par le code Kotlin sont présents dans le .so.
+  #   Il échoue si un seul manque.
+  # ============================================================
+  jni-symbols-verification:
+    name: JNI Symbol Verification
+    runs-on: ubuntu-latest
+    needs: build-android
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download arm64 .so artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: libaegis_core-arm64-v8a
+          path: /tmp/aegis-so/
+
+      - name: List .so files
+        run: ls -la /tmp/aegis-so/
+
+      - name: Verify JNI symbols present
+        run: |
+          SO=$(find /tmp/aegis-so -name "libaegis_core.so" | head -n1)
+          if [ -z "$SO" ]; then
+            echo "ERROR: libaegis_core.so introuvable dans /tmp/aegis-so/"
+            exit 1
+          fi
+          echo "Checking $SO"
+          SYMBOLS=$(nm -D --defined-only "$SO")
+
+          MISSING=0
+          for SYM in \
+            "Java_com_example_aegis_1app_MainActivity_aegisRegisterMainActivity" \
+            "Java_com_example_aegis_1app_MainActivity_aegis_1render_1to_1surface" \
+            "Java_com_example_aegis_1app_MainActivity_aegis_1release_1surface" \
+            "Java_com_example_aegis_1app_MainActivity_aegis_1ingest_1camera_1frame_1direct" \
+            "Java_com_example_aegis_1app_MainActivity_aegis_1control_1media_1player" \
+            "Java_com_example_aegis_1app_MainActivity_aegis_1derive_1and_1set_1master_1key" \
+            "Java_com_example_aegis_1app_MainActivity_aegis_1verify_1attestation_1chain" \
+            "Java_com_example_aegis_1app_MainActivity_aegis_1ble_1mesh_1set_1pipes" \
+            "Java_com_example_aegis_1app_MainActivity_aegis_1ble_1mesh_1shutdown" \
+            "Java_com_example_aegis_1app_MainActivity_aegis_1ble_1mesh_1reader_1start" \
+            "Java_com_example_aegis_1app_MainActivity_aegis_1ble_1mesh_1reader_1stop" \
+            "Java_com_example_aegis_1app_ProtectedConfirmation_aegisPanicSilentBurn" \
+            "Java_com_example_aegis_1app_WifiDirectBridge_aegis_1wifi_1direct_1set_1fd" \
+            "Java_com_example_aegis_1app_WifiDirectBridge_aegis_1wifi_1direct_1close_1fd" \
+          ; do
+            if echo "$SYMBOLS" | grep -q " $SYM$"; then
+              echo "✓ $SYM"
+            else
+              echo "✗ MISSING: $SYM"
+              MISSING=$((MISSING + 1))
+            fi
+          done
+
+          if [ "$MISSING" -gt 0 ]; then
+            echo "ERROR: $MISSING JNI symbol(s) missing"
+            exit 1
+          fi
+          echo "All JNI symbols present."
 
   # ============================================================
   # JOB 4 — Preuve mmap/mprotect (Valgrind sur Linux natif)
