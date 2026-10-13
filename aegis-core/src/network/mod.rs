@@ -1,6 +1,7 @@
 pub mod encrypted_transport;
 pub mod ble_mesh;
 pub mod ble_mesh_frame;
+pub mod ble_mesh_fragment;
 pub mod hopping;
 pub mod p2p_transfer;
 pub mod tor;
