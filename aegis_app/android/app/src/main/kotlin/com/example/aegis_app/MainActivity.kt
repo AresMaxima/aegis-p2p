@@ -99,6 +99,12 @@ class MainActivity : FlutterActivity() {
     external fun aegis_ble_mesh_set_pipes(inFd: Int, outFd: Int): Int
     external fun aegis_ble_mesh_shutdown(): Int
 
+    // ─────────────────────────────────────────────────────────────
+    // P0-A.3d.3b (2026-10-14) — BLE Mesh reader thread.
+    // ─────────────────────────────────────────────────────────────
+    external fun aegis_ble_mesh_reader_start(inFd: Int, outFd: Int): Int
+    external fun aegis_ble_mesh_reader_stop(): Int
+
     /**
      * Wrapper Kotlin : récupère l'attestation matérielle et la fait
      * vérifier par Rust.

@@ -20,6 +20,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.os.ParcelUuid
+import android.util.Base64
 import android.util.Log
 import androidx.core.content.ContextCompat
 import io.flutter.plugin.common.BinaryMessenger
@@ -33,6 +34,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 /**
  * P0-A.3b (2026-10-11) — BLE Mesh bridge Kotlin.
  * P0-A.3c.2 (2026-10-12) — JNI pipes vers Rust.
+ * P0-A.3d.3b (2026-10-14) — Integration reader thread Rust + framing D86/D88.
  *
  * Advertising (Q2) : LOW_LATENCY (100 ms) → LOW_POWER (1000 ms) après 30 s.
  * TX power (D77)   : ULTRA_LOW (~1 m).
@@ -41,6 +43,12 @@ import java.util.concurrent.atomic.AtomicBoolean
  *
  * GATT server : 1 service, 2 caractéristiques (WRITE + NOTIFY avec CCCD).
  * Pipes JNI    : 2 pipes POSIX (in / out) vers Rust (ble_mesh.rs).
+ *
+ * Framing :
+ *   Entrant (Kotlin → Rust) : [u32 BE length][fragment bytes]        (D88)
+ *   Sortant (Rust → Kotlin) : [u8 type][u32 BE len][bytes]           (D86)
+ *     type 0x01 = forward au peer via GATT NOTIFY
+ *     type 0x02 = delivery locale → EventChannel Dart
  */
 class BleMeshBridge(
     private val context: Context,
@@ -65,6 +73,9 @@ class BleMeshBridge(
 
         // Q2 — Advertising adaptatif.
         private const val ADVERTISE_ADAPTIVE_DELAY_MS = 30_000L
+
+        // D86 — Bornes de sécurité du framing sortant.
+        private const val MAX_FRAME_SIZE = 64 * 1024
     }
 
     // ── État interne ──────────────────────────────────────────────────
@@ -188,7 +199,7 @@ class BleMeshBridge(
 
         return try {
             setupGattServer()
-            setupPipes()          // P0-A.3c.2
+            setupPipes()          // P0-A.3c.2 + P0-A.3d.3b
             startAdvertisingLowLatency()
             meshActive = true
             emitEvent(mapOf("type" to "mesh_started"))
@@ -257,7 +268,16 @@ class BleMeshBridge(
             throw IllegalStateException("aegis_ble_mesh_set_pipes a échoué: rc=$rc")
         }
 
-        // Démarrer le thread reader (Rust → Kotlin → GATT NOTIFY).
+        // P0-A.3d.3b : démarrer le reader thread Rust sur les MÊMES fd.
+        // Le reader prend ownership côté Rust (File::from_raw_fd sur in_fd).
+        // Les fd rustReadInFd et rustWriteOutFd ont déjà été détachés par
+        // set_pipes (C56) — on les passe tels quels, SANS re-détacher.
+        val rcReader = mainActivity?.aegis_ble_mesh_reader_start(rustReadInFd, rustWriteOutFd) ?: -1
+        if (rcReader != 0) {
+            throw IllegalStateException("aegis_ble_mesh_reader_start a échoué: rc=$rcReader")
+        }
+
+        // Démarrer le thread writer Kotlin (Rust → Kotlin → GATT NOTIFY).
         startWriterThread()
 
         Log.i(TAG, "Pipes JNI configurés (in=$rustReadInFd, out=$rustWriteOutFd)")
@@ -273,7 +293,15 @@ class BleMeshBridge(
         } catch (_: Throwable) {}
         writerThread = null
 
-        // Signaler à Rust qu'on ferme.
+        // P0-A.3d.3b : arrêter le reader Rust AVANT shutdown.
+        // reader_stop join le thread ; File::from_raw_fd(in_fd) drop → close.
+        try {
+            mainActivity?.aegis_ble_mesh_reader_stop()
+        } catch (t: Throwable) {
+            Log.e(TAG, "aegis_ble_mesh_reader_stop a échoué", t)
+        }
+
+        // Signaler à Rust qu'on ferme (set_pipes/shutdown — P0-A.3c.1).
         try {
             mainActivity?.aegis_ble_mesh_shutdown()
         } catch (t: Throwable) {
@@ -305,16 +333,34 @@ class BleMeshBridge(
         writerThread = Thread({
             Log.i(TAG, "Writer thread démarré")
             val input = FileInputStream(readEnd.fileDescriptor)
-            val buffer = ByteArray(244)  // Q3 : max fragment size (MTU-3 plafonné à 244)
             try {
                 while (writerRunning.get() && !Thread.currentThread().isInterrupted) {
-                    val n = input.read(buffer)
-                    if (n <= 0) {
-                        if (n < 0) break  // EOF
-                        continue
+                    // D86 : framing sortant [u8 type][u32 BE len][bytes].
+                    // Rust écrit ce préfixe pour chaque message.
+                    val header = readExactly(input, 5) ?: break
+                    val type = header[0].toInt() and 0xFF
+                    val len = ((header[1].toInt() and 0xFF) shl 24) or
+                              ((header[2].toInt() and 0xFF) shl 16) or
+                              ((header[3].toInt() and 0xFF) shl 8) or
+                              (header[4].toInt() and 0xFF)
+
+                    // Borne de sécurité : refuse les frames > 64 KB (défense DoS).
+                    if (len < 0 || len > MAX_FRAME_SIZE) {
+                        Log.e(TAG, "Writer: len invalide $len (drop + break)")
+                        break
                     }
-                    val chunk = buffer.copyOf(n)
-                    notifyPeer(chunk)
+
+                    val payload = if (len > 0) {
+                        readExactly(input, len) ?: break
+                    } else {
+                        ByteArray(0)
+                    }
+
+                    when (type) {
+                        0x01 -> notifyPeer(payload)         // forward au peer
+                        0x02 -> emitLocalDelivery(payload)  // delivery locale
+                        else -> Log.w(TAG, "Writer: type inconnu 0x${type.toString(16)}")
+                    }
                 }
             } catch (t: Throwable) {
                 if (writerRunning.get()) {
@@ -328,6 +374,39 @@ class BleMeshBridge(
             isDaemon = true
             start()
         }
+    }
+
+    /**
+     * Lit exactement `n` octets depuis `input`.
+     *
+     * FileInputStream.read() peut retourner moins que demandé (comportement
+     * POSIX read(2)). On boucle jusqu'à avoir les n octets ou EOF.
+     *
+     * Retourne `null` si EOF avant d'avoir lu n octets.
+     */
+    private fun readExactly(input: FileInputStream, n: Int): ByteArray? {
+        if (n <= 0) return ByteArray(0)
+        val out = ByteArray(n)
+        var off = 0
+        while (off < n) {
+            val r = input.read(out, off, n - off)
+            if (r < 0) return null  // EOF
+            off += r
+        }
+        return out
+    }
+
+    /**
+     * D86 (Q15) : delivery locale → EventChannel Flutter.
+     *
+     * Le payload est encodé en Base64 pour traverser le canal Dart
+     * (StandardMessageCodec ne supporte pas ByteArray directement).
+     *
+     * Le flag NO_WRAP évite les \n tous les 76 caractères (padding Base64).
+     */
+    private fun emitLocalDelivery(payload: ByteArray) {
+        val b64 = Base64.encodeToString(payload, Base64.NO_WRAP)
+        emitEvent(mapOf("type" to "local_delivery", "payload_b64" to b64))
     }
 
     private fun notifyPeer(data: ByteArray) {
@@ -359,6 +438,16 @@ class BleMeshBridge(
         val writeEnd = pipeIn?.get(1) ?: return
         try {
             val out = FileOutputStream(writeEnd.fileDescriptor)
+            // D88 : framing entrant [u32 BE length][fragment bytes].
+            // Rust reader_loop attend ce préfixe pour délimiter les fragments
+            // (pipe POSIX = stream d'octets, pas de notion de messages).
+            val lenPrefix = byteArrayOf(
+                (data.size ushr 24).toByte(),
+                (data.size ushr 16).toByte(),
+                (data.size ushr 8).toByte(),
+                data.size.toByte(),
+            )
+            out.write(lenPrefix)
             out.write(data)
             out.flush()
         } catch (t: Throwable) {
@@ -524,7 +613,7 @@ class BleMeshBridge(
             )
 
             if (characteristic?.uuid == UUID_CHAR_WRITE && value != null) {
-                // P0-A.3c.2 : pipe vers Rust.
+                // P0-A.3c.2 + P0-A.3d.3b : pipe vers Rust avec framing D88.
                 forwardToRust(value)
                 Log.d(TAG, "WRITE reçu: ${value.size} octets → pipe Rust")
             }
