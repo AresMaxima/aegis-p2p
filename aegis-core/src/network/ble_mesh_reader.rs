@@ -12,6 +12,7 @@
 //               type 0x02 = delivery locale → EventChannel Dart
 //   D87 (Q16) : MeshDeduplicator + MeshReassembler PARTAGÉS
 //   D88 (Q17) : framing entrant = [len u32 BE][fragment bytes]
+//   D93 (C66) : close explicite out_fd en fin de reader_loop + reset handshake
 //
 // =====================================================================
 // FORMAT ENTRANT (in_fd, Kotlin → Rust)
@@ -28,6 +29,9 @@
 // =====================================================================
 //   Kotlin ferme pipeIn[1] → Rust reçoit EOF sur in_fd → sortie propre.
 //   Rust signale aussi shutdown via AtomicBool pour sortie rapide du poll.
+//   En fin de reader_loop :
+//     - in_fd est fermé via Drop de File::from_raw_fd
+//     - out_fd est fermé explicitement via libc::close (C66 FIX)
 //
 // =====================================================================
 
@@ -311,7 +315,10 @@ mod unix_reader {
 
     fn reader_loop(in_fd: RawFd, out_fd: RawFd, state: Arc<Mutex<MeshState>>) {
         // SAFETY : fd détenus par Rust (transférés via JNI en P0-A.3c.1).
-        // Ne PAS les fermer ici : Kotlin les ferme de son côté.
+        //
+        // in_fd  : pris en ownership par File::from_raw_fd → close auto au Drop.
+        // out_fd : PAS pris en ownership (libc::write direct) → close explicite
+        //          en fin de boucle (C66 FIX).
         let mut in_file = unsafe { std::fs::File::from_raw_fd(in_fd) };
         let mut pending: Vec<u8> = Vec::new();
         let mut read_buf = [0u8; READ_BUF_SIZE];
@@ -365,6 +372,14 @@ mod unix_reader {
         if let Ok(s) = state.lock() {
             publish_counters(&s);
         }
+
+        // C66 FIX (2026-10-16) : fermer out_fd explicitement.
+        // out_fd n'est PAS détenu via File::from_raw_fd (contrairement à in_fd)
+        // → il faut le close manuellement, sinon leak (~365 fd/an).
+        unsafe { libc::close(out_fd); }
+
+        // Relever l'état handshake si un handshake était en cours (D93).
+        crate::network::ble_handshake::reset();
     }
 
     fn process_incoming(frag_bytes: &[u8], out_fd: RawFd, state: &Arc<Mutex<MeshState>>) {
