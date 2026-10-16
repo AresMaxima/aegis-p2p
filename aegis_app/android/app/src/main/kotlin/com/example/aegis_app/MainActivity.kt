@@ -105,6 +105,14 @@ class MainActivity : FlutterActivity() {
     external fun aegis_ble_mesh_reader_start(inFd: Int, outFd: Int): Int
     external fun aegis_ble_mesh_reader_stop(): Int
 
+    // ─────────────────────────────────────────────────────────────
+    // P0-A.3e.2b.1 (2026-10-16) — BLE handshake ed25519.
+    // ─────────────────────────────────────────────────────────────
+    external fun aegis_ble_handshake_start_initiator(fp: ByteArray): Int
+    external fun aegis_ble_handshake_start_responder(fp: ByteArray): Int
+    external fun aegis_ble_handshake_is_complete(): Int
+    external fun aegis_ble_handshake_reset(): Int
+
     /**
      * Wrapper Kotlin : récupère l'attestation matérielle et la fait
      * vérifier par Rust.

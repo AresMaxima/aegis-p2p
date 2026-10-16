@@ -108,6 +108,10 @@ jobs:
   #   Ce job vérifie, APRÈS le build, que TOUS les symboles JNI
   #   attendus par le code Kotlin sont présents dans le .so.
   #   Il échoue si un seul manque.
+  #
+  # P0-A.3e.2b.1b (2026-10-16) : ajout des 4 symboles
+  #   aegis_ble_handshake_* (start_initiator, start_responder,
+  #   is_complete, reset). Total : 18 symboles.
   # ============================================================
   jni-symbols-verification:
     name: JNI Symbol Verification
@@ -152,6 +156,10 @@ jobs:
             "Java_com_example_aegis_1app_ProtectedConfirmation_aegisPanicSilentBurn" \
             "Java_com_example_aegis_1app_WifiDirectBridge_aegis_1wifi_1direct_1set_1fd" \
             "Java_com_example_aegis_1app_WifiDirectBridge_aegis_1wifi_1direct_1close_1fd" \
+            "Java_com_example_aegis_1app_MainActivity_aegis_1ble_1handshake_1start_1initiator" \
+            "Java_com_example_aegis_1app_MainActivity_aegis_1ble_1handshake_1start_1responder" \
+            "Java_com_example_aegis_1app_MainActivity_aegis_1ble_1handshake_1is_1complete" \
+            "Java_com_example_aegis_1app_MainActivity_aegis_1ble_1handshake_1reset" \
           ; do
             if echo "$SYMBOLS" | grep -q " $SYM$"; then
               echo "✓ $SYM"

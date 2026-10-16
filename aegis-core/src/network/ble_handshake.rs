@@ -1,6 +1,7 @@
 // src/network/ble_handshake.rs
 //
 // P0-A.3e.1 (2026-10-16) — Handshake ed25519 sur BLE.
+// P0-A.3e.2b.1 (2026-10-16) — Envoi Msg1 sur out_fd + wrappers JNI.
 //
 // Réutilise le protocole 3-message symétrique acté en D74 (Wi-Fi Direct).
 //
@@ -371,6 +372,39 @@ fn derive_shared_secret(
 }
 
 // ─────────────────────────────────────────────────────────────────────
+// P0-A.3e.2b.1 (2026-10-16) — Envoi Msg1 sur out_fd
+// ─────────────────────────────────────────────────────────────────────
+
+/// Écrit un message handshake (Msg1) dans le pipe out_fd avec framing D86 :
+/// `[u8 type=REMOTE_FORWARD][u32 BE len][payload]`.
+///
+/// Récupère out_fd depuis `ble_mesh::current_pipes()` (actif après set_pipes).
+/// Le reader thread a mis out_fd en O_NONBLOCK → drop silencieux si plein.
+#[cfg(unix)]
+fn send_on_out_pipe(payload: &[u8]) -> Result<(), HandshakeError> {
+    let (_in_fd, out_fd) = crate::network::ble_mesh::current_pipes()
+        .ok_or(HandshakeError::CryptoUnavailable)?;
+
+    let mut wire = Vec::with_capacity(5 + payload.len());
+    wire.push(crate::network::ble_mesh_reader::OUT_TYPE_REMOTE_FORWARD);
+    wire.extend_from_slice(&(payload.len() as u32).to_be_bytes());
+    wire.extend_from_slice(payload);
+
+    let n = unsafe {
+        libc::write(out_fd, wire.as_ptr() as *const libc::c_void, wire.len())
+    };
+    if n < 0 || (n as usize) != wire.len() {
+        return Err(HandshakeError::CryptoUnavailable);
+    }
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn send_on_out_pipe(_payload: &[u8]) -> Result<(), HandshakeError> {
+    Err(HandshakeError::CryptoUnavailable)
+}
+
+// ─────────────────────────────────────────────────────────────────────
 // État global (utilisé par le reader thread)
 // ─────────────────────────────────────────────────────────────────────
 
@@ -378,16 +412,23 @@ static HANDSHAKE_STATE: Mutex<Option<HandshakeState>> = Mutex::new(None);
 
 /// Initialise un handshake en tant qu'initiateur.
 ///
-/// Retourne le Msg1 à envoyer au peer.
-pub fn start_initiator(peer_fingerprint: [u8; 32]) -> Result<Vec<u8>, HandshakeError> {
+/// P0-A.3e.2b.1 : écrit Msg1 sur out_fd (framing D86) avant de stocker
+/// l'état. Si l'envoi échoue (pipe non configuré), le state n'est pas
+/// stocké → cohérent fail-closed.
+pub fn start_initiator(peer_fingerprint: [u8; 32]) -> Result<(), HandshakeError> {
     let mut guard = HANDSHAKE_STATE.lock().map_err(|_| HandshakeError::AlreadyStarted)?;
     if guard.is_some() {
         return Err(HandshakeError::AlreadyStarted);
     }
     let mut state = HandshakeState::new_initiator(peer_fingerprint)?;
     let msg1 = state.initiator_start()?;
+
+    // P0-A.3e.2b.1 : envoyer Msg1 au peer via out_fd (framing D86).
+    // AVANT le stockage du state : si l'envoi échoue, on ne stocke rien.
+    send_on_out_pipe(&msg1)?;
+
     *guard = Some(state);
-    Ok(msg1)
+    Ok(())
 }
 
 /// Initialise un handshake en tant que responder (attend Msg1).
@@ -497,7 +538,8 @@ pub unsafe extern "C" fn aegis_ble_handshake_start_initiator(fp_ptr: *const u8) 
     let mut fp = [0u8; 32];
     fp.copy_from_slice(std::slice::from_raw_parts(fp_ptr, 32));
     match start_initiator(fp) {
-        Ok(_msg1) => 0, // Msg1 sera écrit sur out_fd par le reader (voir P0-A.3e.2)
+        // P0-A.3e.2b.1 : Msg1 a été écrit dans out_fd par start_initiator.
+        Ok(()) => 0,
         Err(e) => e.to_code(),
     }
 }
@@ -522,6 +564,78 @@ pub extern "C" fn aegis_ble_handshake_is_complete() -> i32 {
 
 #[no_mangle]
 pub extern "C" fn aegis_ble_handshake_reset() -> i32 {
+    reset();
+    0
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// P0-A.3e.2b.1 (2026-10-16) — Wrappers JNI pour MainActivity.kt
+//
+// JNI symbol naming (C64) : Java_<pkg>_<Classe>_<method>
+//   . → _, _ → _1
+// ─────────────────────────────────────────────────────────────────────
+
+#[no_mangle]
+pub unsafe extern "system" fn Java_com_example_aegis_1app_MainActivity_aegis_1ble_1handshake_1start_1initiator(
+    env: jni::JNIEnv,
+    _this: jni::objects::JObject,
+    fp: jni::objects::JByteArray,
+) -> jni::sys::jint {
+    let fp_vec = match env.convert_byte_array(&fp) {
+        Ok(v) => v,
+        Err(_) => {
+            let _ = env.exception_clear();
+            return HandshakeError::InvalidLength.to_code();
+        }
+    };
+    if fp_vec.len() != 32 {
+        return HandshakeError::InvalidLength.to_code();
+    }
+    let mut fp_arr = [0u8; 32];
+    fp_arr.copy_from_slice(&fp_vec);
+    match start_initiator(fp_arr) {
+        Ok(()) => 0,
+        Err(e) => e.to_code(),
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "system" fn Java_com_example_aegis_1app_MainActivity_aegis_1ble_1handshake_1start_1responder(
+    env: jni::JNIEnv,
+    _this: jni::objects::JObject,
+    fp: jni::objects::JByteArray,
+) -> jni::sys::jint {
+    let fp_vec = match env.convert_byte_array(&fp) {
+        Ok(v) => v,
+        Err(_) => {
+            let _ = env.exception_clear();
+            return HandshakeError::InvalidLength.to_code();
+        }
+    };
+    if fp_vec.len() != 32 {
+        return HandshakeError::InvalidLength.to_code();
+    }
+    let mut fp_arr = [0u8; 32];
+    fp_arr.copy_from_slice(&fp_vec);
+    match start_responder(fp_arr) {
+        Ok(()) => 0,
+        Err(e) => e.to_code(),
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "system" fn Java_com_example_aegis_1app_MainActivity_aegis_1ble_1handshake_1is_1complete(
+    _env: jni::JNIEnv,
+    _this: jni::objects::JObject,
+) -> jni::sys::jint {
+    if is_complete() { 1 } else { 0 }
+}
+
+#[no_mangle]
+pub unsafe extern "system" fn Java_com_example_aegis_1app_MainActivity_aegis_1ble_1handshake_1reset(
+    _env: jni::JNIEnv,
+    _this: jni::objects::JObject,
+) -> jni::sys::jint {
     reset();
     0
 }
