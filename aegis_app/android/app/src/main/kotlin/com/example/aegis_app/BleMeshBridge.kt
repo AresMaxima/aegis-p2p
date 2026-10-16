@@ -35,6 +35,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * P0-A.3b (2026-10-11) — BLE Mesh bridge Kotlin.
  * P0-A.3c.2 (2026-10-12) — JNI pipes vers Rust.
  * P0-A.3d.3b (2026-10-14) — Integration reader thread Rust + framing D86/D88.
+ * P0-A.3e.2b.2 (2026-10-17) — Handshake ed25519 (dispatch 0x03 + API Dart).
  *
  * Advertising (Q2) : LOW_LATENCY (100 ms) → LOW_POWER (1000 ms) après 30 s.
  * TX power (D77)   : ULTRA_LOW (~1 m).
@@ -49,6 +50,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  *   Sortant (Rust → Kotlin) : [u8 type][u32 BE len][bytes]           (D86)
  *     type 0x01 = forward au peer via GATT NOTIFY
  *     type 0x02 = delivery locale → EventChannel Dart
+ *     type 0x03 = événement handshake → EventChannel Dart (P0-A.3e.2b.2)
  */
 class BleMeshBridge(
     private val context: Context,
@@ -115,10 +117,22 @@ class BleMeshBridge(
         methodChannel.setMethodCallHandler { call, result ->
             try {
                 when (call.method) {
-                    "isSupported" -> result.success(actionIsSupported())
-                    "initialize"  -> result.success(actionInitialize())
-                    "startMesh"   -> result.success(actionStartMesh())
-                    "stopMesh"    -> result.success(actionStopMesh())
+                    "isSupported"    -> result.success(actionIsSupported())
+                    "initialize"     -> result.success(actionInitialize())
+                    "startMesh"      -> result.success(actionStartMesh())
+                    "stopMesh"       -> result.success(actionStopMesh())
+                    // P0-A.3e.2b.2 : handshake ed25519 sur BLE
+                    "startHandshake" -> {
+                        val fpB64 = call.argument<String>("peerFingerprintB64") ?: ""
+                        val isInitiator = call.argument<Boolean>("isInitiator") ?: false
+                        result.success(actionStartHandshake(fpB64, isInitiator))
+                    }
+                    "handshakeIsComplete" -> {
+                        result.success(actionHandshakeIsComplete())
+                    }
+                    "handshakeReset" -> {
+                        result.success(actionHandshakeReset())
+                    }
                     else -> result.notImplemented()
                 }
             } catch (t: Throwable) {
@@ -228,6 +242,67 @@ class BleMeshBridge(
             Log.e(TAG, "stopMesh a échoué", t)
             false
         }
+    }
+
+    // =================================================================
+    // P0-A.3e.2b.2 — Handshake ed25519 sur BLE
+    // =================================================================
+
+    /**
+     * Démarre un handshake ed25519 sur BLE.
+     *
+     * @param peerFingerprintB64  Fingerprint SHA-256 de la pubkey ed25519 du
+     *                            peer, encodé en Base64 (32 octets bruts).
+     * @param isInitiator         true = client GATT (envoie Msg1).
+     *                            false = serveur GATT (attend Msg1).
+     * @return true si démarré, false sinon.
+     */
+    private fun actionStartHandshake(peerFingerprintB64: String, isInitiator: Boolean): Boolean {
+        if (!meshActive) {
+            Log.w(TAG, "startHandshake: mesh pas actif")
+            return false
+        }
+
+        val fp = try {
+            Base64.decode(peerFingerprintB64, Base64.NO_WRAP)
+        } catch (t: Throwable) {
+            Log.e(TAG, "startHandshake: Base64 decode a échoué", t)
+            return false
+        }
+        if (fp.size != 32) {
+            Log.e(TAG, "startHandshake: fingerprint invalide (${fp.size} octets, attendu 32)")
+            return false
+        }
+
+        val rc = if (isInitiator) {
+            mainActivity?.aegis_ble_handshake_start_initiator(fp)
+        } else {
+            mainActivity?.aegis_ble_handshake_start_responder(fp)
+        } ?: -1
+
+        if (rc != 0) {
+            Log.e(TAG, "startHandshake a échoué: rc=$rc (isInitiator=$isInitiator)")
+            emitEvent(mapOf("type" to "handshake_event", "status" to "failed:$rc"))
+            return false
+        }
+
+        Log.i(TAG, "Handshake démarré (role=${if (isInitiator) "initiator" else "responder"})")
+        return true
+    }
+
+    /**
+     * Retourne true si le handshake ed25519 est terminé avec succès.
+     */
+    private fun actionHandshakeIsComplete(): Boolean {
+        return (mainActivity?.aegis_ble_handshake_is_complete() ?: 0) == 1
+    }
+
+    /**
+     * Réinitialise l'état handshake (à appeler sur déconnexion).
+     */
+    private fun actionHandshakeReset(): Boolean {
+        val rc = mainActivity?.aegis_ble_handshake_reset() ?: -1
+        return rc == 0
     }
 
     // =================================================================
@@ -359,6 +434,7 @@ class BleMeshBridge(
                     when (type) {
                         0x01 -> notifyPeer(payload)         // forward au peer
                         0x02 -> emitLocalDelivery(payload)  // delivery locale
+                        0x03 -> emitHandshakeEvent(payload) // P0-A.3e.2b.2 handshake event
                         else -> Log.w(TAG, "Writer: type inconnu 0x${type.toString(16)}")
                     }
                 }
@@ -407,6 +483,26 @@ class BleMeshBridge(
     private fun emitLocalDelivery(payload: ByteArray) {
         val b64 = Base64.encodeToString(payload, Base64.NO_WRAP)
         emitEvent(mapOf("type" to "local_delivery", "payload_b64" to b64))
+    }
+
+    /**
+     * P0-A.3e.2b.2 (D86 type 0x03) : événement handshake → EventChannel Dart.
+     *
+     * Payload ASCII :
+     *   - "complete"        → handshake terminé, session prête
+     *   - "failed:<code>"   → échec (code HandshakeError::to_code)
+     *
+     * Format event :
+     *   {type: "handshake_event", status: "complete" | "failed:-50" | ...}
+     */
+    private fun emitHandshakeEvent(payload: ByteArray) {
+        val status = try {
+            String(payload, Charsets.UTF_8)
+        } catch (t: Throwable) {
+            Log.e(TAG, "emitHandshakeEvent: payload non-UTF8", t)
+            "failed:-1"
+        }
+        emitEvent(mapOf("type" to "handshake_event", "status" to status))
     }
 
     private fun notifyPeer(data: ByteArray) {
