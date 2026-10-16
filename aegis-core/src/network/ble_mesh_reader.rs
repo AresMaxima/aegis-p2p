@@ -1,6 +1,7 @@
 // src/network/ble_mesh_reader.rs
 //
 // P0-A.3d.3a (2026-10-13) — Reader thread Rust + FFI + MeshState.
+// P0-A.3e.2a (2026-10-16) — Routage par état handshake vs mesh (D90).
 //
 // =====================================================================
 // DÉCISIONS ACTÉES
@@ -10,14 +11,23 @@
 //   D86 (Q15) : out_fd reçoit [type u8][len u32 BE][bytes]
 //               type 0x01 = forward au peer via GATT NOTIFY
 //               type 0x02 = delivery locale → EventChannel Dart
+//               type 0x03 = événement handshake → EventChannel Dart (P0-A.3e.2a)
 //   D87 (Q16) : MeshDeduplicator + MeshReassembler PARTAGÉS
 //   D88 (Q17) : framing entrant = [len u32 BE][fragment bytes]
+//   D89 (Q18) : handshake en GATT direct (rôle client = initiateur)
+//   D90 (Q19) : routage par ÉTAT (pas de préfixe type dans le wire)
+//   D91 (Q20) : timeout handshake 30 s
+//   D92 (Q21) : shared_secret = HKDF-SHA256(nonce_i||nonce_r||pubkey_i||pubkey_r)
 //   D93 (C66) : close explicite out_fd en fin de reader_loop + reset handshake
 //
 // =====================================================================
 // FORMAT ENTRANT (in_fd, Kotlin → Rust)
 // =====================================================================
-//   [u32 BE length][MeshFragment serialized]
+//   [u32 BE length][bytes]
+//
+//   Selon l'état courant (is_in_progress handshake) :
+//     - handshake en cours → bytes = message handshake (Msg1/Msg2/Msg3)
+//     - sinon             → bytes = MeshFragment serialized
 //
 // =====================================================================
 // FORMAT SORTANT (out_fd, Rust → Kotlin)
@@ -48,6 +58,9 @@ use crate::network::ble_mesh_fragment::{MeshFragment, MeshReassembler};
 
 pub const OUT_TYPE_REMOTE_FORWARD: u8 = 0x01;
 pub const OUT_TYPE_LOCAL_DELIVERY: u8 = 0x02;
+/// D90 (Q19) : événement de handshake (complete / failed:code).
+/// Routé vers Dart via EventChannel par Kotlin (nouveau handler 0x03).
+pub const OUT_TYPE_HANDSHAKE_EVENT: u8 = 0x03;
 
 const PIPE_FRAMING_LEN: usize = 4;
 const READ_BUF_SIZE: usize = 4096;
@@ -383,6 +396,15 @@ mod unix_reader {
     }
 
     fn process_incoming(frag_bytes: &[u8], out_fd: RawFd, state: &Arc<Mutex<MeshState>>) {
+        // D90 (Q19) : routage par état — pas de préfixe type dans le wire.
+        // Si un handshake est en cours, tout message entrant est traité
+        // comme un message de handshake (Msg1/Msg2/Msg3).
+        // Sinon, traitement normal comme MeshFragment.
+        if crate::network::ble_handshake::is_in_progress() {
+            process_handshake_message(frag_bytes, out_fd);
+            return;
+        }
+
         let frag = match MeshFragment::parse(frag_bytes) {
             Ok(f) => f,
             Err(_) => {
@@ -403,17 +425,47 @@ mod unix_reader {
         };
 
         if let Some(out) = outgoing {
-            let mut wire = Vec::with_capacity(1 + 4 + out.bytes.len());
-            wire.push(out.kind);
-            wire.extend_from_slice(&(out.bytes.len() as u32).to_be_bytes());
-            wire.extend_from_slice(&out.bytes);
-
-            if !write_nonblocking(out_fd, &wire) {
+            if !write_out(out_fd, out.kind, &out.bytes) {
                 if let Ok(mut s) = state.lock() {
                     s.drops += 1;
                 }
             }
         }
+    }
+
+    /// Traite un message de handshake entrant et route la réponse/sortie.
+    ///
+    /// Les réponses au peer (Msg2, Msg3) sont envoyées via
+    /// OUT_TYPE_REMOTE_FORWARD → GATT NOTIFY côté Kotlin.
+    /// Les événements de complétion/échec sont envoyés via
+    /// OUT_TYPE_HANDSHAKE_EVENT → EventChannel Dart.
+    fn process_handshake_message(msg: &[u8], out_fd: RawFd) {
+        use crate::network::ble_handshake::{process_message, reset, HandshakeAction};
+
+        match process_message(msg) {
+            Ok(HandshakeAction::Send(reply)) => {
+                let _ = write_out(out_fd, OUT_TYPE_REMOTE_FORWARD, &reply);
+            }
+            Ok(HandshakeAction::Done) => {
+                let _ = write_out(out_fd, OUT_TYPE_HANDSHAKE_EVENT, b"complete");
+            }
+            Err(e) => {
+                let code = e.to_code();
+                let payload = format!("failed:{}", code);
+                let _ = write_out(out_fd, OUT_TYPE_HANDSHAKE_EVENT, payload.as_bytes());
+                reset();
+            }
+        }
+    }
+
+    /// Écrit un message framing D86 sur le fd sortant :
+    /// `[u8 kind][u32 BE len][payload]`.
+    fn write_out(fd: RawFd, kind: u8, payload: &[u8]) -> bool {
+        let mut wire = Vec::with_capacity(1 + 4 + payload.len());
+        wire.push(kind);
+        wire.extend_from_slice(&(payload.len() as u32).to_be_bytes());
+        wire.extend_from_slice(payload);
+        write_nonblocking(fd, &wire)
     }
 
     fn poll_read(fd: RawFd, timeout_ms: i32) -> i32 {
@@ -666,5 +718,12 @@ mod tests {
         ];
         let set: HashSet<i32> = codes.iter().copied().collect();
         assert_eq!(set.len(), 4);
+    }
+
+    #[test]
+    fn test_out_type_constants_distinct() {
+        assert_ne!(OUT_TYPE_REMOTE_FORWARD, OUT_TYPE_LOCAL_DELIVERY);
+        assert_ne!(OUT_TYPE_REMOTE_FORWARD, OUT_TYPE_HANDSHAKE_EVENT);
+        assert_ne!(OUT_TYPE_LOCAL_DELIVERY, OUT_TYPE_HANDSHAKE_EVENT);
     }
 }
