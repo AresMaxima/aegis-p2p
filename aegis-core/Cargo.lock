@@ -48,6 +48,7 @@ dependencies = [
  "jni",
  "lazy_static",
  "libc",
+ "pqcrypto-mldsa",
  "pqcrypto-mlkem",
  "pqcrypto-traits",
  "proptest",
@@ -2555,6 +2556,20 @@ dependencies = [
  "dunce",
  "getrandom 0.3.4",
  "libc",
+]
+
+[[package]]
+name = "pqcrypto-mldsa"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f9f812cd126a2582599478a434fea75937b4b05d234c64a49e0cea129e130528"
+dependencies = [
+ "cc",
+ "glob",
+ "libc",
+ "paste",
+ "pqcrypto-internals",
+ "pqcrypto-traits",
 ]
 
 [[package]]
