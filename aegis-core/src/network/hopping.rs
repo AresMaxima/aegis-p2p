@@ -1,5 +1,9 @@
 //! aegis-core/src/network/hopping.rs
 //! Routage Hopping Dynamique Multi-Transports & Générateur de Trafic Leurre (Chaff) - CdCM v2.2-RC1.
+//!
+//! P0-A.5a (2026-10-17) — Introduction de RouteHandle typé (D100).
+//! Remplace l'ancien TransportType qui référençait encore P2pDht (supprimé D47)
+//! et isole l'adresse au sein de chaque variante.
 
 use std::future::Future;
 use std::sync::Arc;
@@ -20,22 +24,37 @@ impl TransportHoppingRouter {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TransportType {
-    LocalLan,
-    P2pDht,
-    TorOnion,
+/// D100 (P0-A.5a) — Handle typé pour remplacer `address: String`.
+/// Chaque variante porte l'adresse spécifique à son transport.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RouteHandle {
+    /// Tor .onion address. Le booléen indique si le circuit doit être
+    /// renouvelé périodiquement (rotation de circuit).
+    Tor { address: String, is_ephemeral: bool },
+    /// Wi-Fi Direct (IP:Port du socket TCP).
+    WifiDirect { address: String },
+    /// BLE Mesh (identifiant de device ou UUID).
+    BleMesh { address: String },
+}
+
+impl RouteHandle {
+    /// Récupère l'adresse sous forme de slice pour le logging ou la connexion.
+    pub fn address(&self) -> &str {
+        match self {
+            RouteHandle::Tor { address, .. } => address,
+            RouteHandle::WifiDirect { address } => address,
+            RouteHandle::BleMesh { address } => address,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RouteCandidate {
-    pub transport: TransportType,
-    pub address: String,
+    pub handle: RouteHandle,
     pub priority: u8,
-    pub is_ephemeral: bool,
 }
 
-/// Sélecteur de route dynamique gérant l'ordre des transports et la bascule à chaud
+/// Sélecteur de route dynamique gérant l'ordre des transports et la bascule à chaud.
 pub struct TransportSelector {
     candidates: Arc<RwLock<Vec<RouteCandidate>>>,
     rotation_interval: Duration,
@@ -87,18 +106,21 @@ impl TransportSelector {
 
                 // 2. Mise à jour éphémère sous verrou en microseconde
                 let mut guards = candidates_clone.write().await;
-                if let Some(tor_route) = guards
-                    .iter_mut()
-                    .find(|c| c.transport == TransportType::TorOnion && c.is_ephemeral)
-                {
-                    tor_route.address = new_onion_address;
+                
+                // On cherche la route Tor marquée comme éphémère (celle qui subit la rotation)
+                if let Some(tor_route) = guards.iter_mut().find(|c| {
+                    matches!(c.handle, RouteHandle::Tor { is_ephemeral: true, .. })
+                }) {
+                    if let RouteHandle::Tor { ref mut address, .. } = tor_route.handle {
+                        *address = new_onion_address;
+                    }
                 }
             }
         });
     }
 }
 
-/// Générateur de trafic leurre réseau (Chaff Traffic Generator)
+/// Générateur de trafic leurre réseau (Chaff Traffic Generator).
 /// Injecte des paquets factices matelassés à intervalles aléatoires (jitter)
 /// pour contrecarrer l'inspection de paquets (DPI) et l'analyse statistique de trafic.
 pub struct ChaffTrafficGenerator;
@@ -147,82 +169,73 @@ impl ChaffTrafficGenerator {
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
 
     #[test]
     fn test_hopping_guard_reorder() {
         let mut guards = vec![
-            HoppingGuard { id: 1, priority: 5 },
-            HoppingGuard { id: 2, priority: 10 },
-            HoppingGuard { id: 3, priority: 1 },
+            HoppingGuard { id: 1, priority: 10 },
+            HoppingGuard { id: 2, priority: 30 },
+            HoppingGuard { id: 3, priority: 20 },
         ];
+
         TransportHoppingRouter::reorder_guards(&mut guards);
-        assert_eq!(guards[0].priority, 10);
-        assert_eq!(guards[1].priority, 5);
-        assert_eq!(guards[2].priority, 1);
+        assert_eq!(guards[0].id, 2); // Priority 30
+        assert_eq!(guards[1].id, 3); // Priority 20
+        assert_eq!(guards[2].id, 1); // Priority 10
     }
 
     #[tokio::test]
     async fn test_transport_hopping_selection() {
-        let selector = TransportSelector::new(300);
+        let selector = TransportSelector::new(60);
 
-        selector
-            .add_route(RouteCandidate {
-                transport: TransportType::P2pDht,
-                address: "/ip4/192.168.1.50/tcp/4001".to_string(),
-                priority: 5,
-                is_ephemeral: false,
-            })
-            .await;
+        // 1. Ajout de routes avec différents handles
+        selector.add_route(RouteCandidate {
+            handle: RouteHandle::Tor { address: "abc.onion".to_string(), is_ephemeral: false },
+            priority: 50,
+        }).await;
 
-        selector
-            .add_route(RouteCandidate {
-                transport: TransportType::LocalLan,
-                address: "/ip4/192.168.1.50/tcp/5000".to_string(),
-                priority: 10,
-                is_ephemeral: false,
-            })
-            .await;
+        selector.add_route(RouteCandidate {
+            handle: RouteHandle::WifiDirect { address: "192.168.49.1:8080".to_string() },
+            priority: 80, // Priorité plus haute
+        }).await;
 
-        selector
-            .add_route(RouteCandidate {
-                transport: TransportType::TorOnion,
-                address: "aegis_ephemeral_1.onion:9050".to_string(),
-                priority: 2,
-                is_ephemeral: true,
-            })
-            .await;
-
+        // 2. Le meilleur doit être Wi-Fi Direct (priorité 80)
         let best = selector.get_best_route().await.unwrap();
-        assert_eq!(best.transport, TransportType::LocalLan);
+        assert_eq!(best.handle.address(), "192.168.49.1:8080");
 
+        // 3. Fallback vers Tor
         let next = selector.fallback_next().await.unwrap();
-        assert_eq!(next.transport, TransportType::P2pDht);
+        assert_eq!(next.handle.address(), "abc.onion");
 
-        let tor = selector.fallback_next().await.unwrap();
-        assert_eq!(tor.transport, TransportType::TorOnion);
-        assert!(tor.is_ephemeral);
+        // 4. Plus de route
+        assert!(selector.fallback_next().await.is_none());
     }
 
     #[tokio::test]
     async fn test_chaff_traffic_generation() {
-        let packet_count = Arc::new(AtomicUsize::new(0));
-        let packet_count_clone = Arc::clone(&packet_count);
+        use std::time::Duration;
+        
+        let counter = Arc::new(AtomicUsize::new(0));
+        let counter_clone = Arc::clone(&counter);
 
-        // Lance un générateur de leurres ultra-rapide (1 à 2 secondes) pour le test
+        // On lance le générateur avec des délais très courts (0 à 1 sec)
         ChaffTrafficGenerator::spawn_chaff_loop(
             move |packet| {
-                let count = Arc::clone(&packet_count_clone);
+                let c = Arc::clone(&counter_clone);
                 async move {
-                    assert_eq!(packet.len(), 528); // Vérification de la taille standard matelassée
-                    count.fetch_add(1, Ordering::SeqCst);
+                    // Vérifie la taille fixe du paquet leurre
+                    assert_eq!(packet.len(), 528);
+                    c.fetch_add(1, Ordering::SeqCst);
                 }
             },
-            1,
-            2,
+            0, 1
         );
 
-        // Attend 2.5 secondes pour vérifier qu'au moins un paquet leurre a été généré
-        sleep(Duration::from_millis(2500)).await;
-        assert!(packet_count.load(Ordering::SeqCst) >= 1);
+        // On attend 2.5 secondes pour laisser passer au moins 2 paquets
+        tokio::time::sleep(Duration::from_millis(2500)).await;
+        
+        let count = counter.load(Ordering::SeqCst);
+        assert!(count >= 2, "Au moins 2 paquets chaff attendus, reçu {}", count);
     }
 }
