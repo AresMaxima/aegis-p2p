@@ -36,6 +36,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * P0-A.3c.2 (2026-10-12) — JNI pipes vers Rust.
  * P0-A.3d.3b (2026-10-14) — Integration reader thread Rust + framing D86/D88.
  * P0-A.3e.2b.2 (2026-10-17) — Handshake ed25519 (dispatch 0x03 + API Dart).
+ * P0-A.4b (2026-10-17) — Fragmentation MTU pour handshake PQ (ML-KEM + ML-DSA).
  *
  * Advertising (Q2) : LOW_LATENCY (100 ms) → LOW_POWER (1000 ms) après 30 s.
  * TX power (D77)   : ULTRA_LOW (~1 m).
@@ -77,7 +78,8 @@ class BleMeshBridge(
         private const val ADVERTISE_ADAPTIVE_DELAY_MS = 30_000L
 
         // D86 — Bornes de sécurité du framing sortant.
-        private const val MAX_FRAME_SIZE = 64 * 1024
+        // P0-A.4b : 16 Ko (Msg2 handshake PQ = 10.5 Ko + overhead).
+        private const val MAX_FRAME_SIZE = 16 * 1024
     }
 
     // ── État interne ──────────────────────────────────────────────────
@@ -419,7 +421,7 @@ class BleMeshBridge(
                               ((header[3].toInt() and 0xFF) shl 8) or
                               (header[4].toInt() and 0xFF)
 
-                    // Borne de sécurité : refuse les frames > 64 KB (défense DoS).
+                    // Borne de sécurité : refuse les frames > MAX_FRAME_SIZE (défense DoS).
                     if (len < 0 || len > MAX_FRAME_SIZE) {
                         Log.e(TAG, "Writer: len invalide $len (drop + break)")
                         break
@@ -515,14 +517,32 @@ class BleMeshBridge(
         val service = server.getService(UUID_SERVICE) ?: return
         val notifyChar = service.getCharacteristic(UUID_CHAR_NOTIFY) ?: return
 
-        try {
-            notifyChar.value = data
-            val ok = server.notifyCharacteristicChanged(dev, notifyChar, false)
-            if (!ok) {
-                Log.w(TAG, "notifyCharacteristicChanged a retourné false")
+        // P0-A.4b : Fragmenter le payload pour respecter le MTU BLE (244 max).
+        // Rust fait déjà le réassemblage via feed_fragment() de son côté.
+        val chunkSize = 244
+        var offset = 0
+        
+        while (offset < data.size) {
+            val end = minOf(offset + chunkSize, data.size)
+            val chunk = data.copyOfRange(offset, end)
+
+            try {
+                notifyChar.value = chunk
+                // API 33+ : server.notifyCharacteristicChanged(dev, notifyChar, false, chunk)
+                val ok = server.notifyCharacteristicChanged(dev, notifyChar, false)
+                if (!ok) {
+                    Log.w(TAG, "notifyCharacteristicChanged a retourné false (offset $offset/${data.size})")
+                    break // On arrête l'envoi si le buffer BLE est saturé
+                }
+            } catch (t: Throwable) {
+                Log.e(TAG, "notifyPeer a échoué à l'offset $offset", t)
+                break
             }
-        } catch (t: Throwable) {
-            Log.e(TAG, "notifyPeer a échoué", t)
+            offset = end
+        }
+        
+        if (offset < data.size) {
+            Log.w(TAG, "notifyPeer partiel: $offset/${data.size} octets envoyés")
         }
     }
 
