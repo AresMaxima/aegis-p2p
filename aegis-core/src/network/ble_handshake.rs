@@ -476,10 +476,10 @@ pub unsafe extern "system" fn Java_com_example_aegis_1app_MainActivity_aegis_1bl
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// Tests
+// Tests — C31 : Miri ne supporte pas le FFI C (pqcrypto) → exclu
 // ─────────────────────────────────────────────────────────────────────
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
     use crate::keystore::{HardwareKeystore, TEST_LOCK};
