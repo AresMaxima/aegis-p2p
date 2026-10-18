@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Minimal exposure : seul le sous-répertoire cacheDir/updates/ est exposé.
+         Défense contre la "Dirty Stream" attack : ne pas exposer tout le cacheDir. -->
+    <cache-path name="updates" path="updates/" />
+</paths>

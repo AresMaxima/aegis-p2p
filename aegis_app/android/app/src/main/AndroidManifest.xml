@@ -48,6 +48,23 @@
     <!-- Foreground Service pour maintenir le mesh BLE en arrière-plan -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 
+    <!--
+      ================================================================
+      P0-A.8b (2026-10-19) — Updater in-app (P-6)
+      ================================================================
+      Permission indispensable pour déclencher l'installation d'un
+      APK hors Play Store via Intent ACTION_VIEW (API 26+).
+
+      C69 : la permission doit être vérifiée AU RUNTIME via
+      `packageManager.canRequestPackageInstalls()`. La déclaration
+      manifest seule ne suffit pas : Android exige que l'utilisateur
+      autorise AEGIS dans Paramètres > Applications spéciales >
+      Installer des applis inconnues. Sans autorisation utilisateur,
+      l'Intent est refusé silencieusement (aucune exception levée,
+      aucun log système évident).
+    -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <uses-feature
         android:name="android.hardware.camera"
         android:required="false" />
@@ -93,6 +110,37 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+          ================================================================
+          P0-A.8b (2026-10-19) — FileProvider pour l'updater (Q25)
+          ================================================================
+          Expose de façon minimale le sous-répertoire cacheDir/updates/
+          via un content:// URI. Obligatoire depuis API 24 (Android 7.0)
+          pour transmettre un fichier à l'installateur système sans
+          FileUriExposedException.
+
+          - exported="false" : aucune autre app ne peut invoquer le
+            provider directement (défense "Dirty Stream").
+          - grantUriPermissions="true" : permet d'accorder au runtime
+            FLAG_GRANT_READ_URI_PERMISSION pour la durée de l'Intent.
+          - authority ${applicationId}.updater.fileprovider : doit
+            matcher EXACTEMENT la valeur passée côté Kotlin via
+            "${activity.packageName}.updater.fileprovider"
+            (AegisUpdater.kt::launchInstaller).
+
+          Le scope (res/xml/file_paths.xml) n'expose QUE
+          cacheDir/updates/, jamais l'intégralité du cacheDir.
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.updater.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
         <meta-data
             android:name="flutterEmbedding"

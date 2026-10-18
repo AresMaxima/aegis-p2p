@@ -511,6 +511,20 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+
+        // --- P0-A.8b — Updater in-app (P-6) ---
+        // Chaîne de confiance Q22-Q27 :
+        //   Q22 : Dart vérifie ed25519 du manifeste via FFI Rust.
+        //   Q23 : Kotlin télécharge l'APK (OkHttp, whitelist aresmaxima.com).
+        //   Q24 : Kotlin vérifie SHA-256 en temps constant.
+        //   Q25 : Kotlin lance l'installateur via FileProvider.
+        //   Q26 : Kotlin vérifie canRequestPackageInstalls() avant l'Intent.
+        //   Q27 : Kotlin supprime l'APK après consommation du fd par l'installateur.
+        val updaterChannel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            AegisUpdater.CHANNEL_NAME
+        )
+        updaterChannel.setMethodCallHandler(AegisUpdater(this, updaterChannel))
     }
 
     // =====================================================================
