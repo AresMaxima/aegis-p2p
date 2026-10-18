@@ -292,7 +292,9 @@ struct KeyDescription<'a> {
     tee_enforced: &'a [u8],
 }
 
-fn parse_key_description(ext_bytes: &[u8]) -> Result<KeyDescription, AttestationStatus> {
+// C46 FIX (2026-10-18) : lifetime elision explicite (`<'_>`) pour satisfaire
+// le lint `mismatched_lifetime_syntaxes`.
+fn parse_key_description(ext_bytes: &[u8]) -> Result<KeyDescription<'_>, AttestationStatus> {
     let (seq, _) = der_read_tag(ext_bytes, 0x30)?;
     let mut cursor = seq;
 
@@ -347,7 +349,8 @@ struct RootOfTrust<'a> {
     verified_boot_hash: &'a [u8],
 }
 
-fn parse_root_of_trust(data: &[u8]) -> Result<RootOfTrust, AttestationStatus> {
+// C46 FIX (2026-10-18) : lifetime elision explicite (`<'_>`).
+fn parse_root_of_trust(data: &[u8]) -> Result<RootOfTrust<'_>, AttestationStatus> {
     let (seq, _) = der_read_tag(data, 0x30)?;
     let mut cursor = seq;
 

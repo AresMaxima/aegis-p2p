@@ -701,7 +701,6 @@ mod tests {
 
     #[tokio::test]
     #[ignore = "slow: requires real Tor network bootstrap (~30-60s)"]
-    #[cfg_attr(miri, ignore)]
     async fn test_tor_transport_bootstrap() {
         let result = TorTransport::bootstrap().await;
         assert!(result.is_ok(), "bootstrap Tor échoué: {:?}", result.err());
@@ -712,7 +711,6 @@ mod tests {
 
     #[tokio::test]
     #[ignore = "slow: requires real Tor network bootstrap (~30-60s)"]
-    #[cfg_attr(miri, ignore)]
     async fn test_tor_transport_reuses_existing_isolated_client() {
         let transport = TorTransport::bootstrap().await.expect("bootstrap");
         let _c1 = transport
@@ -728,7 +726,6 @@ mod tests {
 
     #[tokio::test]
     #[ignore = "slow: requires real Tor network bootstrap (~30-60s)"]
-    #[cfg_attr(miri, ignore)]
     async fn test_tor_transport_creates_isolated_client_per_contact() {
         let transport = TorTransport::bootstrap().await.expect("bootstrap");
         let _a = transport
@@ -744,7 +741,6 @@ mod tests {
 
     #[tokio::test]
     #[ignore = "slow: requires real Tor network bootstrap (~30-60s)"]
-    #[cfg_attr(miri, ignore)]
     async fn test_tor_transport_drops_isolated_client() {
         let transport = TorTransport::bootstrap().await.expect("bootstrap");
         let _a = transport
@@ -759,7 +755,6 @@ mod tests {
     /// Vérifie que `apply_rotation` drop stream + client + reset compteur.
     #[tokio::test]
     #[ignore = "slow: requires real Tor network bootstrap (~30-60s)"]
-    #[cfg_attr(miri, ignore)]
     async fn test_rotation_apply_rotation_drops_state() {
         let transport = TorTransport::bootstrap().await.expect("bootstrap");
 

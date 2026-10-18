@@ -37,6 +37,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * P0-A.3d.3b (2026-10-14) — Integration reader thread Rust + framing D86/D88.
  * P0-A.3e.2b.2 (2026-10-17) — Handshake ed25519 (dispatch 0x03 + API Dart).
  * P0-A.4b (2026-10-17) — Fragmentation MTU pour handshake PQ (ML-KEM + ML-DSA).
+ * P0-A.7a (2026-10-18) — C60 fix (BLE API 33+ notifyCharacteristicChanged).
  *
  * Advertising (Q2) : LOW_LATENCY (100 ms) → LOW_POWER (1000 ms) après 30 s.
  * TX power (D77)   : ULTRA_LOW (~1 m).
@@ -527,9 +528,18 @@ class BleMeshBridge(
             val chunk = data.copyOfRange(offset, end)
 
             try {
-                notifyChar.value = chunk
-                // API 33+ : server.notifyCharacteristicChanged(dev, notifyChar, false, chunk)
-                val ok = server.notifyCharacteristicChanged(dev, notifyChar, false)
+                // C60 FIX (P0-A.7a) : utiliser l'API 33+ si disponible, sinon fallback déprécié.
+                val ok: Boolean
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    // API 33+ retourne un code de statut (Int), pas un Boolean.
+                    val status = server.notifyCharacteristicChanged(dev, notifyChar, false, chunk)
+                    ok = status == android.bluetooth.BluetoothStatusCodes.SUCCESS
+                } else {
+                    @Suppress("DEPRECATION")
+                    notifyChar.value = chunk
+                    @Suppress("DEPRECATION")
+                    ok = server.notifyCharacteristicChanged(dev, notifyChar, false)
+                }
                 if (!ok) {
                     Log.w(TAG, "notifyCharacteristicChanged a retourné false (offset $offset/${data.size})")
                     break // On arrête l'envoi si le buffer BLE est saturé

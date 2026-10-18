@@ -2,7 +2,7 @@
 mod tests {
     use aegis_core::secure_buffer::SecureBuffer;
     use aegis_core::viewer::stream_pipe::{
-        aegis_control_media_player, aegis_render_to_surface, StreamPipeController,
+        aegis_control_media_player, StreamPipeController,
     };
     use std::ffi::c_void;
 
