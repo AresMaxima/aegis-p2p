@@ -66,6 +66,7 @@ pub mod stegano;
 pub mod storage;
 pub mod transport;
 pub mod viewer;
+pub mod updater;
 
 pub const ADMIN_PUBLIC_KEY_BYTES: [u8; 32] = [
     0xac, 0x26, 0x11, 0xc4, 0x08, 0xd3, 0x4c, 0xf5,
@@ -102,6 +103,10 @@ pub unsafe extern "system" fn JNI_OnLoad(
     // P0-A.2b.3a : ancre pour les FFI Wi-Fi Direct (appelées via JNI
     // depuis Kotlin, invisibles pour le linker LLD).
     _anchor_wifi_direct_ffi();
+
+    // P0-A.8a : ancre pour la FFI de vérification de mise à jour
+    // (appelée uniquement depuis Dart/Kotlin via FFI dynamique).
+    _anchor_updater_ffi();
 
     if vm.is_null() {
         return JNI_ERR;
@@ -1199,6 +1204,18 @@ fn _anchor_wifi_direct_ffi() {
     ));
 }
 
+/// P0-A.8a : ancre runtime pour la FFI de vérification des mises à jour.
+///
+/// `aegis_verify_update_signature` sera appelée uniquement depuis
+/// Dart/Kotlin via FFI dynamique. Sans cette ancre, le linker LLD du NDK
+/// peut supprimer le symbole à l'étape `--gc-sections`.
+#[inline(never)]
+fn _anchor_updater_ffi() {
+    std::hint::black_box((
+        aegis_verify_update_signature as *const (),
+    ));
+}
+
 #[inline(never)]
 fn _anchor_vault_ffi() {
     std::hint::black_box((
@@ -1322,5 +1339,59 @@ mod ed25519_identity_tests {
             "message d'erreur doit mentionner master_key: {}",
             err
         );
+    }
+}
+
+// =========================================================================
+// P0-A.8a — FFI de vérification cryptographique des mises à jour
+// =========================================================================
+//
+// Appelée depuis Dart/Kotlin après téléchargement du manifeste signé.
+//
+// Vérifie :
+//   1. La signature ed25519 du manifeste brut (JSON bytes)
+//   2. Le parsing JSON du manifeste (dans updater::verify_manifest)
+//
+// Le hash SHA-256 de l'APK est vérifié séparément par
+// `updater::verify_apk_hash()` une fois l'APK téléchargé.
+//
+// # Arguments
+// - `manifest_ptr` : pointeur vers les octets JSON du manifeste
+// - `manifest_len` : longueur du manifeste
+// - `sig_ptr`      : pointeur vers 64 octets (signature ed25519)
+// - `pubkey_ptr`   : pointeur vers 32 octets (clé publique admin)
+//
+// # Retour
+//   0   = signature valide + manifeste parsé
+//  -1   = pointeur null
+//  -60  = signature invalide
+//  -61  = hash mismatch (non utilisé ici)
+//  -62  = erreur de parsing JSON
+#[no_mangle]
+pub unsafe extern "C" fn aegis_verify_update_signature(
+    manifest_ptr: *const u8,
+    manifest_len: usize,
+    sig_ptr: *const u8,
+    pubkey_ptr: *const u8,
+) -> i32 {
+    if manifest_ptr.is_null() || sig_ptr.is_null() || pubkey_ptr.is_null() {
+        return -1;
+    }
+
+    let manifest = unsafe { std::slice::from_raw_parts(manifest_ptr, manifest_len) };
+
+    let mut sig_arr = [0u8; 64];
+    unsafe {
+        std::ptr::copy_nonoverlapping(sig_ptr, sig_arr.as_mut_ptr(), 64);
+    }
+
+    let mut pk_arr = [0u8; 32];
+    unsafe {
+        std::ptr::copy_nonoverlapping(pubkey_ptr, pk_arr.as_mut_ptr(), 32);
+    }
+
+    match crate::updater::verify_manifest(manifest, &sig_arr, &pk_arr) {
+        Ok(_) => 0,
+        Err(e) => e.to_code(),
     }
 }
