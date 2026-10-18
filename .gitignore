@@ -16,6 +16,7 @@ aegis_app/android/.gradle/
 *.idsig
 *.so
 **/*.so
+*.so.sig
 
 # 4. DOSSIERS DE COMPILATION & CACHES
 aegis-core/target/
