@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Debug
 import android.util.Log
 import android.view.Surface
 import androidx.annotation.NonNull
@@ -19,6 +20,7 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
+import java.io.File
 import java.nio.ByteBuffer
 import java.util.concurrent.Executors
 
@@ -137,17 +139,6 @@ class MainActivity : FlutterActivity() {
     /**
      * N3 (audit 2026-09-20) : détecte si l'APK est signée avec la clé
      * debug standard Android (`CN=Android Debug, O=Android, C=US`).
-     *
-     * Utilisation : la vérification d'attestation ne peut réussir que si
-     * le challenge SHA256(signature APK) correspond à la chaîne d'attestation
-     * StrongBox. En mode debug, le challenge mismatch est inévitable → on
-     * skip l'attestation pour permettre le développement.
-     *
-     * En mode release officiel (avec la clé de signature de production),
-     * le challenge sera correct et l'attestation ACTIVE.
-     *
-     * Robuste à tous les cas : impossible de "tricher" sur un flag Gradle —
-     * on lit la signature réelle du package.
      */
     private fun isSignedWithDebugKey(): Boolean {
         return try {
@@ -179,9 +170,74 @@ class MainActivity : FlutterActivity() {
             false
         } catch (e: Exception) {
             Log.e(TAG, "Impossible de vérifier la signature de l'APK", e)
-            // En cas de doute : considérer release-signed (strict).
             false
         }
+    }
+
+    // =====================================================================
+    // P1 / P2 — Sécurité Forensique & Anti-Root
+    // =====================================================================
+
+    /**
+     * P2 (P-5) : Détecte si l'environnement est compromis (Root, Frida, Debugger).
+     */
+    private fun isDeviceCompromised(): Boolean {
+        // 1. Détection de Debugger attaché
+        if (Debug.isDebuggerConnected() || Debug.waitingForDebugger()) {
+            Log.e(TAG, "P2: Debugger détecté !")
+            return true
+        }
+
+        // 2. Détection de Root (fichiers / binaires su)
+        val rootPaths = arrayOf(
+            "/system/app/Superuser.apk", "/sbin/su", "/system/bin/su",
+            "/system/xbin/su", "/data/local/xbin/su", "/data/local/bin/su",
+            "/system/sd/xbin/su", "/system/bin/failsafe/su", "/data/local/su"
+        )
+        for (path in rootPaths) {
+            if (File(path).exists()) {
+                Log.e(TAG, "P2: Root détecté via $path !")
+                return true
+            }
+        }
+
+        // 3. Détection de Frida (ports ouverts ou processus)
+        try {
+            val process = Runtime.getRuntime().exec("ps -A")
+            val reader = process.inputStream.bufferedReader()
+            val output = reader.readText()
+            if (output.contains("frida-server") || output.contains("frida-helper")) {
+                Log.e(TAG, "P2: Frida détecté !")
+                return true
+            }
+        } catch (_: Throwable) {}
+
+        return false
+    }
+
+    /**
+     * P1 (fstrim) : Force l'OS à écraser les blocs libres.
+     * Alloue un fichier massif (100 Mo) pour écraser les anciennes données, puis le supprime.
+     * NOTE : Exécuté sur un thread séparé pour éviter un ANR si appelé dans onDestroy.
+     */
+    fun aegisForceFstrim() {
+        Thread {
+            try {
+                val dummyFile = File(filesDir, "aegis_fstrim_dummy.dat")
+                val fos = java.io.FileOutputStream(dummyFile)
+                val buffer = ByteArray(1024 * 1024) // 1 Mo
+                java.util.Random().nextBytes(buffer)
+                for (i in 0 until 100) {
+                    fos.write(buffer)
+                }
+                fos.flush()
+                fos.close()
+                dummyFile.delete()
+                Log.i(TAG, "P1: fstrim trigger OK (100 MB allocated & deleted)")
+            } catch (e: Throwable) {
+                Log.e(TAG, "P1: fstrim trigger failed", e)
+            }
+        }.start()
     }
 
     // =====================================================================
@@ -193,7 +249,6 @@ class MainActivity : FlutterActivity() {
     private val cameraExecutor = Executors.newSingleThreadExecutor()
     private var cameraProvider: ProcessCameraProvider? = null
 
-    // P0-A.3a (2026-10-11) : bridge BLE Mesh (squelette + permissions).
     private var bleMeshBridge: BleMeshBridge? = null
 
     private var yPool: ByteBuffer? = null
@@ -207,6 +262,14 @@ class MainActivity : FlutterActivity() {
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // P2 (P-5) : Fail-closed si l'environnement est compromis.
+        if (isDeviceCompromised()) {
+            Log.e(TAG, "P2: Environnement compromis — PanicPurge (Process Kill).")
+            // On tue le processus immédiatement.
+            android.os.Process.killProcess(android.os.Process.myPid())
+            System.exit(0)
+        }
+
         // CRUCIAL : enregistrer l'instance AVANT tout appel de aegis_capture_ndk_camera.
         try {
             aegisRegisterMainActivity(this)
@@ -215,7 +278,6 @@ class MainActivity : FlutterActivity() {
         }
 
         // P0-A.2a (2026-10-07) : initialisation du bridge Wi-Fi Direct.
-        // No-op si l'hardware ne supporte pas FEATURE_WIFI_DIRECT.
         try {
             val wifiOk = WifiDirectBridge.initialize(this)
             Log.i(TAG, "WifiDirectBridge.initialize = $wifiOk")
@@ -225,15 +287,6 @@ class MainActivity : FlutterActivity() {
 
         // ============================================================
         // N3 (audit 2026-09-20) : politique d'attestation automatique.
-        // ============================================================
-        //   • APK signée avec la clé DEBUG Android → attestation SKIPPED.
-        //     Raison : la clé StrongBox a été générée avec un challenge
-        //     différent de SHA256(signature APK debug). Toute vérification
-        //     échouerait avec ChallengeMismatch → PanicPurge → kill.
-        //
-        //   • APK signée avec la clé RELEASE officielle → attestation ACTIVE.
-        //     Le challenge SHA256(signature APK release) sera correctement
-        //     comparé à la chaîne d'attestation StrongBox.
         // ============================================================
         val isDebugSigned = isSignedWithDebugKey()
         if (isDebugSigned) {
@@ -253,10 +306,12 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onDestroy() {
+        // P1 : Force l'OS à écraser les blocs libres après le départ de l'app.
+        try { aegisForceFstrim() } catch (_: Throwable) {}
+
         try { cameraProvider?.unbindAll() } catch (_: Throwable) {}
         try { aegis_release_surface() } catch (_: Throwable) {}
-        // P0-A.3a : arrêt du bridge BLE Mesh (dé-enregistre les canaux
-        // MethodChannel/EventChannel pour éviter les fuites mémoire).
+        // P0-A.3a : arrêt du bridge BLE Mesh
         try { bleMeshBridge?.destroy() } catch (_: Throwable) {}
         bleMeshBridge = null
         try { WifiDirectBridge.shutdown() } catch (_: Throwable) {}
@@ -291,10 +346,6 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    /**
-     * Arrête la capture caméra (débind tous les use cases).
-     * Appelée par Flutter quand l'utilisateur tape CAPTURER ou ANNULER.
-     */
     fun aegisStopHardwareCapture(): Int {
         return try {
             cameraProvider?.unbindAll()
@@ -314,10 +365,7 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         protectedConfirmation = ProtectedConfirmation(this)
 
-        // P0-A.3a (2026-10-11) : bridge BLE Mesh (squelette + permissions).
-        // Instancie les canaux MethodChannel (com.aegis/ble_mesh) et
-        // EventChannel (com.aegis/ble_mesh_events). Les méthodes sont
-        // des stubs pour l'instant (P0-A.3b/c/d les rempliront).
+        // P0-A.3a (2026-10-11) : bridge BLE Mesh
         bleMeshBridge = BleMeshBridge(this, flutterEngine.dartExecutor.binaryMessenger)
 
         // PlatformView : surface VRAM (BlindView).
@@ -346,11 +394,7 @@ class MainActivity : FlutterActivity() {
                                     Log.i(TAG, "Hardware secret OK (niveau=${hw.level})")
                                     result.success(hw.secret)
                                 } else {
-                                    result.error(
-                                        "TEE_ERROR",
-                                        "Taille secrète invalide: ${hw.secret.size} (attendu 32)",
-                                        null
-                                    )
+                                    result.error("TEE_ERROR", "Taille secrète invalide: ${hw.secret.size} (attendu 32)", null)
                                 }
                             }
                             is HardwareKeystore.HardwareSecretResult.Failure -> {
@@ -361,14 +405,11 @@ class MainActivity : FlutterActivity() {
                     }
 
                     "deriveMasterKey" -> {
-                        // Option 2 (audit 2026-09-20) : combine ROOT_KEY (StrongBox,
-                        // déjà stockée côté Rust) + vault PIN → master_key via HKDF-SHA256.
                         val pin = call.argument<String>("pin")
                         if (pin.isNullOrEmpty()) {
                             result.error("MASTER_ERROR", "PIN vide", null)
                             return@setMethodCallHandler
                         }
-
                         val rc = aegis_derive_and_set_master_key(pin)
                         if (rc == 0) {
                             Log.i(TAG, "Master key dérivée (HKDF-SHA256) — PIN combiné StrongBox")
@@ -380,9 +421,6 @@ class MainActivity : FlutterActivity() {
                     }
 
                     "isStrongBoxOperational" -> {
-                        // P0-A.1e (D42-bis) : vérification active StrongBox
-                        // pour Tor. Appelée depuis Dart au démarrage.
-                        // Rust refuse Tor si le résultat est false.
                         val available = HardwareKeystore.isStrongBoxOperational()
                         Log.i(TAG, "isStrongBoxOperational = $available")
                         result.success(available)
@@ -414,68 +452,46 @@ class MainActivity : FlutterActivity() {
             }
 
         // --- Canal Wi-Fi Direct (P0-A.2a) ---
-        // Manual pairing uniquement (D3). Pas d'auto-discovery.
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, WIFI_DIRECT_CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
-                    "isSupported" -> {
-                        val supported = WifiDirectBridge.isSupported(this)
-                        result.success(supported)
-                    }
-                    "getEphemeralName" -> {
-                        val name = WifiDirectBridge.getEphemeralName()
-                        result.success(name)
-                    }
-                    "getEphemeralPort" -> {
-                        val port = WifiDirectBridge.getEphemeralPort()
-                        result.success(port)
-                    }
-                    "getState" -> {
-                        val state = WifiDirectBridge.getState()
-                        result.success(state)
-                    }
+                    "isSupported" -> result.success(WifiDirectBridge.isSupported(this))
+                    "getEphemeralName" -> result.success(WifiDirectBridge.getEphemeralName())
+                    "getEphemeralPort" -> result.success(WifiDirectBridge.getEphemeralPort())
+                    "getState" -> result.success(WifiDirectBridge.getState())
                     "startDiscovery" -> {
                         val code = WifiDirectBridge.startDiscovery(null)
-                        if (code == 0) result.success(true)
-                        else result.error("DISCOVERY_ERROR", "code=$code", null)
+                        if (code == 0) result.success(true) else result.error("DISCOVERY_ERROR", "code=$code", null)
                     }
                     "stopDiscovery" -> {
                         val code = WifiDirectBridge.stopDiscovery()
-                        if (code == 0) result.success(true)
-                        else result.error("DISCOVERY_ERROR", "code=$code", null)
+                        if (code == 0) result.success(true) else result.error("DISCOVERY_ERROR", "code=$code", null)
                     }
                     "connectToPeer" -> {
                         val name = call.argument<String>("deviceName") ?: ""
                         val port = call.argument<Int>("peerPort") ?: 0
                         val code = WifiDirectBridge.connectToPeer(name, port)
-                        if (code == 0) result.success(true)
-                        else result.error("CONNECT_ERROR", "code=$code", null)
+                        if (code == 0) result.success(true) else result.error("CONNECT_ERROR", "code=$code", null)
                     }
                     "disconnect" -> {
                         val code = WifiDirectBridge.disconnect()
-                        if (code == 0) result.success(true)
-                        else result.error("DISCONNECT_ERROR", "code=$code", null)
+                        if (code == 0) result.success(true) else result.error("DISCONNECT_ERROR", "code=$code", null)
                     }
                     "closeFd" -> {
                         val rc = WifiDirectBridge.disconnect()
-                        if (rc == 0) result.success(true)
-                        else result.error("CLOSE_ERROR", "code=$rc", null)
+                        if (rc == 0) result.success(true) else result.error("CLOSE_ERROR", "code=$rc", null)
                     }
                     else -> result.notImplemented()
                 }
             }
 
         // --- EventChannel Wi-Fi Direct (P0-A.2b.2) ---
-        // Stream d'événements asynchrones (peers, connection, timeout).
         EventChannel(flutterEngine.dartExecutor.binaryMessenger, WIFI_DIRECT_EVENTS_CHANNEL)
             .setStreamHandler(object : EventChannel.StreamHandler {
                 override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
-                    Log.i(TAG, "Wi-Fi Direct EventChannel: onListen")
                     WifiDirectBridge.setEventSink(events)
                 }
-
                 override fun onCancel(arguments: Any?) {
-                    Log.i(TAG, "Wi-Fi Direct EventChannel: onCancel")
                     WifiDirectBridge.setEventSink(null)
                 }
             })
@@ -486,8 +502,7 @@ class MainActivity : FlutterActivity() {
                 when (call.method) {
                     "startNativeCamera" -> {
                         val code = aegisStartHardwareCapture()
-                        if (code == 0) result.success(0)
-                        else result.error("CAMERA_ERROR", "Code=$code", null)
+                        if (code == 0) result.success(0) else result.error("CAMERA_ERROR", "Code=$code", null)
                     }
                     "stopNativeCamera" -> {
                         val code = aegisStopHardwareCapture()
@@ -508,9 +523,6 @@ class MainActivity : FlutterActivity() {
             try {
                 cameraProvider = future.get()
 
-                // ─────────────────────────────────────────────────────
-                // Use case 1 : PREVIEW (aperçu live à l'écran)
-                // ─────────────────────────────────────────────────────
                 val previewView = getPreviewView()
                 if (previewView == null) {
                     Log.e(TAG, "startCameraInternal: pas de PreviewView attachée")
@@ -520,9 +532,6 @@ class MainActivity : FlutterActivity() {
                 val preview = Preview.Builder().build()
                 preview.setSurfaceProvider(previewView.surfaceProvider)
 
-                // ─────────────────────────────────────────────────────
-                // Use case 2 : IMAGE ANALYSIS (frames YUV → Rust)
-                // ─────────────────────────────────────────────────────
                 val imageAnalysis = ImageAnalysis.Builder()
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .build()
@@ -554,8 +563,8 @@ class MainActivity : FlutterActivity() {
                 cameraProvider?.bindToLifecycle(
                     this as LifecycleOwner,
                     CameraSelector.DEFAULT_BACK_CAMERA,
-                    preview,        // ← aperçu visible
-                    imageAnalysis   // ← capture en RAM
+                    preview,
+                    imageAnalysis
                 )
                 Log.i(TAG, "CameraX: Preview + ImageAnalysis liés")
             } catch (e: Exception) {
@@ -596,10 +605,6 @@ class MainActivity : FlutterActivity() {
     // =====================================================================
     // Callback permission caméra (filet de sécurité)
     // =====================================================================
-    //
-    // NOTE : permission_handler côté Dart gère désormais le dialog de
-    // permission AVANT d'ouvrir CameraCaptureScreen. Ce callback reste
-    // en filet de sécurité si un autre chemin déclenche requestPermissions.
 
     override fun onRequestPermissionsResult(
         requestCode: Int,
