@@ -13,20 +13,19 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-import 'translations.dart'; // IMPORT DU DICTIONNAIRE GLOBAL
+import 'translations.dart';
 import 'views/blind_viewer.dart';
-import 'views/camera_capture_screen.dart'; // ← AJOUTÉ
-import 'views/steganography_view.dart'; // NOUVEAU MODULE AJOUTÉ
-import 'widgets/aegis_keyboard.dart'; // Q3.11 : clavier custom anti-IME
+import 'views/camera_capture_screen.dart';
+import 'views/steganography_view.dart';
+import 'widgets/aegis_keyboard.dart';
 import 'models/session_vault.dart';
-import 'services/global_state.dart'; // ← FIX 1 : état partagé
-import 'keystore_bridge.dart'; // ← N1 (audit 20/09) : clé StrongBox + F6-C vault
+import 'services/global_state.dart';
+import 'keystore_bridge.dart';
 
-// NOTE : les déclarations `activeRamPin`, `globalSteganoRamBuffer` et
-// `isIntentPendingInDart` sont maintenant dans `services/global_state.dart`.
-// Ne PAS les redéclarer ici → conflit de symboles.
+// P0-A.8c.3
+import 'services/updater_service.dart';
+import 'views/updater_screen.dart';
 
-/// Contrôle d'intégrité binaire et signature APK via le noyau Rust
 void verifyApkSignatureOrBurn(String currentApkSha256) {
   try {
     final DynamicLibrary aegisLib = Platform.isAndroid
@@ -45,7 +44,6 @@ void verifyApkSignatureOrBurn(String currentApkSha256) {
   }
 }
 
-/// Validation FFI de la clé de licence client auprès du noyau Rust
 bool verifyLicenseKeyFfi(String licenseKey) {
   try {
     final DynamicLibrary aegisLib = Platform.isAndroid
@@ -65,7 +63,6 @@ bool verifyLicenseKeyFfi(String licenseKey) {
   }
 }
 
-/// Ingestion tactique Zero-Disk des fichiers (Photos, Vidéos, Documents) en RAM
 Future<bool> ingestFileZeroDisk(String filePath) async {
   try {
     final DynamicLibrary aegisLib = Platform.isAndroid
@@ -87,7 +84,6 @@ Future<bool> ingestFileZeroDisk(String filePath) async {
   }
 }
 
-/// Noyage stéganographique FFI dans un poème
 String drownKeyFfi(String keyToDrown, String poem) {
   try {
     final DynamicLibrary aegisLib = Platform.isAndroid
@@ -123,7 +119,6 @@ String drownKeyFfi(String keyToDrown, String poem) {
   }
 }
 
-/// Extraction stéganographique FFI depuis un poème
 String extractKeyFfi(String stegoText) {
   try {
     final DynamicLibrary aegisLib = Platform.isAndroid
@@ -206,16 +201,6 @@ void main() async {
 
   await deploySnowflake();
 
-  // ============================================================
-  // F6-C (2026-09-30) : configuration du dossier vault (Rust).
-  //
-  // Cette étape DOIT précéder tout appel vault (isInitialized,
-  // initializeMasterPin, unlockSession) et être dans le même
-  // contexte que LockScreen (avant runApp).
-  //
-  // Le dossier utilisé est `getApplicationDocumentsDirectory()`,
-  // sous-dossier private du sandbox Android.
-  // ============================================================
   try {
     final docsDir = await getApplicationDocumentsDirectory();
     final dirOk = KeystoreBridge.vaultSetDir(docsDir.path);
@@ -227,20 +212,6 @@ void main() async {
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   runApp(const AegisApp());
 
-  // ============================================================
-  // N1 (audit 2026-09-20) : initialisation de la clé racine
-  // matérielle (StrongBox/TEE) via le canal `com.aegis/keystore`.
-  //
-  // Flux :
-  //   Dart  → MethodChannel.getHardwareSecret
-  //   Kotlin → HardwareKeystore.getHardwareSecret() (StrongBox strict)
-  //   Kotlin → renvoie 32 octets
-  //   Dart  → FFI aegis_set_hardware_secret(ptr, 32)
-  //   Rust  → HardwareKeystore::set_root_key() → ROOT_KEY
-  //
-  // Sans cet appel, `ROOT_KEY` reste `None` côté Rust et toute
-  // crypto échoue avec "Root key non initialisée".
-  // ============================================================
   WidgetsBinding.instance.addPostFrameCallback((_) async {
     try {
       final ok = await KeystoreBridge.initializeHardwareSecurity(
@@ -251,9 +222,6 @@ void main() async {
       debugPrint("AEGIS: initializeHardwareSecurity a échoué: $e");
     }
 
-    // P0-A.1e (D42-bis) : vérification active StrongBox pour Tor.
-    // Résultat transmis à Rust via FFI. Si false → Tor désactivé,
-    // mode dégradé local only (D62, Wi-Fi Direct + BLE).
     try {
       final torOk = await KeystoreBridge.setTorStrongboxAvailable();
       debugPrint("AEGIS: setTorStrongboxAvailable = $torOk");
@@ -341,16 +309,12 @@ class _AegisAppState extends State<AegisApp> {
         colorScheme: const ColorScheme.dark(primary: brandYellow),
         cardColor: const Color(0xFF141416),
       ),
-      // CORRECTION CRITIQUE : Le wrapper englobe TOUTES les routes, il ne sera plus détruit
       builder: (context, child) => UserInactivityWrapper(child: child!),
       home: const LockScreen(),
     );
   }
 }
 
-// -----------------------------------------------------------------------------
-// INTÉGRATION WIDGETSBINDINGOBSERVER (CYCLE DE VIE OS & VERROUILLAGE D'URGENCE)
-// -----------------------------------------------------------------------------
 class UserInactivityWrapper extends StatefulWidget {
   final Widget child;
   const UserInactivityWrapper({super.key, required this.child});
@@ -362,20 +326,14 @@ class UserInactivityWrapper extends StatefulWidget {
 class _UserInactivityWrapperState extends State<UserInactivityWrapper> with WidgetsBindingObserver {
   Timer? _inactivityTimer;
 
-  // FIX 4 : utilise `isExternalFlowActive()` (compteur + flag booléen)
-  // au lieu du flag brut `isIntentPendingInDart`.
-
   void _lockAndPurge() {
     if (isExternalFlowActive()) return;
 
-    // 1. Purge FFI immédiate de la mémoire RAM
     activeRamPin = "";
     _executeEmergencyFfiPurge();
 
-    // 2. Écrase la mémoire visuelle Flutter (Snapshot OS) vers le code PIN
     runApp(const AegisApp());
 
-    // 3. Fermeture instantanée et brutale à la microseconde
     SystemChannels.platform.invokeMethod('SystemNavigator.pop');
     exit(0);
   }
@@ -383,7 +341,6 @@ class _UserInactivityWrapperState extends State<UserInactivityWrapper> with Widg
   void _resetTimer() {
     if (isExternalFlowActive()) return;
     _inactivityTimer?.cancel();
-    // Sécurité accrue : verrouillage après 1 minute d'inactivité tactile
     _inactivityTimer = Timer(const Duration(minutes: 1), _lockAndPurge);
   }
 
@@ -405,20 +362,6 @@ class _UserInactivityWrapperState extends State<UserInactivityWrapper> with Widg
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (isExternalFlowActive()) return;
 
-    // ────────────────────────────────────────────────────────────────
-    // CORRECTIF : ne purge QUE sur un vrai arrière-plan.
-    //
-    //   • `inactive` : transition transitoire — déclenchée par TOUT dialog
-    //     OS (permission caméra, file picker, notification, appel entrant,
-    //     aperçu CameraX). L'app est encore visible → NE PAS purger.
-    //
-    //   • `hidden`   : équivalent API 30+ de `inactive` → NE PAS purger.
-    //
-    //   • `paused`   : arrière-plan réel (bouton home, changement d'app,
-    //     écran verrouillé) → PURGER.
-    //
-    //   • `detached` : vue Flutter détruite (app fermée) → PURGER.
-    // ────────────────────────────────────────────────────────────────
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
       _lockAndPurge();
@@ -434,7 +377,6 @@ class _UserInactivityWrapperState extends State<UserInactivityWrapper> with Widg
     );
   }
 }
-// -----------------------------------------------------------------------------
 
 class AegisLogoWidget extends StatelessWidget {
   const AegisLogoWidget({super.key});
@@ -483,7 +425,6 @@ class _LockScreenState extends State<LockScreen> {
   bool _isLoading = false;
   bool? _isVaultInitialized;
 
-  // Indicateurs de force du mot de passe (mode création uniquement).
   PasswordStrength? _passwordStrength;
   String? _passwordError;
 
@@ -491,8 +432,6 @@ class _LockScreenState extends State<LockScreen> {
   void initState() {
     super.initState();
     _checkVaultState();
-
-    // Écoute la saisie du PIN pour calculer la force en temps réel.
     _pinController.addListener(_onPinChanged);
   }
 
@@ -577,7 +516,6 @@ class _LockScreenState extends State<LockScreen> {
     setState(() { _isLoading = true; });
 
     if (_isVaultInitialized == false) {
-      // Validation du mot de passe fort AVANT tout traitement.
       final pwdError = PasswordValidator.validate(pin);
       if (pwdError != null) {
         setState(() { _isLoading = false; });
@@ -600,8 +538,6 @@ class _LockScreenState extends State<LockScreen> {
         return;
       }
 
-      // F6-C : initializeMasterPin écrit vault.json (verifier HMAC).
-      // Il dérive aussi la MASTER_KEY en interne (HKDF ROOT_KEY||PIN).
       final success = await _vault.initializeMasterPin(pin);
       if (!mounted) return;
 
@@ -612,12 +548,6 @@ class _LockScreenState extends State<LockScreen> {
         return;
       }
 
-      // ============================================================
-      // Option 2 (audit 2026-09-20) : dérivation de la master_key.
-      // Combine la ROOT_KEY StrongBox (déjà en mémoire Rust) avec le PIN.
-      // Note : `vaultInit` a déjà dérivé la MASTER_KEY en interne,
-      // cet appel est idempotent (même ROOT_KEY + même PIN → même MK).
-      // ============================================================
       final masterOk = await KeystoreBridge.deriveMasterKey(pin);
       if (!mounted) return;
 
@@ -642,15 +572,10 @@ class _LockScreenState extends State<LockScreen> {
       return;
     }
 
-    // ----- Vault déjà initialisé : PIN tapé pour déverrouiller -----
     final session = await _vault.unlockSession(pin);
     if (!mounted) return;
 
     if (session.type == VaultSessionType.real) {
-      // ============================================================
-      // Mode REAL : on dérive la master_key avec le PIN saisi.
-      // Le mode decoy n'appelle PAS deriveMasterKey (pas de fuite timing).
-      // ============================================================
       final masterOk = await KeystoreBridge.deriveMasterKey(pin);
       if (!mounted) return;
 
@@ -674,7 +599,6 @@ class _LockScreenState extends State<LockScreen> {
       return;
     }
 
-    // ----- Mode DECOY : navigation sans dérive de clé -----
     _pinController.clear();
     setState(() { _isLoading = false; });
     Navigator.pushReplacement(
@@ -763,9 +687,6 @@ class _LockScreenState extends State<LockScreen> {
                   ),
                   const SizedBox(height: 12),
                 ],
-                // Q3.11 (2026-09-26) : remplacement du TextField système par clavier custom.
-                // Le PIN ne transite plus par le clavier système (anti-keylogger IME,
-                // anti-telemetry Samsung Keyboard / Gboard).
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
@@ -794,7 +715,6 @@ class _LockScreenState extends State<LockScreen> {
                   brandYellow: buttonColor,
                 ),
 
-                // Indicateur de force (visible uniquement en mode création).
                 if (_isVaultInitialized == false && _passwordStrength != null) ...[
                   const SizedBox(height: 8),
                   Row(
@@ -913,24 +833,35 @@ class _MainDashboardState extends State<MainDashboard> {
   int _currentIndex = 0;
   final TextEditingController _recipientController = TextEditingController();
   final TextEditingController _chatController = TextEditingController();
+  late final UpdaterService _updaterService;
 
   String _networkMode = "t_auto";
   String _connectedPeer = "";
   final String _myEphemeralKey = "AEGIS-P2P-v2.2-GA-4F8B12E9903A7C12D";
   final List<String> _chatMessages = [];
 
+  @override
+  void initState() {
+    super.initState();
+    _updaterService = UpdaterService(currentVersion: '3.1.0');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _updaterService.check();
+    });
+  }
+
+  @override
+  void dispose() {
+    _updaterService.dispose();
+    _recipientController.dispose();
+    _chatController.dispose();
+    super.dispose();
+  }
+
   void _instantRamPurge() {
     _executeEmergencyFfiPurge();
     activeRamPin = "";
     SystemChannels.platform.invokeMethod('SystemNavigator.pop');
     exit(0);
-  }
-
-  @override
-  void dispose() {
-    _recipientController.dispose();
-    _chatController.dispose();
-    super.dispose();
   }
 
   Future<void> _pickFileZeroDisk() async {
@@ -1240,7 +1171,6 @@ class _MainDashboardState extends State<MainDashboard> {
         children: [
           const Icon(Icons.folder_special, size: 80, color: Colors.white12),
           const SizedBox(height: 24),
-
           ElevatedButton.icon(
             onPressed: _startCameraFromVault,
             style: ElevatedButton.styleFrom(
@@ -1254,9 +1184,7 @@ class _MainDashboardState extends State<MainDashboard> {
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
             ),
           ),
-
           const SizedBox(height: 12),
-
           ElevatedButton.icon(
             onPressed: _pickFileZeroDisk,
             style: ElevatedButton.styleFrom(
@@ -1270,7 +1198,6 @@ class _MainDashboardState extends State<MainDashboard> {
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
             ),
           ),
-
           const SizedBox(height: 16),
           Text(
             AppTranslations.get(context, 'vault_ingestion_note'),
@@ -1298,12 +1225,19 @@ class _MainDashboardState extends State<MainDashboard> {
           const SizedBox(width: 8),
         ],
       ),
-      body: IndexedStack(
-        index: _currentIndex,
+      body: Column(
         children: [
-          _buildNetworkTab(),
-          _buildChatTab(),
-          _buildVaultTab(),
+          UpdaterBanner(service: _updaterService),
+          Expanded(
+            child: IndexedStack(
+              index: _currentIndex,
+              children: [
+                _buildNetworkTab(),
+                _buildChatTab(),
+                _buildVaultTab(),
+              ],
+            ),
+          ),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(

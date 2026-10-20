@@ -9,6 +9,8 @@ import 'package:flutter/material.dart';
 ///   • Layout randomisé à chaque appel pour résister à l'épaule-surfing.
 ///   • Aucune suggestion / autocomplete / autocorrect.
 ///   • Bouton coller désactivé — le PIN ne vient jamais du presse-papier.
+///   • Support multi-alphabets (Latin, Cyrillique, Arabe) avec bascule
+///     dynamique.
 class AegisKeyboard extends StatefulWidget {
   final TextEditingController controller;
   final VoidCallback? onInput;
@@ -28,12 +30,24 @@ class AegisKeyboard extends StatefulWidget {
 }
 
 class _AegisKeyboardState extends State<AegisKeyboard> {
-  static const List<String> _row1 = ['q','w','e','r','t','y','u','i','o','p'];
-  static const List<String> _row2 = ['a','s','d','f','g','h','j','k','l'];
-  static const List<String> _row3 = ['z','x','c','v','b','n','m'];
+  // Layouts source
+  static const List<String> _row1Latin = ['q','w','e','r','t','y','u','i','o','p'];
+  static const List<String> _row2Latin = ['a','s','d','f','g','h','j','k','l'];
+  static const List<String> _row3Latin = ['z','x','c','v','b','n','m'];
+
+  static const List<String> _row1Cyr = ['й','ц','у','к','е','н','г','ш','щ','з','х'];
+  static const List<String> _row2Cyr = ['ф','ы','в','а','п','р','о','л','д','ж'];
+  static const List<String> _row3Cyr = ['я','ч','с','м','и','т','ь','б','ю'];
+
+  static const List<String> _row1Ara = ['ض','ص','ث','ق','ف','غ','ع','ه','خ','ح'];
+  static const List<String> _row2Ara = ['ش','س','ي','ب','ل','ا','ت','ن','م','ك'];
+  static const List<String> _row3Ara = ['ظ','ط','ذ','د','ز','ر','و','ة','ى'];
+
   static const List<String> _row4num = ['1','2','3','4','5','6','7','8','9','0'];
   static const List<String> _row4sym = ['.','-','_','@','#','!','?','&','*','+'];
 
+  // 0 = Latin, 1 = Cyrillique, 2 = Arabe
+  int _alphabetMode = 0;
   late List<String> _r1, _r2, _r3, _r4;
   bool _showSymbols = false;
   bool _showPassword = false;
@@ -47,9 +61,19 @@ class _AegisKeyboardState extends State<AegisKeyboard> {
 
   void _shuffleLayout() {
     final rng = Random.secure();
-    _r1 = List.of(_row1)..shuffle(rng);
-    _r2 = List.of(_row2)..shuffle(rng);
-    _r3 = List.of(_row3)..shuffle(rng);
+    if (_alphabetMode == 0) {
+      _r1 = List.of(_row1Latin)..shuffle(rng);
+      _r2 = List.of(_row2Latin)..shuffle(rng);
+      _r3 = List.of(_row3Latin)..shuffle(rng);
+    } else if (_alphabetMode == 1) {
+      _r1 = List.of(_row1Cyr)..shuffle(rng);
+      _r2 = List.of(_row2Cyr)..shuffle(rng);
+      _r3 = List.of(_row3Cyr)..shuffle(rng);
+    } else {
+      _r1 = List.of(_row1Ara)..shuffle(rng);
+      _r2 = List.of(_row2Ara)..shuffle(rng);
+      _r3 = List.of(_row3Ara)..shuffle(rng);
+    }
     _r4 = List.of(_showSymbols ? _row4sym : _row4num)..shuffle(rng);
   }
 
@@ -94,6 +118,13 @@ class _AegisKeyboardState extends State<AegisKeyboard> {
   void _onToggleShowPassword() {
     setState(() {
       _showPassword = !_showPassword;
+    });
+  }
+
+  void _onToggleAlphabet() {
+    setState(() {
+      _alphabetMode = (_alphabetMode + 1) % 3;
+      _shuffleLayout();
     });
   }
 
@@ -202,6 +233,11 @@ class _AegisKeyboardState extends State<AegisKeyboard> {
           _row(_r4),
           Row(
             children: [
+              // Bascule d'alphabet
+              _key('🌐', flex: 1.5, bgColor: Colors.grey[800],
+                  onTap: _onToggleAlphabet,
+                  child: const Icon(Icons.language,
+                      color: Colors.white, size: 18)),
               _key('?123', flex: 2, bgColor: Colors.grey[800],
                   onTap: _onToggleSymbols,
                   child: Text(
@@ -212,7 +248,7 @@ class _AegisKeyboardState extends State<AegisKeyboard> {
                       fontWeight: FontWeight.bold,
                     ),
                   )),
-              _key(' ', flex: 6, bgColor: Colors.grey[800]),
+              _key(' ', flex: 4, bgColor: Colors.grey[800]),
               _key('CLR', flex: 2, bgColor: Colors.orange[800],
                   onTap: _onClear,
                   child: const Text(
