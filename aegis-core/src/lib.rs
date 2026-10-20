@@ -684,7 +684,13 @@ pub unsafe extern "C" fn aegis_verify_license_key(license_ptr: *const c_char) ->
         Err(_) => return -8,
     };
 
-    if verifying_key.verify(order_num.as_bytes(), &signature).is_ok() {
+    // P0-A.8d.1 — séparation de domaine (anti cross-usage avec manifestes).
+    // Le payload signé côté generate_license.py est b"LICENSE:v1:" || order_num.
+    let mut signed_msg = Vec::with_capacity(crate::updater::LICENSE_DOMAIN.len() + order_num.len());
+    signed_msg.extend_from_slice(crate::updater::LICENSE_DOMAIN);
+    signed_msg.extend_from_slice(order_num.as_bytes());
+
+    if verifying_key.verify(&signed_msg, &signature).is_ok() {
         0
     } else {
         -9
