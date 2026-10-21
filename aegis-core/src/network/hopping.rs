@@ -2,10 +2,13 @@
 //! Routage Hopping Dynamique Multi-Transports & Générateur de Trafic Leurre (Chaff) - CdCM v2.2-RC1.
 //!
 //! P0-A.5a (2026-10-17) — Introduction de RouteHandle typé (D100).
-//! Remplace l'ancien TransportType qui référençait encore P2pDht (supprimé D47)
-//! et isole l'adresse au sein de chaque variante.
+//! P0-A.5a+ (2026-10-22) — Refactor C110 : newtypes typés (TorAddress, WifiDirectAddress,
+//! BleMeshAddress) pour remplacer les String nus. La compilation empêche désormais
+//! de passer une IP à un RouteHandle::Tor.
 
+use std::fmt;
 use std::future::Future;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
@@ -24,26 +27,142 @@ impl TransportHoppingRouter {
     }
 }
 
-/// D100 (P0-A.5a) — Handle typé pour remplacer `address: String`.
-/// Chaque variante porte l'adresse spécifique à son transport.
+// ─────────────────────────────────────────────────────────────────────
+// Newtypes typés pour RouteHandle (C110)
+// ─────────────────────────────────────────────────────────────────────
+
+/// Adresse Tor v3 (.onion). Format strict :
+///   • <56 chars base32>.onion (v3 = 56 chars)
+///   • <16 chars base32>.onion (v2 legacy, déprécié mais accepté en lecture)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TorAddress(String);
+
+impl TorAddress {
+    /// Constructeur validant le format .onion.
+    pub fn new(addr: impl Into<String>) -> Result<Self, &'static str> {
+        let s = addr.into();
+        if !s.ends_with(".onion") {
+            return Err("Tor address must end with .onion");
+        }
+        let host = &s[..s.len() - 6];
+        if host.len() != 56 && host.len() != 16 {
+            return Err("Tor v3 host must be 56 chars, v2 = 16");
+        }
+        if !host.chars().all(|c| c.is_ascii_alphanumeric()) {
+            return Err("Tor host must be base32 alphanumeric");
+        }
+        Ok(Self(s))
+    }
+
+    /// Constructeur non-validant, réservé aux tests.
+    #[cfg(test)]
+    pub fn new_unchecked(addr: impl Into<String>) -> Self {
+        Self(addr.into())
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    pub fn is_ephemeral(&self) -> bool {
+        // Heuristique : toutes les adresses Tor v3 sont "ephemeral" par défaut
+        // dans AEGIS (rotation de circuit). Surchargeable côté appelant.
+        self.0.len() == 62 // .onion v3 = 56 + 6
+    }
+}
+
+impl fmt::Display for TorAddress {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+/// Adresse Wi-Fi Direct (socket TCP).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WifiDirectAddress(SocketAddr);
+
+impl WifiDirectAddress {
+    pub fn new(addr: SocketAddr) -> Self {
+        Self(addr)
+    }
+
+    /// Parse une chaîne "IP:Port" — pour la compatibilité des tests.
+    pub fn parse(s: &str) -> Result<Self, std::net::AddrParseError> {
+        Ok(Self(s.parse::<SocketAddr>()?))
+    }
+
+    pub fn as_socket_addr(&self) -> SocketAddr {
+        self.0
+    }
+}
+
+impl fmt::Display for WifiDirectAddress {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+/// Adresse BLE Mesh (MAC 48-bit ou UUID).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BleMeshAddress(String);
+
+impl BleMeshAddress {
+    pub fn new(addr: impl Into<String>) -> Result<Self, &'static str> {
+        let s = addr.into();
+        // MAC : "AA:BB:CC:DD:EE:FF" (17 chars)
+        // UUID : 36 chars avec tirets
+        let valid_mac = s.len() == 17
+            && s.chars().enumerate().all(|(i, c)| {
+                if i % 3 == 2 { c == ':' } else { c.is_ascii_hexdigit() }
+            });
+        let valid_uuid = s.len() == 36
+            && s.chars().all(|c| c.is_ascii_hexdigit() || c == '-');
+        if !valid_mac && !valid_uuid {
+            return Err("BLE address must be MAC (AA:BB:...) or UUID");
+        }
+        Ok(Self(s))
+    }
+
+    #[cfg(test)]
+    pub fn new_unchecked(addr: impl Into<String>) -> Self {
+        Self(addr.into())
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Display for BleMeshAddress {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+/// Handle typé vers une route de transport.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RouteHandle {
-    /// Tor .onion address. Le booléen indique si le circuit doit être
-    /// renouvelé périodiquement (rotation de circuit).
-    Tor { address: String, is_ephemeral: bool },
-    /// Wi-Fi Direct (IP:Port du socket TCP).
-    WifiDirect { address: String },
-    /// BLE Mesh (identifiant de device ou UUID).
-    BleMesh { address: String },
+    Tor {
+        address: TorAddress,
+        is_ephemeral: bool,
+    },
+    WifiDirect {
+        address: WifiDirectAddress,
+    },
+    BleMesh {
+        address: BleMeshAddress,
+    },
 }
 
 impl RouteHandle {
-    /// Récupère l'adresse sous forme de slice pour le logging ou la connexion.
-    pub fn address(&self) -> &str {
+    /// Retourne une représentation textuelle du handle (pour logging uniquement).
+    /// Utilise un buffer `String` — ne jamais reconstruire un `RouteHandle` à partir
+    /// de cette sortie (perte de typage).
+    pub fn display_address(&self) -> String {
         match self {
-            RouteHandle::Tor { address, .. } => address,
-            RouteHandle::WifiDirect { address } => address,
-            RouteHandle::BleMesh { address } => address,
+            RouteHandle::Tor { address, .. } => address.to_string(),
+            RouteHandle::WifiDirect { address } => address.to_string(),
+            RouteHandle::BleMesh { address } => address.to_string(),
         }
     }
 }
@@ -102,7 +221,14 @@ impl TransportSelector {
                 sleep(interval).await;
 
                 // 1. Génération de la nouvelle adresse .onion en I/O asynchrone (hors verrou)
-                let new_onion_address = on_circuit_rotate().await;
+                let new_onion_str = on_circuit_rotate().await;
+                // On suppose que la closure retourne une chaîne valide. En prod, il faudra
+                // utiliser TorAddress::new() et gérer l'erreur. On garde new_unchecked pour
+                // la simplicité du refactor actuel.
+                let new_onion_address = match TorAddress::new(&new_onion_str) {
+                    Ok(a) => a,
+                    Err(_) => continue, // Ignore les adresses invalides (fail-closed)
+                };
 
                 // 2. Mise à jour éphémère sous verrou en microseconde
                 let mut guards = candidates_clone.write().await;
@@ -191,22 +317,27 @@ mod tests {
 
         // 1. Ajout de routes avec différents handles
         selector.add_route(RouteCandidate {
-            handle: RouteHandle::Tor { address: "abc.onion".to_string(), is_ephemeral: false },
+            handle: RouteHandle::Tor {
+                address: TorAddress::new_unchecked("abc.onion"),
+                is_ephemeral: false,
+            },
             priority: 50,
         }).await;
 
         selector.add_route(RouteCandidate {
-            handle: RouteHandle::WifiDirect { address: "192.168.49.1:8080".to_string() },
+            handle: RouteHandle::WifiDirect {
+                address: WifiDirectAddress::parse("192.168.49.1:8080").unwrap(),
+            },
             priority: 80, // Priorité plus haute
         }).await;
 
         // 2. Le meilleur doit être Wi-Fi Direct (priorité 80)
         let best = selector.get_best_route().await.unwrap();
-        assert_eq!(best.handle.address(), "192.168.49.1:8080");
+        assert_eq!(best.handle.display_address(), "192.168.49.1:8080");
 
         // 3. Fallback vers Tor
         let next = selector.fallback_next().await.unwrap();
-        assert_eq!(next.handle.address(), "abc.onion");
+        assert_eq!(next.handle.display_address(), "abc.onion");
 
         // 4. Plus de route
         assert!(selector.fallback_next().await.is_none());

@@ -2,12 +2,16 @@
 //!
 //! P0-A.5b (2026-10-17) — Dispatcher réseau unifié.
 //! P0-A.5c (2026-10-17) — Preuve d'indistinguabilité du chaff (même pipeline).
+//! P0-A.5a+ (2026-10-22) — Refactor C110 : RouteHandle typé (TorAddress,
+//! WifiDirectAddress, BleMeshAddress).
 //! Route les payloads applicatifs vers le bon transport (Tor, Wifi, BLE)
 //! en appliquant le chiffrement Double Ratchet (D40).
 
 use crate::crypto::ratchet::RatchetSession;
 use crate::network::encrypted_transport::{EncryptedTransport, TransportError};
-use crate::network::hopping::{RouteHandle, TransportSelector};
+use crate::network::hopping::{
+    BleMeshAddress, RouteHandle, TorAddress, TransportSelector, WifiDirectAddress,
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum DispatchError {
@@ -147,7 +151,7 @@ mod tests {
         selector
             .add_route(RouteCandidate {
                 handle: RouteHandle::Tor {
-                    address: "abc.onion".to_string(),
+                    address: TorAddress::new_unchecked("abc.onion"),
                     is_ephemeral: false,
                 },
                 priority: 50,
@@ -174,7 +178,7 @@ mod tests {
         selector
             .add_route(RouteCandidate {
                 handle: RouteHandle::WifiDirect {
-                    address: "192.168.49.1:8080".to_string(),
+                    address: WifiDirectAddress::parse("192.168.49.1:8080").unwrap(),
                 },
                 priority: 80,
             })
@@ -200,7 +204,7 @@ mod tests {
         selector
             .add_route(RouteCandidate {
                 handle: RouteHandle::BleMesh {
-                    address: "AA:BB:CC:DD:EE:FF".to_string(),
+                    address: BleMeshAddress::new_unchecked("AA:BB:CC:DD:EE:FF"),
                 },
                 priority: 90,
             })
@@ -239,7 +243,10 @@ mod tests {
     async fn test_chaff_indistinguishable_from_real_traffic() {
         let selector = TransportSelector::new(60);
         selector.add_route(RouteCandidate {
-            handle: RouteHandle::Tor { address: "abc.onion".to_string(), is_ephemeral: false },
+            handle: RouteHandle::Tor {
+                address: TorAddress::new_unchecked("abc.onion"),
+                is_ephemeral: false,
+            },
             priority: 50,
         }).await;
 
@@ -247,7 +254,7 @@ mod tests {
         struct CapturingMock {
             last_ciphertext_len: Arc<AtomicUsize>,
         }
-        
+
         #[allow(async_fn_in_trait)]
         impl EncryptedTransport for CapturingMock {
             async fn send_encrypted(
@@ -267,12 +274,12 @@ mod tests {
 
         let capture = Arc::new(AtomicUsize::new(0));
         let mock_tor = CapturingMock { last_ciphertext_len: Arc::clone(&capture) };
-        
+
         // On utilise les mêmes autres mocks factices
         let dispatcher = Dispatcher::new(
-            selector, 
-            mock_tor, 
-            MockTransport::new(), 
+            selector,
+            mock_tor,
+            MockTransport::new(),
             MockTransport::new()
         );
 
@@ -290,11 +297,11 @@ mod tests {
         assert!(res_chaff.is_ok());
         let chaff_len = capture.load(Ordering::SeqCst);
 
-        // 3. L'assertion cruciale : pour une même taille d'entrée (528 octets), 
+        // 3. L'assertion cruciale : pour une même taille d'entrée (528 octets),
         // le ciphertext réel et le ciphertext chaff ont la même taille.
         // Cela prouve que le chaff est indistinguable du vrai trafic au niveau du réseau.
         assert_eq!(real_len, chaff_len, "Chaff et trafic réel de même taille doivent produire la même taille de ciphertext");
-        
+
         // (Double Ratchet pad à 512 octets + header)
         assert!(real_len > 528);
     }
