@@ -97,7 +97,7 @@ jobs:
           retention-days: 7
 
   # ============================================================
-  # JOB 3bis — Vérification des symboles JNI (C64/C65)
+  # JOB 3bis — Vérification des symboles JNI (C64/C65) et FFI C ABI (C79)
   # ============================================================
   # Contexte :
   #   Le 13/10/2026, un audit a révélé que 6 FFI appelées depuis
@@ -111,7 +111,11 @@ jobs:
   #
   # P0-A.3e.2b.1b (2026-10-16) : ajout des 4 symboles
   #   aegis_ble_handshake_* (start_initiator, start_responder,
-  #   is_complete, reset). Total : 18 symboles.
+  #   is_complete, reset). Total : 18 symboles JNI.
+  #
+  # C79 (2026-10-21) : ajout de la vérification des FFI C ABI
+  #   (Dart DynamicLibrary.lookupFunction) pour éviter les régressions
+  #   silencieuses sur les exports appelés depuis Dart.
   # ============================================================
   jni-symbols-verification:
     name: JNI Symbol Verification
@@ -174,6 +178,47 @@ jobs:
             exit 1
           fi
           echo "All JNI symbols present."
+
+      # C79 : Vérification des FFI C ABI (Dart DynamicLibrary.lookupFunction)
+      - name: Verify FFI C ABI symbols
+        run: |
+          SO=$(find /tmp/aegis-so -name "libaegis_core.so" | head -n1)
+          if [ -z "$SO" ]; then
+            echo "ERROR: libaegis_core.so introuvable dans /tmp/aegis-so/"
+            exit 1
+          fi
+          echo "Checking FFI C ABI symbols in $SO"
+          SYMBOLS=$(nm -D --defined-only "$SO")
+          
+          MISSING=0
+          for SYM in \
+            "aegis_verify_update_signature" \
+            "aegis_vault_set_dir" \
+            "aegis_vault_is_initialized" \
+            "aegis_vault_init" \
+            "aegis_vault_unlock" \
+            "aegis_vault_wipe" \
+            "aegis_ed25519_sign" \
+            "aegis_ed25519_verify" \
+            "aegis_ed25519_public_key" \
+            "aegis_ed25519_fingerprint" \
+            "aegis_tor_set_strongbox_available" \
+            "aegis_wifi_direct_set_fd" \
+            "aegis_verify_license_key" \
+          ; do
+            if echo "$SYMBOLS" | grep -qE " T $SYM$"; then
+              echo "✓ $SYM"
+            else
+              echo "✗ MISSING: $SYM"
+              MISSING=$((MISSING + 1))
+            fi
+          done
+
+          if [ "$MISSING" -gt 0 ]; then
+            echo "ERROR: $MISSING FFI C ABI symbol(s) missing"
+            exit 1
+          fi
+          echo "All FFI C ABI symbols present."
 
   # ============================================================
   # JOB 4 — Preuve mmap/mprotect (Valgrind sur Linux natif)

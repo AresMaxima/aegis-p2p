@@ -47,17 +47,6 @@ audit_private.key
 aegis-core/coverage-report/
 aegis-core/llvm-cov.toml
 
-# 7. ARTIFACTS DE BENCHMARK ET RAPPORTS
-*.jpeg
-*.png
-*.pdf
-*.docx
-*.zip
-*.csv
-*.txt
-aegis-core/coverage-report/
-aegis-core/llvm-cov.toml
-
 # ============================================================
 # 8. FIX 26/09/2026 — nettoyage pre-commit v3.0
 # ============================================================
@@ -92,3 +81,10 @@ translations_before_mojibake_fix.dart
 
 # Clone OSS-Fuzz (repo tiers Google, pas AEGIS)
 oss-fuzz/
+
+# ============================================================
+# 10. EXCEPTIONS (FINDING C103)
+# ============================================================
+
+# Autoriser explicitement les outils Python de signature (malgré *.txt)
+!tools/requirements.txt

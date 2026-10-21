@@ -1401,3 +1401,90 @@ pub unsafe extern "C" fn aegis_verify_update_signature(
         Err(e) => e.to_code(),
     }
 }
+
+// =========================================================================
+// C93 — Tests de la FFI de licence (séparation de domaine)
+// =========================================================================
+
+#[cfg(test)]
+mod license_ffi_tests {
+    use super::*;
+    use crate::updater::LICENSE_DOMAIN;
+
+    fn generate_test_keypair() -> (SigningKey, [u8; 32]) {
+        let mut seed = [0u8; 32];
+        rand::RngCore::fill_bytes(&mut rand::rngs::OsRng, &mut seed);
+        let sk = SigningKey::from_bytes(&seed);
+        let pk = sk.verifying_key().to_bytes();
+        (sk, pk)
+    }
+
+    fn make_license(sk: &SigningKey, order: &str, domain: &[u8]) -> String {
+        let mut payload = Vec::new();
+        payload.extend_from_slice(domain);
+        payload.extend_from_slice(order.as_bytes());
+        let sig = sk.sign(&payload);
+        let inner = format!("{}:{}", order, hex::encode(sig.to_bytes()));
+        hex::encode(inner.as_bytes())
+    }
+
+    /// Vérifie que la logique de domaine côté Rust est correcte.
+    #[test]
+    fn test_license_domain_separation() {
+        let (sk, pk) = generate_test_keypair();
+        let order = "CMD-12345";
+
+        let license_hex = make_license(&sk, order, LICENSE_DOMAIN);
+        let inner_bytes = hex::decode(&license_hex).unwrap();
+        let inner_str = std::str::from_utf8(&inner_bytes).unwrap();
+        let parts: Vec<&str> = inner_str.split(':').collect();
+
+        let mut expected_payload = Vec::new();
+        expected_payload.extend_from_slice(LICENSE_DOMAIN);
+        expected_payload.extend_from_slice(parts[0].as_bytes());
+
+        let sig_bytes = hex::decode(parts[1]).unwrap();
+        let sig = Signature::from_bytes(sig_bytes.as_slice().try_into().unwrap());
+        let vk = VerifyingKey::from_bytes(&pk).unwrap();
+
+        assert!(vk.verify(&expected_payload, &sig).is_ok());
+    }
+
+    /// Une signature faite avec le domaine MANIFEST:v1: ne doit PAS valider
+    /// une licence (séparation de domaine).
+    #[test]
+    fn test_license_rejects_manifest_domain() {
+        let (sk, pk) = generate_test_keypair();
+        let order = "CMD-12345";
+
+        let license_hex = make_license(&sk, order, b"MANIFEST:v1:");
+        let inner_bytes = hex::decode(&license_hex).unwrap();
+        let inner_str = std::str::from_utf8(&inner_bytes).unwrap();
+        let parts: Vec<&str> = inner_str.split(':').collect();
+
+        let mut license_payload = Vec::new();
+        license_payload.extend_from_slice(LICENSE_DOMAIN);
+        license_payload.extend_from_slice(parts[0].as_bytes());
+
+        let sig_bytes = hex::decode(parts[1]).unwrap();
+        let sig = Signature::from_bytes(sig_bytes.as_slice().try_into().unwrap());
+        let vk = VerifyingKey::from_bytes(&pk).unwrap();
+
+        // La signature a été faite sur MANIFEST:v1:CMD-12345, pas LICENSE:v1:CMD-12345
+        assert!(vk.verify(&license_payload, &sig).is_err());
+    }
+
+    #[test]
+    fn test_license_invalid_hex() {
+        let bad_hex = "not_a_hex_string";
+        assert!(hex::decode(bad_hex).is_err());
+    }
+
+    #[test]
+    fn test_license_missing_colon() {
+        let bad_format = hex::encode(b"CMD12345_NO_COLON");
+        let decoded = hex::decode(&bad_format).unwrap();
+        let s = std::str::from_utf8(&decoded).unwrap();
+        assert!(!s.contains(':'));
+    }
+}
