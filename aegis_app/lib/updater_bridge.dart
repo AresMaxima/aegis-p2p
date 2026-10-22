@@ -1,21 +1,23 @@
 // aegis_app/lib/updater_bridge.dart
 //
 // P0-A.8c.1 (2026-10-19) — Pont Dart ↔ Kotlin ↔ Rust pour l'updater in-app (P-6).
+// C82 (2026-10-22) — Fetch manifest via Tor (HTTP-over-Tor).
 //
 // Chaîne de confiance Q22-Q27 :
-//   Q22 — Dart fetch le manifest depuis aresmaxima.com (HTTPS), appelle
-//         FFI Rust aegis_verify_update_signature() pour valider ed25519.
-//         Si OK, parse le JSON.
+//   Q22 — Dart appelle FFI Rust aegis_tor_fetch_http() qui fetch le manifest
+//         + sa signature via Tor (HTTP-over-Tor, .onion aresmaxima.com).
+//         Puis appelle FFI Rust aegis_verify_update_signature() pour valider
+//         ed25519. Si OK, parse le JSON.
 //   Q23 — Kotlin télécharge l'APK (OkHttp, whitelist aresmaxima.com).
 //   Q24 — Kotlin vérifie SHA-256 en temps constant.
 //   Q25 — Kotlin lance l'installateur via FileProvider.
 //   Q26 — Kotlin vérifie canRequestPackageInstalls() avant.
 //   Q27 — Kotlin supprime l'APK post-install.
 //
-// C82 : le fetch manifest utilise HTTPS direct (dart:io HttpClient).
-//       L'IP du client est exposée à aresmaxima.com (domaine contrôlé).
-//       Mitigation future : router via AegisTorClient::fetch_http()
-//       (nécessite wrapper HTTP-over-Tor côté Rust, hors P0-A.8c).
+// C82 (strict) : si Tor n'est pas disponible (StrongBox absent, réseau
+// bloqué, .onion introuvable), l'update est DIFFÉRÉ. Pas de fallback HTTPS
+// (qui exposerait l'IP au serveur). L'utilisateur voit "Tor requis pour
+// vérifier les mises à jour".
 
 import 'dart:async';
 import 'dart:convert';
@@ -42,6 +44,19 @@ typedef _VerifyUpdateSigDart = int Function(
   Pointer<Uint8> pubkeyPtr,
 );
 
+typedef _TorFetchHttpC = Int32 Function(
+  Pointer<Uint8> outManifestPtr,
+  Pointer<IntPtr> outManifestLen,
+  Pointer<Uint8> outSigPtr,
+  Pointer<IntPtr> outSigLen,
+);
+typedef _TorFetchHttpDart = int Function(
+  Pointer<Uint8> outManifestPtr,
+  Pointer<IntPtr> outManifestLen,
+  Pointer<Uint8> outSigPtr,
+  Pointer<IntPtr> outSigLen,
+);
+
 // =========================================================================
 // Constantes cryptographiques et réseau
 // =========================================================================
@@ -55,16 +70,9 @@ const List<int> _adminPublicKeyBytes = <int>[
   0x90, 0x67, 0x69, 0x0c, 0x5d, 0xd2, 0x14, 0x6d,
 ];
 
-/// URL du manifeste de mise à jour (hébergé sur aresmaxima.com).
-const String _manifestUrl = 'https://aresmaxima.com/update/manifest.json';
-
-/// URL de la signature ed25519 du manifeste (64 octets bruts).
-const String _signatureUrl = 'https://aresmaxima.com/update/manifest.json.sig';
-
-/// Bornes de sécurité anti-DoS.
+/// Bornes de sécurité anti-DoS (miroir de lib.rs).
 const int _maxManifestBytes = 64 * 1024;
 const int _sigLength = 64;
-const Duration _httpTimeout = Duration(seconds: 15);
 
 // =========================================================================
 // Modèles
@@ -86,6 +94,10 @@ class UpdateRc {
   static const int invalidSignature = -60;
   static const int parseError = -62;
 
+  // Codes spécifiques C82 (fetch via Tor)
+  static const int torUnavailable = -70;
+  static const int torFetchFailed = -71;
+
   static String describe(int rc) {
     switch (rc) {
       case ok: return 'OK';
@@ -98,6 +110,8 @@ class UpdateRc {
       case sizeExceeded: return 'APK trop volumineux';
       case invalidSignature: return 'Signature ed25519 invalide';
       case parseError: return 'JSON manifeste invalide';
+      case torUnavailable: return 'Tor indisponible — vérifiez StrongBox';
+      case torFetchFailed: return 'Fetch Tor échoué — vérifiez votre connexion';
       default: return 'Erreur inconnue ($rc)';
     }
   }
@@ -211,50 +225,34 @@ class UpdaterBridge {
   }
 
   // ─────────────────────────────────────────────────────────────────────
-  // Q22 : check du manifeste (Dart fetch + FFI Rust ed25519)
+  // Q22 / C82 : check du manifeste (Tor fetch + FFI Rust ed25519)
   // ─────────────────────────────────────────────────────────────────────
 
-  /// Télécharge le manifeste + sa signature, vérifie ed25519 via Rust,
-  /// retourne le manifeste parsé si `version > currentVersion`.
+  /// Fetch le manifeste + sa signature via Tor (HTTP-over-Tor), vérifie
+  /// ed25519 via Rust, retourne le manifeste parsé si `version > currentVersion`.
   ///
-  /// [currentVersion] : version actuelle (ex : '3.1.0'). Si le manifeste
-  /// a une version strictement supérieure → hasUpdate=true.
+  /// [currentVersion] : version actuelle (ex : '3.1.0').
+  ///
+  /// Si Tor n'est pas disponible (StrongBox absent, .onion introuvable,
+  /// réseau bloqué), retourne `UpdateCheckResult.failure(UpdateRc.torUnavailable)`
+  /// ou `torFetchFailed`. Pas de fallback HTTPS (C82 strict).
   static Future<UpdateCheckResult> checkForUpdates({
     required String currentVersion,
   }) async {
-    HttpClient? client;
     try {
-      client = HttpClient()..connectionTimeout = _httpTimeout;
-
-      // 1. Fetch manifest
-      final manifestBytes = await _fetchBytes(
-        client,
-        Uri.parse(_manifestUrl),
-        maxBytes: _maxManifestBytes,
-      );
-      if (manifestBytes == null) {
-        return UpdateCheckResult.failure(UpdateRc.networkError);
+      // 1. Fetch manifest + signature via Tor (FFI Rust)
+      final (manifestBytes, sigBytes) = await _fetchManifestViaTor();
+      if (manifestBytes == null || sigBytes == null) {
+        return UpdateCheckResult.failure(UpdateRc.torFetchFailed);
       }
 
-      // 2. Fetch signature
-      final sigBytes = await _fetchBytes(
-        client,
-        Uri.parse(_signatureUrl),
-        maxBytes: _sigLength,
-      );
-      if (sigBytes == null || sigBytes.length != _sigLength) {
-        return UpdateCheckResult.failure(UpdateRc.invalidSignature);
-      }
-
-      // 3. Vérifier la signature ed25519 via Rust
-      //    Rust valide la signature PUIS vérifie que le JSON parse
-      //    en UpdateManifest. rc=0 garantit les deux.
+      // 2. Vérifier la signature ed25519 via Rust
       final rc = _verifyUpdateSignature(manifestBytes, sigBytes);
       if (rc != UpdateRc.ok) {
         return UpdateCheckResult.failure(rc);
       }
 
-      // 4. Parser le JSON (après validation cryptographique)
+      // 3. Parser le JSON (après validation cryptographique)
       final UpdateManifest manifest;
       try {
         final decoded = jsonDecode(utf8.decode(manifestBytes));
@@ -271,15 +269,13 @@ class UpdaterBridge {
         return UpdateCheckResult.failure(UpdateRc.parseError);
       }
 
-      // 5. Comparer les versions
+      // 4. Comparer les versions
       if (_isNewerVersion(manifest.version, currentVersion)) {
         return UpdateCheckResult.available(manifest);
       }
       return UpdateCheckResult.upToDate();
     } catch (_) {
       return UpdateCheckResult.failure(UpdateRc.networkError);
-    } finally {
-      client?.close(force: true);
     }
   }
 
@@ -301,8 +297,6 @@ class UpdaterBridge {
       });
       return rc ?? UpdateRc.networkError;
     } on PlatformException catch (e) {
-      // AegisUpdater.kt::handleDownloadAndInstall renvoie
-      // result.error(code, msg, details) — details porte le rc.
       final details = e.details;
       if (details is int) return details;
       return UpdateRc.networkError;
@@ -310,9 +304,6 @@ class UpdaterBridge {
   }
 
   /// Stream de progression (émis par Kotlin via `invokeMethod('onProgress')`).
-  ///
-  /// Broadcast : plusieurs listeners possibles (UI + logs).
-  /// Le handler natif est enregistré au premier accès (lazy).
   static Stream<UpdateProgress> get progressStream {
     if (!_reverseHandlerSet) {
       _channel.setMethodCallHandler((call) async {
@@ -357,31 +348,44 @@ class UpdaterBridge {
     }
   }
 
-  /// Fetch HTTPS en bytes, avec plafond anti-DoS.
-  /// Retourne `null` sur erreur réseau / HTTP non-200 / dépassement.
-  static Future<Uint8List?> _fetchBytes(
-    HttpClient client,
-    Uri uri, {
-    required int maxBytes,
-  }) async {
+  /// Fetch le manifest + signature via Tor (FFI Rust `aegis_tor_fetch_http`).
+  ///
+  /// Retourne `(null, null)` si Tor indisponible / fetch échoué.
+  /// Les buffers sont alloués une fois (pas d'allocation dynamique itérative).
+  static Future<(Uint8List?, Uint8List?)> _fetchManifestViaTor() async {
+    final manifestBuf = calloc<Uint8>(_maxManifestBytes);
+    final sigBuf = calloc<Uint8>(_sigLength);
+    final manifestLen = calloc<IntPtr>();
+    final sigLen = calloc<IntPtr>();
+
     try {
-      final req = await client.getUrl(uri).timeout(_httpTimeout);
-      req.headers.set(HttpHeaders.userAgentHeader, 'Aegis-Updater/1.0');
-      final resp = await req.close().timeout(_httpTimeout);
-      if (resp.statusCode != 200) {
-        await resp.drain<void>();
-        return null;
+      final fn = _lib.lookupFunction<_TorFetchHttpC, _TorFetchHttpDart>(
+        'aegis_tor_fetch_http',
+      );
+
+      final rc = fn(manifestBuf, manifestLen, sigBuf, sigLen);
+
+      if (rc != 0) {
+        // -2 = Tor indisponible (StrongBox absent)
+        // -3 = fetch échoué (réseau, .onion introuvable)
+        // -4 = manifest trop gros
+        return (null, null);
       }
-      final chunks = <int>[];
-      var totalBytes = 0;
-      await for (final chunk in resp) {
-        totalBytes += chunk.length;
-        if (totalBytes > maxBytes) return null;
-        chunks.addAll(chunk);
-      }
-      return Uint8List.fromList(chunks);
+
+      final m = Uint8List.fromList(
+        manifestBuf.asTypedList(manifestLen.value),
+      );
+      final s = Uint8List.fromList(
+        sigBuf.asTypedList(sigLen.value),
+      );
+      return (m, s);
     } catch (_) {
-      return null;
+      return (null, null);
+    } finally {
+      calloc.free(manifestBuf);
+      calloc.free(sigBuf);
+      calloc.free(manifestLen);
+      calloc.free(sigLen);
     }
   }
 
