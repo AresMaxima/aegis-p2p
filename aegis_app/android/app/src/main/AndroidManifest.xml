@@ -45,9 +45,6 @@
     <!-- Note: ACCESS_FINE_LOCATION est déjà déclaré pour Wi-Fi Direct (maxSdkVersion="32").
          Il couvre également le besoin BLE pour API < 31. Ne pas dupliquer. -->
 
-    <!-- Foreground Service pour maintenir le mesh BLE en arrière-plan -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-
     <!--
       ================================================================
       P0-A.8b (2026-10-19) — Updater in-app (P-6)
