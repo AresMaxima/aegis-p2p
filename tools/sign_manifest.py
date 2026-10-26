@@ -65,7 +65,7 @@ except ImportError:
 
 # Doit matcher exactement ADMIN_PUBLIC_KEY_BYTES dans aegis-core/src/lib.rs
 ADMIN_PUBLIC_KEY_HEX = (
-    "ac2611c408d34cf565189cba8448d776c20d958c288372659067690c5dd2146d"
+    "bb45a7db9a81c9609dbc8f93ab879c2f382fc73cb3871cb103a4b653c385cd87"
 )
 
 # Doit matcher updater::MANIFEST_DOMAIN
