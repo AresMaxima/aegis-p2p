@@ -84,7 +84,7 @@
       allowBackup="false" + fullBackupContent + dataExtractionRules
     -->
     <application
-        android:label="aegis_app"
+        android:label="aegis P2P"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="false"

@@ -35,9 +35,9 @@ class _AegisKeyboardState extends State<AegisKeyboard> {
   static const List<String> _row2Latin = ['a','s','d','f','g','h','j','k','l'];
   static const List<String> _row3Latin = ['z','x','c','v','b','n','m'];
 
-  static const List<String> _row1Cyr = ['й','ц','у','к','е','н','г','ш','щ','з','х'];
-  static const List<String> _row2Cyr = ['ф','ы','в','а','п','р','о','л','д','ж'];
-  static const List<String> _row3Cyr = ['я','ч','с','м','и','т','ь','б','ю'];
+  static const List<String> _row1Cyr = ['й','ц','у','к','е','н','г','ш','щ','з','х','ї'];
+  static const List<String> _row2Cyr = ['ф','ы','і','в','а','п','р','о','л','д','ж','є'];
+  static const List<String> _row3Cyr = ['я','ч','с','м','и','т','ь','б','ю','ґ'];
 
   static const List<String> _row1Ara = ['ض','ص','ث','ق','ف','غ','ع','ه','خ','ح'];
   static const List<String> _row2Ara = ['ش','س','ي','ب','ل','ا','ت','ن','م','ك'];
@@ -52,11 +52,25 @@ class _AegisKeyboardState extends State<AegisKeyboard> {
   bool _showSymbols = false;
   bool _showPassword = false;
   bool _capsLock = false;
+  String? _lastLocale;
 
   @override
   void initState() {
     super.initState();
     _shuffleLayout();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final code = Localizations.localeOf(context).languageCode;
+    if (_lastLocale == code) return;
+    _lastLocale = code;
+    final int newMode = code == 'ar' ? 2 : (code == 'uk' || code == 'ru') ? 1 : 0;
+    if (_alphabetMode != newMode) {
+      _alphabetMode = newMode;
+      _shuffleLayout();
+    }
   }
 
   void _shuffleLayout() {
@@ -156,6 +170,7 @@ class _AegisKeyboardState extends State<AegisKeyboard> {
                       color: fgColor ?? Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
+                      fontFamilyFallback: const <String>['NotoSansArabic'],
                     ),
                   ),
             ),
@@ -197,6 +212,7 @@ class _AegisKeyboardState extends State<AegisKeyboard> {
                       color: Colors.white,
                       fontFamily: 'monospace',
                       fontSize: 14,
+                      fontFamilyFallback: <String>['NotoSansArabic'],
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),

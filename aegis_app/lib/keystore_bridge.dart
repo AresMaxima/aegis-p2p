@@ -1,4 +1,5 @@
 import 'dart:ffi';
+import 'dart:isolate';
 import 'dart:io';
 import 'package:ffi/ffi.dart';
 import 'package:flutter/services.dart';
@@ -278,6 +279,20 @@ class KeystoreBridge {
     } catch (e) {
       return VaultUnlockStatus.error;
     }
+  }
+
+  /// C80 FIX (2026-11-03) : `vault_init` exécute Argon2id (~2-4 s) qui
+  /// bloque le main thread → ANR garanti. On déporte l'appel FFI dans
+  /// un isolate dédié. Pas de MethodChannel touché, pas de rebuild Rust.
+  static Future<bool> vaultInitInIsolate(String pin) async {
+    if (pin.isEmpty) return false;
+    return await Isolate.run(() => vaultInit(pin));
+  }
+
+  /// C80 FIX (2026-11-03) : idem pour `vault_unlock` (Argon2id).
+  static Future<VaultUnlockStatus> vaultUnlockInIsolate(String pin) async {
+    if (pin.isEmpty) return VaultUnlockStatus.error;
+    return await Isolate.run(() => vaultUnlock(pin));
   }
 
   /// Efface `vault.json` + ROOT_KEY + MASTER_KEY.

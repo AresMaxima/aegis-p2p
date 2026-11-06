@@ -39,6 +39,8 @@ audit_private.key
 # 7. ARTIFACTS DE BENCHMARK ET RAPPORTS
 *.jpeg
 *.png
+!aegis_app/assets/logo.png
+!aegis_app/assets/fonts/
 *.pdf
 *.docx
 *.zip

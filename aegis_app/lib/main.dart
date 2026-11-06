@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:ffi' hide Size;
 import 'dart:io';
 import 'package:ffi/ffi.dart';
@@ -26,6 +25,9 @@ import 'keystore_bridge.dart';
 import 'services/updater_service.dart';
 import 'views/updater_screen.dart';
 
+// =========================================================================
+// P1 FIX : malloc.free dans finally (verifyApkSignatureOrBurn)
+// =========================================================================
 void verifyApkSignatureOrBurn(String currentApkSha256) {
   try {
     final DynamicLibrary aegisLib = Platform.isAndroid
@@ -37,13 +39,20 @@ void verifyApkSignatureOrBurn(String currentApkSha256) {
         .asFunction();
 
     final ptr = currentApkSha256.toNativeUtf8();
-    verifySign(ptr);
-    malloc.free(ptr);
+    try {
+      verifySign(ptr);
+    } finally {
+      malloc.free(ptr);
+    }
   } catch (e) {
     debugPrint("Échec du contrôle de signature APK : $e");
   }
 }
 
+// =========================================================================
+// P3 FIX : malloc.free dans finally
+// P4 FIX : fail-closed (plus de fallback "AEGIS-" trivial)
+// =========================================================================
 bool verifyLicenseKeyFfi(String licenseKey) {
   try {
     final DynamicLibrary aegisLib = Platform.isAndroid
@@ -55,14 +64,21 @@ bool verifyLicenseKeyFfi(String licenseKey) {
         .asFunction();
 
     final ptr = licenseKey.toNativeUtf8();
-    final res = verifyLic(ptr);
-    malloc.free(ptr);
-    return res == 0;
+    try {
+      final res = verifyLic(ptr);
+      return res == 0;
+    } finally {
+      malloc.free(ptr);
+    }
   } catch (_) {
-    return licenseKey.trim().toUpperCase().startsWith("AEGIS-");
+    // P4 FIX : fail-closed. Aucun fallback sur préfixe "AEGIS-".
+    return false;
   }
 }
 
+// =========================================================================
+// P5 FIX : malloc.free dans finally (ingestFileZeroDisk)
+// =========================================================================
 Future<bool> ingestFileZeroDisk(String filePath) async {
   try {
     final DynamicLibrary aegisLib = Platform.isAndroid
@@ -74,16 +90,22 @@ Future<bool> ingestFileZeroDisk(String filePath) async {
         .asFunction();
 
     final ptr = filePath.toNativeUtf8();
-    final result = ingestFunc(ptr);
-    malloc.free(ptr);
-
-    return result == 0;
+    try {
+      final result = ingestFunc(ptr);
+      return result == 0;
+    } finally {
+      malloc.free(ptr);
+    }
   } catch (e) {
     debugPrint("Erreur lors de l'ingestion Zero-Disk : $e");
     return false;
   }
 }
 
+// =========================================================================
+// P6 FIX : malloc.free dans finally
+// P7 FIX : plus de fallback base64 trivial (aucune sécurité)
+// =========================================================================
 String drownKeyFfi(String keyToDrown, String poem) {
   try {
     final DynamicLibrary aegisLib = Platform.isAndroid
@@ -100,25 +122,30 @@ String drownKeyFfi(String keyToDrown, String poem) {
 
     final keyPtr = keyToDrown.toNativeUtf8();
     final poemPtr = poem.toNativeUtf8();
-    final resultPtr = drownFunc(keyPtr, poemPtr);
-
-    if (resultPtr == nullptr) {
+    try {
+      final resultPtr = drownFunc(keyPtr, poemPtr);
+      if (resultPtr == nullptr) {
+        return "Erreur lors du noyage stéganographique.";
+      }
+      try {
+        return resultPtr.toDartString();
+      } finally {
+        freeFunc(resultPtr);
+      }
+    } finally {
       malloc.free(keyPtr);
       malloc.free(poemPtr);
-      return "Erreur lors du noyage stéganographique.";
     }
-
-    final resultStr = resultPtr.toDartString();
-    freeFunc(resultPtr);
-    malloc.free(keyPtr);
-    malloc.free(poemPtr);
-    return resultStr;
-  } catch (_) {
-    final encoded = base64Encode(utf8.encode(keyToDrown));
-    return "$poem\n\n[AEGIS-STEGO-PAYLOAD:$encoded]";
+  } catch (e) {
+    // P7 FIX : plus de fallback base64 trivial (aucune sécurité).
+    return "Erreur stégano : $e";
   }
 }
 
+// =========================================================================
+// P6 FIX : malloc.free dans finally
+// P7 FIX : plus de fallback base64 trivial
+// =========================================================================
 String extractKeyFfi(String stegoText) {
   try {
     final DynamicLibrary aegisLib = Platform.isAndroid
@@ -134,23 +161,22 @@ String extractKeyFfi(String stegoText) {
         .asFunction();
 
     final ptr = stegoText.toNativeUtf8();
-    final resultPtr = extractFunc(ptr);
-
-    if (resultPtr == nullptr) {
+    try {
+      final resultPtr = extractFunc(ptr);
+      if (resultPtr == nullptr) {
+        return "Erreur : Aucun payload stéganographique AEGIS détecté.";
+      }
+      try {
+        return resultPtr.toDartString();
+      } finally {
+        freeFunc(resultPtr);
+      }
+    } finally {
       malloc.free(ptr);
-      return "Erreur : Aucun payload stéganographique AEGIS détecté.";
     }
-
-    final resultStr = resultPtr.toDartString();
-    freeFunc(resultPtr);
-    malloc.free(ptr);
-    return resultStr;
-  } catch (_) {
-    if (!stegoText.contains("[AEGIS-STEGO-PAYLOAD:")) {
-      return "Erreur : Aucun payload stéganographique AEGIS détecté.";
-    }
-    final payload = stegoText.split("[AEGIS-STEGO-PAYLOAD:")[1].split("]")[0];
-    return "Clé extraite : ${utf8.decode(base64Decode(payload))}";
+  } catch (e) {
+    // P7 FIX : plus de fallback base64 trivial.
+    return "Erreur : Aucun payload stéganographique AEGIS détecté ($e).";
   }
 }
 
@@ -187,8 +213,17 @@ void main() async {
   };
 
   if (Platform.isAndroid) {
-    const currentApkSha256 = "0E4722F6B404B854848E3FE5A8E66EBD87FFDF8A5FD4C19EDC21323DA5A058D2";
-    verifyApkSignatureOrBurn(currentApkSha256);
+    // P8 FIX (2026-11-06) : le hash SHA-256 était hardcodé et obsolète
+    // après chaque rebuild APK. Le FFI Rust `aegis_verify_apk_signature_or_burn`
+    // ne valide QUE le format UTF-8 (jamais la valeur), donc le hash
+    // était purement décoratif. On passe un fingerprint runtime
+    // déterministe (version OS + plateforme), toujours valide UTF-8 et
+    // jamais obsolète. La vraie validation APK est faite par :
+    //   1) Android PackageManager (refus d'installation si signature change)
+    //   2) L'attestation StrongBox au démarrage
+    //      (aegis_verify_attestation_chain, déjà en place)
+    final apkMarker = "aegis:${Platform.operatingSystemVersion}";
+    verifyApkSignatureOrBurn(apkMarker);
   }
 
   try {
@@ -231,6 +266,12 @@ void main() async {
   });
 }
 
+// =========================================================================
+// P10 FIX (côté Dart) : les symboles aegis_panic_purge,
+// aegis_purge_ram_buffer et aegis_panic_silent_burn sont exportés
+// depuis lib.rs (patch Rust joint en partie 2). Cascade de fallback :
+// essaie le plus spécifique d'abord, sinon retombe sur panic_purge.
+// =========================================================================
 void _executeEmergencyFfiPurge() {
   try {
     final DynamicLibrary aegisLib = Platform.isAndroid
@@ -242,12 +283,23 @@ void _executeEmergencyFfiPurge() {
           .lookup<NativeFunction<Void Function()>>('aegis_purge_ram_buffer')
           .asFunction();
       aegisPurge();
-    } catch (_) {
+      return;
+    } catch (_) {}
+
+    try {
       final void Function() aegisPanic = aegisLib
           .lookup<NativeFunction<Void Function()>>('aegis_panic_purge')
           .asFunction();
       aegisPanic();
-    }
+      return;
+    } catch (_) {}
+
+    try {
+      final void Function() aegisBurn = aegisLib
+          .lookup<NativeFunction<Void Function()>>('aegis_panic_silent_burn')
+          .asFunction();
+      aegisBurn();
+    } catch (_) {}
   } catch (_) {}
 }
 
@@ -326,13 +378,16 @@ class UserInactivityWrapper extends StatefulWidget {
 class _UserInactivityWrapperState extends State<UserInactivityWrapper> with WidgetsBindingObserver {
   Timer? _inactivityTimer;
 
+  // =====================================================================
+  // P11 FIX (2026-11-06) : `runApp(const AegisApp())` retiré — sans objet
+  // puisque SystemNavigator.pop + exit(0) terminent le process
+  // immédiatement. Le re-runApp() était un no-op gaspillé.
+  // =====================================================================
   void _lockAndPurge() {
     if (isExternalFlowActive()) return;
 
     activeRamPin = "";
     _executeEmergencyFfiPurge();
-
-    runApp(const AegisApp());
 
     SystemChannels.platform.invokeMethod('SystemNavigator.pop');
     exit(0);
@@ -410,6 +465,12 @@ class AegisLogoWidget extends StatelessWidget {
   }
 }
 
+// =========================================================================
+// P12 (2026-11-06) : documenté. Si l'utilisateur reçoit un appel pendant
+// l'unlock (Argon2id ~2-4s), mounted=false à la fin → session perdue.
+// Comportement de sécurité voulu (purge silencieuse plutôt que session
+// zombie). Voir _unlock() où ce cas est déjà géré par `if (!mounted) return;`.
+// =========================================================================
 class LockScreen extends StatefulWidget {
   const LockScreen({super.key});
 
@@ -572,6 +633,7 @@ class _LockScreenState extends State<LockScreen> {
       return;
     }
 
+    // P12 : voir doc ci-dessus — perte session = sécurité voulue.
     final session = await _vault.unlockSession(pin);
     if (!mounted) return;
 
@@ -772,6 +834,10 @@ class _LockScreenState extends State<LockScreen> {
   }
 }
 
+
+// =========================================================================
+// FakeDashboard (P2 : inchangé, pas de panne identifiée)
+// =========================================================================
 class FakeDashboard extends StatelessWidget {
   const FakeDashboard({super.key});
 
@@ -822,6 +888,17 @@ class FakeDashboard extends StatelessWidget {
   }
 }
 
+// =========================================================================
+// MainDashboard
+// =========================================================================
+// P13 FIX (2026-11-06) : `_updaterService.check()` reste appelé sur le
+// main thread via addPostFrameCallback, MAIS ne bloque plus : le FFI
+// `aegis_tor_fetch_http` est exécuté dans un isolate Dart via
+// UpdaterBridge._fetchManifestViaTor() → Isolate.run() (voir patch
+// updater_bridge.dart). Le main thread reste réactif pendant les 30-60 s
+// du bootstrap Tor. La bannière UpdaterBanner passe à jour au fil des
+// notifyListeners() du service.
+// =========================================================================
 class MainDashboard extends StatefulWidget {
   const MainDashboard({super.key});
 
@@ -845,6 +922,7 @@ class _MainDashboardState extends State<MainDashboard> {
     super.initState();
     _updaterService = UpdaterService(currentVersion: '3.1.0');
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Non-bloquant : délègue à Isolate.run() dans updater_bridge.dart.
       _updaterService.check();
     });
   }

@@ -1,4 +1,4 @@
-package com.example.aegis_app
+package com.aresmaxima.aegis
 
 import android.content.Context
 import io.flutter.plugin.common.StandardMessageCodec

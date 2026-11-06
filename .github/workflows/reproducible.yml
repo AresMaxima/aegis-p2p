@@ -146,24 +146,24 @@ jobs:
 
           MISSING=0
           for SYM in \
-            "Java_com_example_aegis_1app_MainActivity_aegisRegisterMainActivity" \
-            "Java_com_example_aegis_1app_MainActivity_aegis_1render_1to_1surface" \
-            "Java_com_example_aegis_1app_MainActivity_aegis_1release_1surface" \
-            "Java_com_example_aegis_1app_MainActivity_aegis_1ingest_1camera_1frame_1direct" \
-            "Java_com_example_aegis_1app_MainActivity_aegis_1control_1media_1player" \
-            "Java_com_example_aegis_1app_MainActivity_aegis_1derive_1and_1set_1master_1key" \
-            "Java_com_example_aegis_1app_MainActivity_aegis_1verify_1attestation_1chain" \
-            "Java_com_example_aegis_1app_MainActivity_aegis_1ble_1mesh_1set_1pipes" \
-            "Java_com_example_aegis_1app_MainActivity_aegis_1ble_1mesh_1shutdown" \
-            "Java_com_example_aegis_1app_MainActivity_aegis_1ble_1mesh_1reader_1start" \
-            "Java_com_example_aegis_1app_MainActivity_aegis_1ble_1mesh_1reader_1stop" \
-            "Java_com_example_aegis_1app_ProtectedConfirmation_aegisPanicSilentBurn" \
-            "Java_com_example_aegis_1app_WifiDirectBridge_aegis_1wifi_1direct_1set_1fd" \
-            "Java_com_example_aegis_1app_WifiDirectBridge_aegis_1wifi_1direct_1close_1fd" \
-            "Java_com_example_aegis_1app_MainActivity_aegis_1ble_1handshake_1start_1initiator" \
-            "Java_com_example_aegis_1app_MainActivity_aegis_1ble_1handshake_1start_1responder" \
-            "Java_com_example_aegis_1app_MainActivity_aegis_1ble_1handshake_1is_1complete" \
-            "Java_com_example_aegis_1app_MainActivity_aegis_1ble_1handshake_1reset" \
+            "Java_com_aresmaxima_aegis_MainActivity_aegisRegisterMainActivity" \
+            "Java_com_aresmaxima_aegis_MainActivity_aegis_1render_1to_1surface" \
+            "Java_com_aresmaxima_aegis_MainActivity_aegis_1release_1surface" \
+            "Java_com_aresmaxima_aegis_MainActivity_aegis_1ingest_1camera_1frame_1direct" \
+            "Java_com_aresmaxima_aegis_MainActivity_aegis_1control_1media_1player" \
+            "Java_com_aresmaxima_aegis_MainActivity_aegis_1derive_1and_1set_1master_1key" \
+            "Java_com_aresmaxima_aegis_MainActivity_aegis_1verify_1attestation_1chain" \
+            "Java_com_aresmaxima_aegis_MainActivity_aegis_1ble_1mesh_1set_1pipes" \
+            "Java_com_aresmaxima_aegis_MainActivity_aegis_1ble_1mesh_1shutdown" \
+            "Java_com_aresmaxima_aegis_MainActivity_aegis_1ble_1mesh_1reader_1start" \
+            "Java_com_aresmaxima_aegis_MainActivity_aegis_1ble_1mesh_1reader_1stop" \
+            "Java_com_aresmaxima_aegis_ProtectedConfirmation_aegisPanicSilentBurn" \
+            "Java_com_aresmaxima_aegis_WifiDirectBridge_aegis_1wifi_1direct_1set_1fd" \
+            "Java_com_aresmaxima_aegis_WifiDirectBridge_aegis_1wifi_1direct_1close_1fd" \
+            "Java_com_aresmaxima_aegis_MainActivity_aegis_1ble_1handshake_1start_1initiator" \
+            "Java_com_aresmaxima_aegis_MainActivity_aegis_1ble_1handshake_1start_1responder" \
+            "Java_com_aresmaxima_aegis_MainActivity_aegis_1ble_1handshake_1is_1complete" \
+            "Java_com_aresmaxima_aegis_MainActivity_aegis_1ble_1handshake_1reset" \
           ; do
             if echo "$SYMBOLS" | grep -q " $SYM$"; then
               echo "✓ $SYM"

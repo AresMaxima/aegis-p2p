@@ -55,10 +55,10 @@ pub mod viewer;
 pub mod updater;
 
 pub const ADMIN_PUBLIC_KEY_BYTES: [u8; 32] = [
-    0xbb, 0x45, 0xa7, 0xdb, 0x9a, 0x81, 0xc9, 0x60,
-    0x9d, 0xbc, 0x8f, 0x93, 0xab, 0x87, 0x9c, 0x2f,
-    0x38, 0x2f, 0xc7, 0x3c, 0xb3, 0x87, 0x1c, 0xb1,
-    0x03, 0xa4, 0xb6, 0x53, 0xc3, 0x85, 0xcd, 0x87,
+    0xac, 0x26, 0x11, 0xc4, 0x08, 0xd3, 0x4c, 0xf5,
+    0x65, 0x18, 0x9c, 0xba, 0x84, 0x48, 0xd7, 0x76,
+    0xc2, 0x0d, 0x95, 0x8c, 0x28, 0x83, 0x72, 0x65,
+    0x90, 0x67, 0x69, 0x0c, 0x5d, 0xd2, 0x14, 0x6d,
 ];
 
 // =========================================================================
@@ -80,10 +80,14 @@ pub unsafe extern "system" fn JNI_OnLoad(
     ffi_security::init_native_security();
     secure_buffer::init_secure_buffer_system();
 
+    // Ancres runtime (empêchent --gc-sections d'éliminer les symboles
+    // FFI non référencés dans le crate).
     _anchor_vault_ffi();
     _anchor_wifi_direct_ffi();
     _anchor_updater_ffi();
     _anchor_tor_fetch_ffi();
+    _anchor_deadman_ffi();
+    _anchor_panic_purge_ffi();
 
     if vm.is_null() {
         return JNI_ERR;
@@ -104,7 +108,7 @@ pub unsafe extern "system" fn JNI_OnLoad(
 // =========================================================================
 
 #[no_mangle]
-pub unsafe extern "system" fn Java_com_example_aegis_1app_MainActivity_aegisRegisterMainActivity(
+pub unsafe extern "system" fn Java_com_aresmaxima_aegis_MainActivity_aegisRegisterMainActivity(
     env: JNIEnv,
     _this: JObject,
     activity: JObject,
@@ -426,7 +430,7 @@ pub extern "C" fn aegis_wifi_direct_close_fd() -> i32 {
 // =========================================================================
 
 #[no_mangle]
-pub unsafe extern "system" fn Java_com_example_aegis_1app_WifiDirectBridge_aegis_1wifi_1direct_1set_1fd(
+pub unsafe extern "system" fn Java_com_aresmaxima_aegis_WifiDirectBridge_aegis_1wifi_1direct_1set_1fd(
     _env: jni::JNIEnv,
     _this: jni::objects::JObject,
     fd: jni::sys::jint,
@@ -435,7 +439,7 @@ pub unsafe extern "system" fn Java_com_example_aegis_1app_WifiDirectBridge_aegis
 }
 
 #[no_mangle]
-pub unsafe extern "system" fn Java_com_example_aegis_1app_WifiDirectBridge_aegis_1wifi_1direct_1close_1fd(
+pub unsafe extern "system" fn Java_com_aresmaxima_aegis_WifiDirectBridge_aegis_1wifi_1direct_1close_1fd(
     _env: jni::JNIEnv,
     _this: jni::objects::JObject,
 ) -> jni::sys::jint {
@@ -652,7 +656,7 @@ pub unsafe extern "C" fn aegis_send_p2p_tor(
 // =========================================================================
 
 #[no_mangle]
-pub unsafe extern "system" fn Java_com_example_aegis_1app_MainActivity_aegis_1ingest_1camera_1frame_1direct(
+pub unsafe extern "system" fn Java_com_aresmaxima_aegis_MainActivity_aegis_1ingest_1camera_1frame_1direct(
     env: JNIEnv,
     _this: JObject,
     y_buffer: JByteBuffer,
@@ -700,7 +704,7 @@ pub unsafe extern "system" fn Java_com_example_aegis_1app_MainActivity_aegis_1in
 }
 
 #[no_mangle]
-pub unsafe extern "system" fn Java_com_example_aegis_1app_MainActivity_aegis_1render_1to_1surface(
+pub unsafe extern "system" fn Java_com_aresmaxima_aegis_MainActivity_aegis_1render_1to_1surface(
     env: JNIEnv,
     _this: JObject,
     surface: JObject,
@@ -709,7 +713,7 @@ pub unsafe extern "system" fn Java_com_example_aegis_1app_MainActivity_aegis_1re
 }
 
 #[no_mangle]
-pub unsafe extern "system" fn Java_com_example_aegis_1app_MainActivity_aegis_1release_1surface(
+pub unsafe extern "system" fn Java_com_aresmaxima_aegis_MainActivity_aegis_1release_1surface(
     _env: JNIEnv,
     _this: JObject,
 ) -> jint {
@@ -717,7 +721,7 @@ pub unsafe extern "system" fn Java_com_example_aegis_1app_MainActivity_aegis_1re
 }
 
 #[no_mangle]
-pub unsafe extern "system" fn Java_com_example_aegis_1app_MainActivity_aegis_1control_1media_1player(
+pub unsafe extern "system" fn Java_com_aresmaxima_aegis_MainActivity_aegis_1control_1media_1player(
     mut env: JNIEnv,
     _this: JObject,
     cmd: JString,
@@ -741,7 +745,7 @@ pub unsafe extern "system" fn Java_com_example_aegis_1app_MainActivity_aegis_1co
 // =========================================================================
 
 #[no_mangle]
-pub unsafe extern "system" fn Java_com_example_aegis_1app_ProtectedConfirmation_aegisPanicSilentBurn(
+pub unsafe extern "system" fn Java_com_aresmaxima_aegis_ProtectedConfirmation_aegisPanicSilentBurn(
     _env: JNIEnv,
     _this: JObject,
 ) {
@@ -753,7 +757,7 @@ pub unsafe extern "system" fn Java_com_example_aegis_1app_ProtectedConfirmation_
 // =========================================================================
 
 #[no_mangle]
-pub unsafe extern "system" fn Java_com_example_aegis_1app_MainActivity_aegis_1derive_1and_1set_1master_1key(
+pub unsafe extern "system" fn Java_com_aresmaxima_aegis_MainActivity_aegis_1derive_1and_1set_1master_1key(
     mut env: JNIEnv,
     _this: JObject,
     pin: JString,
@@ -790,7 +794,7 @@ pub unsafe extern "system" fn Java_com_example_aegis_1app_MainActivity_aegis_1de
 // =========================================================================
 
 #[no_mangle]
-pub unsafe extern "system" fn Java_com_example_aegis_1app_MainActivity_aegis_1verify_1attestation_1chain(
+pub unsafe extern "system" fn Java_com_aresmaxima_aegis_MainActivity_aegis_1verify_1attestation_1chain(
     env: JNIEnv,
     _this: JObject,
     chain: JByteArray,
@@ -830,7 +834,7 @@ pub unsafe extern "system" fn Java_com_example_aegis_1app_MainActivity_aegis_1ve
         status.to_code()
     );
 
-    if status.is_critical() {
+        if status.is_critical() {
         eprintln!("AEGIS-ATTEST: COMPROMISSION CRITIQUE — PanicPurge déclenché");
         crate::panic::panic_purge();
     }
@@ -962,6 +966,25 @@ fn _anchor_tor_fetch_ffi() {
 }
 
 // =========================================================================
+// P10 FIX (2026-11-06) : ancre runtime pour deadman_heartbeat
+//
+// `aegis_deadman_heartbeat` est défini dans `deadman.rs` avec
+// `#[no_mangle] pub extern "C"`, mais le linker (--gc-sections) peut
+// l'éliminer s'il n'est référencé que par DeadMansSwitch::heartbeat()
+// (lui-même jamais instancié). Cette ancre garantit la présence du
+// symbole dans le .so final, sinon l'appel Dart dans main.dart:622
+// échoue silencieusement (catch).
+// =========================================================================
+
+#[inline(never)]
+fn _anchor_deadman_ffi() {
+    std::hint::black_box((
+        crate::deadman::aegis_deadman_heartbeat as *const (),
+    ));
+}
+
+
+// =========================================================================
 // P0-A.8a — FFI de vérification cryptographique des mises à jour
 // =========================================================================
 
@@ -1075,6 +1098,29 @@ pub unsafe extern "C" fn aegis_tor_fetch_http(
     }
 
     0
+}
+
+// =========================================================================
+// P10 FIX (2026-11-06) : ancre runtime pour les 3 symboles purge
+//
+// Les 3 fonctions `aegis_panic_purge`, `aegis_purge_ram_buffer` et
+// `aegis_panic_silent_burn` sont définies dans `panic.rs` (avec
+// `#[no_mangle] pub extern "C"`). Le linker --gc-sections peut les
+// éliminer du .so si elles ne sont référencées que depuis Dart via
+// lookup dynamique (pas de référence statique dans le crate).
+//
+// Cette ancre garantit leur présence dans le .so final — sans elle,
+// le bouton "PURGE D'URGENCE" de main.dart échoue silencieusement
+// (3 lookup en cascade → catch → rien ne se passe).
+// =========================================================================
+
+#[inline(never)]
+fn _anchor_panic_purge_ffi() {
+    std::hint::black_box((
+        crate::panic::aegis_panic_purge as *const (),
+        crate::panic::aegis_purge_ram_buffer as *const (),
+        crate::panic::aegis_panic_silent_burn as *const (),
+    ));
 }
 
 // =========================================================================

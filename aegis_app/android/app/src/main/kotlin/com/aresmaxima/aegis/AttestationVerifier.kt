@@ -1,4 +1,4 @@
-package com.example.aegis_app
+package com.aresmaxima.aegis
 
 import android.content.Context
 import android.content.pm.PackageManager
@@ -65,12 +65,23 @@ object AttestationVerifier {
             // 2) Charger le KeyStore Android
             val ks = KeyStore.getInstance(PROVIDER).apply { load(null) }
 
-            // 3) Générer la clé d'attestation si elle n'existe pas
-            if (!ks.containsAlias(ATTESTATION_ALIAS)) {
-                generateAttestationKey(challenge)
+            // 3) D63 FIX : Toujours régénérer la clé d'attestation.
+            // Le challenge change à chaque signature d'APK (nouvelle clé de release).
+            // Une clé d'attestation liée à un ancien challenge produit un certificat
+            // avec un ChallengeMismatch, ce qui déclenche panic_purge() côté Rust.
+            if (ks.containsAlias(ATTESTATION_ALIAS)) {
+                try {
+                    ks.deleteEntry(ATTESTATION_ALIAS)
+                    Log.i(TAG, "D63 FIX : ancienne clé d'attestation supprimée")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Impossible de supprimer l'ancienne clé d'attestation", e)
+                }
             }
 
-            // 4) Récupérer l'entrée (doit être un PrivateKeyEntry)
+            // 4) Générer la clé d'attestation avec le nouveau challenge
+            generateAttestationKey(challenge)
+
+            // 5) Récupérer l'entrée (doit être un PrivateKeyEntry)
             val entry = ks.getEntry(ATTESTATION_ALIAS, null)
                     as? KeyStore.PrivateKeyEntry
                 ?: run {
@@ -78,14 +89,14 @@ object AttestationVerifier {
                     return null
                 }
 
-            // 5) Récupérer la chaîne de certificats
+            // 6) Récupérer la chaîne de certificats
             val certs = entry.certificateChain
             if (certs.isEmpty()) {
                 Log.e(TAG, "Chaîne de certificats vide")
                 return null
             }
 
-            // 6) Concatener les certificats en DER
+            // 7) Concatener les certificats en DER
             val out = ByteArrayOutputStream()
             var x509Count = 0
             for (cert in certs) {

@@ -1,4 +1,4 @@
-package com.example.aegis_app
+package com.aresmaxima.aegis
 
 import android.app.Activity
 import android.content.Intent

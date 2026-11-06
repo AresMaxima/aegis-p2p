@@ -450,7 +450,7 @@ pub extern "C" fn aegis_ble_handshake_reset() -> i32 { reset(); 0 }
 // ─────────────────────────────────────────────────────────────────────
 
 #[no_mangle]
-pub unsafe extern "system" fn Java_com_example_aegis_1app_MainActivity_aegis_1ble_1handshake_1start_1initiator(env: jni::JNIEnv, _this: jni::objects::JObject, fp: jni::objects::JByteArray) -> jni::sys::jint {
+pub unsafe extern "system" fn Java_com_aresmaxima_aegis_MainActivity_aegis_1ble_1handshake_1start_1initiator(env: jni::JNIEnv, _this: jni::objects::JObject, fp: jni::objects::JByteArray) -> jni::sys::jint {
     let fp_vec = match env.convert_byte_array(&fp) { Ok(v) => v, Err(_) => { let _ = env.exception_clear(); return HandshakeError::InvalidLength.to_code(); } };
     if fp_vec.len() != 32 { return HandshakeError::InvalidLength.to_code(); }
     let mut fp_arr = [0u8; 32]; fp_arr.copy_from_slice(&fp_vec);
@@ -458,7 +458,7 @@ pub unsafe extern "system" fn Java_com_example_aegis_1app_MainActivity_aegis_1bl
 }
 
 #[no_mangle]
-pub unsafe extern "system" fn Java_com_example_aegis_1app_MainActivity_aegis_1ble_1handshake_1start_1responder(env: jni::JNIEnv, _this: jni::objects::JObject, fp: jni::objects::JByteArray) -> jni::sys::jint {
+pub unsafe extern "system" fn Java_com_aresmaxima_aegis_MainActivity_aegis_1ble_1handshake_1start_1responder(env: jni::JNIEnv, _this: jni::objects::JObject, fp: jni::objects::JByteArray) -> jni::sys::jint {
     let fp_vec = match env.convert_byte_array(&fp) { Ok(v) => v, Err(_) => { let _ = env.exception_clear(); return HandshakeError::InvalidLength.to_code(); } };
     if fp_vec.len() != 32 { return HandshakeError::InvalidLength.to_code(); }
     let mut fp_arr = [0u8; 32]; fp_arr.copy_from_slice(&fp_vec);
@@ -466,12 +466,12 @@ pub unsafe extern "system" fn Java_com_example_aegis_1app_MainActivity_aegis_1bl
 }
 
 #[no_mangle]
-pub unsafe extern "system" fn Java_com_example_aegis_1app_MainActivity_aegis_1ble_1handshake_1is_1complete(_env: jni::JNIEnv, _this: jni::objects::JObject) -> jni::sys::jint {
+pub unsafe extern "system" fn Java_com_aresmaxima_aegis_MainActivity_aegis_1ble_1handshake_1is_1complete(_env: jni::JNIEnv, _this: jni::objects::JObject) -> jni::sys::jint {
     if is_complete() { 1 } else { 0 }
 }
 
 #[no_mangle]
-pub unsafe extern "system" fn Java_com_example_aegis_1app_MainActivity_aegis_1ble_1handshake_1reset(_env: jni::JNIEnv, _this: jni::objects::JObject) -> jni::sys::jint {
+pub unsafe extern "system" fn Java_com_aresmaxima_aegis_MainActivity_aegis_1ble_1handshake_1reset(_env: jni::JNIEnv, _this: jni::objects::JObject) -> jni::sys::jint {
     reset(); 0
 }
 

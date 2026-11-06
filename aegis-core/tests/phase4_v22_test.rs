@@ -4,7 +4,6 @@ mod tests {
     use aegis_core::viewer::stream_pipe::{
         aegis_control_media_player, StreamPipeController,
     };
-    use std::ffi::c_void;
 
     #[test]
     fn test_phase4_stream_pipe_zero_copy_and_scramble() {

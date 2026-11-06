@@ -1,4 +1,4 @@
-package com.example.aegis_app
+package com.aresmaxima.aegis
 
 import android.os.Build
 import android.security.keystore.KeyGenParameterSpec

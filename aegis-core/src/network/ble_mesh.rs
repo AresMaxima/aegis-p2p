@@ -144,7 +144,7 @@ pub extern "C" fn aegis_ble_mesh_shutdown() -> i32 {
 // ─────────────────────────────────────────────────────────────────────
 
 #[no_mangle]
-pub unsafe extern "system" fn Java_com_example_aegis_1app_MainActivity_aegis_1ble_1mesh_1set_1pipes(
+pub unsafe extern "system" fn Java_com_aresmaxima_aegis_MainActivity_aegis_1ble_1mesh_1set_1pipes(
     _env: jni::JNIEnv,
     _this: jni::objects::JObject,
     in_fd: jni::sys::jint,
@@ -154,7 +154,7 @@ pub unsafe extern "system" fn Java_com_example_aegis_1app_MainActivity_aegis_1bl
 }
 
 #[no_mangle]
-pub unsafe extern "system" fn Java_com_example_aegis_1app_MainActivity_aegis_1ble_1mesh_1shutdown(
+pub unsafe extern "system" fn Java_com_aresmaxima_aegis_MainActivity_aegis_1ble_1mesh_1shutdown(
     _env: jni::JNIEnv,
     _this: jni::objects::JObject,
 ) -> jni::sys::jint {

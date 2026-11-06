@@ -1,12 +1,72 @@
 //! aegis-core/src/attestation.rs
 //! Android Key Attestation — Niveau 3 (CdCM v2.2-RC3).
+//!
+//! C78 FIX (2026-11-01) : verify_cert_signature gère maintenant
+//! ECDSA-P256/P384 x SHA256/SHA384 + RSA-PKCS1 x SHA256/384/512
+//! + RSA-PSS x SHA256. Logs natifs ajoutés à chaque étape.
+//!
+//! C78 FIX v2 (2026-11-02) : correctif `subject_public_key.data.as_ref()`
+//! — `Cow<[u8]>` doit être emprunté, pas déplacé.
 
 use ring::signature::{
-    UnparsedPublicKey, ECDSA_P256_SHA256_ASN1, RSA_PKCS1_2048_8192_SHA256,
+    UnparsedPublicKey,
+    ECDSA_P256_SHA256_ASN1,
+    ECDSA_P256_SHA384_ASN1,
+    ECDSA_P384_SHA256_ASN1,
+    ECDSA_P384_SHA384_ASN1,
+    RSA_PKCS1_2048_8192_SHA256,
+    RSA_PKCS1_2048_8192_SHA384,
+    RSA_PKCS1_2048_8192_SHA512,
+    RSA_PSS_2048_8192_SHA256,
 };
 use x509_parser::prelude::*;
 
 const KEY_ATTESTATION_OID: &str = "1.3.6.1.4.1.11129.2.1.17";
+
+// =========================================================================
+// Logging Android natif (visible dans logcat)
+// =========================================================================
+
+#[cfg(target_os = "android")]
+#[link(name = "log")]
+extern "C" {
+    fn __android_log_write(
+        prio: i32,
+        tag: *const std::os::raw::c_char,
+        text: *const std::os::raw::c_char,
+    ) -> i32;
+}
+
+#[cfg(target_os = "android")]
+pub fn log_android(tag: &str, msg: &str) {
+    use std::ffi::CString;
+    if let (Ok(t), Ok(m)) = (CString::new(tag), CString::new(msg)) {
+        unsafe {
+            __android_log_write(4, t.as_ptr(), m.as_ptr());
+        }
+    }
+}
+
+#[cfg(not(target_os = "android"))]
+pub fn log_android(_tag: &str, msg: &str) {
+    eprintln!("{}", msg);
+}
+
+fn hex_preview(bytes: &[u8], max: usize) -> String {
+    let take = bytes.len().min(max);
+    let mut s = String::with_capacity(take * 2 + 16);
+    for b in &bytes[..take] {
+        s.push_str(&format!("{:02x}", b));
+    }
+    if bytes.len() > max {
+        s.push_str(&format!("...({}B)", bytes.len()));
+    }
+    s
+}
+
+// =========================================================================
+// Statuts
+// =========================================================================
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum AttestationStatus {
@@ -99,22 +159,87 @@ fn parse_concatenated_certs(
 
 fn verify_cert_signature(child: &X509Certificate, parent: &X509Certificate) -> bool {
     let tbs = child.tbs_certificate.as_ref();
-    // FIX 3 : Cow<[u8]> → &[u8] via deref coercion, sans clone.
     let sig: &[u8] = &child.signature_value.data;
     let alg_oid = child.signature_algorithm.algorithm.to_id_string();
-    let parent_pk = parent.public_key().raw;
 
-    if alg_oid == "1.2.840.10045.4.3.2" {
-        let vk = UnparsedPublicKey::new(&ECDSA_P256_SHA256_ASN1, parent_pk);
-        return vk.verify(tbs, sig).is_ok();
-    }
+    // C78 FIX v2 : Cow<[u8]> doit être emprunté via as_ref()
+    let parent_spki = parent.public_key();
+    let parent_pk: &[u8] = parent_spki.subject_public_key.data.as_ref();
+    let pk_len = parent_pk.len();
 
-    if alg_oid == "1.2.840.113549.1.1.11" {
-        let vk = UnparsedPublicKey::new(&RSA_PKCS1_2048_8192_SHA256, parent_pk);
-        return vk.verify(tbs, sig).is_ok();
-    }
+    log_android(
+        "AEGIS-ATTEST",
+        &format!(
+            "verify_cert_signature: alg={} pk_len={} sig_len={}",
+            alg_oid, pk_len, sig.len()
+        ),
+    );
 
-    false
+    let ok = match alg_oid.as_str() {
+        // ECDSA P-256 / P-384 — distingue via longueur clé (65=P256 uncompressed, 97=P384 uncompressed)
+        "1.2.840.10045.4.3.2" => {
+            // ecdsa-with-SHA256
+            if pk_len <= 65 {
+                UnparsedPublicKey::new(&ECDSA_P256_SHA256_ASN1, parent_pk)
+                    .verify(tbs, sig)
+                    .is_ok()
+            } else {
+                UnparsedPublicKey::new(&ECDSA_P384_SHA256_ASN1, parent_pk)
+                    .verify(tbs, sig)
+                    .is_ok()
+            }
+        }
+        "1.2.840.10045.4.3.3" => {
+            // ecdsa-with-SHA384
+            if pk_len <= 65 {
+                UnparsedPublicKey::new(&ECDSA_P256_SHA384_ASN1, parent_pk)
+                    .verify(tbs, sig)
+                    .is_ok()
+            } else {
+                UnparsedPublicKey::new(&ECDSA_P384_SHA384_ASN1, parent_pk)
+                    .verify(tbs, sig)
+                    .is_ok()
+            }
+        }
+        // RSA PKCS#1
+        "1.2.840.113549.1.1.11" => {
+            // sha256WithRSAEncryption
+            UnparsedPublicKey::new(&RSA_PKCS1_2048_8192_SHA256, parent_pk)
+                .verify(tbs, sig)
+                .is_ok()
+        }
+        "1.2.840.113549.1.1.12" => {
+            // sha384WithRSAEncryption
+            UnparsedPublicKey::new(&RSA_PKCS1_2048_8192_SHA384, parent_pk)
+                .verify(tbs, sig)
+                .is_ok()
+        }
+        "1.2.840.113549.1.1.13" => {
+            // sha512WithRSAEncryption
+            UnparsedPublicKey::new(&RSA_PKCS1_2048_8192_SHA512, parent_pk)
+                .verify(tbs, sig)
+                .is_ok()
+        }
+        // RSASSA-PSS
+        "1.2.840.113549.1.1.10" => {
+            UnparsedPublicKey::new(&RSA_PSS_2048_8192_SHA256, parent_pk)
+                .verify(tbs, sig)
+                .is_ok()
+        }
+        other => {
+            log_android(
+                "AEGIS-ATTEST",
+                &format!("UNSUPPORTED SIG OID: {}", other),
+            );
+            false
+        }
+    };
+
+    log_android(
+        "AEGIS-ATTEST",
+        &format!("verify_cert_signature: alg={} ok={}", alg_oid, ok),
+    );
+    ok
 }
 
 // =========================================================================
@@ -161,8 +286,6 @@ fn der_read_tag<'a>(data: &'a [u8], expected: u8) -> Result<(&'a [u8], &'a [u8])
     Ok((&data[hdr..hdr + len], &data[hdr + len..]))
 }
 
-/// FIX 1 : Encodage base-128 correct (bit de continuation sur tous les octets
-/// SAUF le dernier). Pour 704 → `[0x85, 0x40]`.
 fn der_read_ctx_tag<'a>(
     data: &'a [u8],
     tag_value: u32,
@@ -171,7 +294,6 @@ fn der_read_ctx_tag<'a>(
         return None;
     }
 
-    // Encodage base-128 : LSB d'abord, puis reverse, puis continuation bit.
     let mut tag_bytes = Vec::new();
     let mut v = tag_value;
     loop {
@@ -224,7 +346,6 @@ fn der_read_ctx_tag<'a>(
     Some((&data[hdr..hdr + len], &data[hdr + len..]))
 }
 
-/// FIX 2 : calcul de `consumed` corrigé (ne pas ajouter 1).
 fn der_find_ctx_tag<'a>(data: &'a [u8], tag_value: u32) -> Option<&'a [u8]> {
     let mut i = 0;
     while i < data.len() {
@@ -232,19 +353,16 @@ fn der_find_ctx_tag<'a>(data: &'a [u8], tag_value: u32) -> Option<&'a [u8]> {
         if slice.len() < 2 {
             return None;
         }
-        // Tag context-specific 1 octet (0xA0..=0xBF sauf 0xBF multi-octets)
         if slice[0] & 0xE0 == 0xA0 && slice[0] != 0xBF {
             let n = (slice[0] & 0x1F) as u32;
             let (content, rest) = read_der_len(&slice[1..]).ok()?;
             if n == tag_value {
                 return Some(content);
             }
-            // FIX 2 : `slice.len() - rest.len()` inclut déjà l'octet de tag.
             let consumed = slice.len() - rest.len();
             i += consumed;
             continue;
         }
-        // Tag context-specific multi-octets
         if slice[0] == 0xBF {
             if let Some((content, _)) = der_read_ctx_tag(slice, tag_value) {
                 return Some(content);
@@ -292,8 +410,6 @@ struct KeyDescription<'a> {
     tee_enforced: &'a [u8],
 }
 
-// C46 FIX (2026-10-18) : lifetime elision explicite (`<'_>`) pour satisfaire
-// le lint `mismatched_lifetime_syntaxes`.
 fn parse_key_description(ext_bytes: &[u8]) -> Result<KeyDescription<'_>, AttestationStatus> {
     let (seq, _) = der_read_tag(ext_bytes, 0x30)?;
     let mut cursor = seq;
@@ -349,7 +465,6 @@ struct RootOfTrust<'a> {
     verified_boot_hash: &'a [u8],
 }
 
-// C46 FIX (2026-10-18) : lifetime elision explicite (`<'_>`).
 fn parse_root_of_trust(data: &[u8]) -> Result<RootOfTrust<'_>, AttestationStatus> {
     let (seq, _) = der_read_tag(data, 0x30)?;
     let mut cursor = seq;
@@ -379,67 +494,158 @@ fn parse_root_of_trust(data: &[u8]) -> Result<RootOfTrust<'_>, AttestationStatus
 // =========================================================================
 
 pub fn verify_attestation_chain(chain: &[u8], expected_challenge: &[u8]) -> AttestationStatus {
+    log_android(
+        "AEGIS-ATTEST",
+        &format!(
+            "=== verify_attestation_chain: chain_len={} challenge={}",
+            chain.len(),
+            hex_preview(expected_challenge, 8)
+        ),
+    );
+
     let certs = match parse_concatenated_certs(chain) {
         Ok(c) => c,
-        Err(e) => return e,
+        Err(e) => {
+            log_android(
+                "AEGIS-ATTEST",
+                &format!("parse_concatenated_certs FAILED: {:?} code={}", e, e.to_code()),
+            );
+            return e;
+        }
     };
+    log_android("AEGIS-ATTEST", &format!("parsed {} certs", certs.len()));
 
     for i in 0..certs.len().saturating_sub(1) {
         if !verify_cert_signature(&certs[i], &certs[i + 1]) {
+            log_android(
+                "AEGIS-ATTEST",
+                &format!("cert[{}] signature INVALID → ChainSignatureInvalid (-4)", i),
+            );
             return AttestationStatus::ChainSignatureInvalid;
         }
+        log_android("AEGIS-ATTEST", &format!("cert[{}] signature OK", i));
     }
 
     let leaf = &certs[0];
     let ext_bytes = match get_attestation_extension(leaf) {
         Some(b) => b,
-        None => return AttestationStatus::AttestationExtensionMissing,
+        None => {
+            log_android("AEGIS-ATTEST", "attestation extension MISSING on leaf");
+            return AttestationStatus::AttestationExtensionMissing;
+        }
     };
+    log_android(
+        "AEGIS-ATTEST",
+        &format!("attestation extension found: {} bytes", ext_bytes.len()),
+    );
 
     let kd = match parse_key_description(ext_bytes) {
         Ok(k) => k,
-        Err(e) => return e,
+        Err(e) => {
+            log_android(
+                "AEGIS-ATTEST",
+                &format!("parse_key_description FAILED: {:?} code={}", e, e.to_code()),
+            );
+            return e;
+        }
     };
+    log_android(
+        "AEGIS-ATTEST",
+        &format!(
+            "key_description: version={} security_level={} challenge_len={} tee_enforced_len={}",
+            kd.attestation_version,
+            kd.attestation_security_level,
+            kd.attestation_challenge.len(),
+            kd.tee_enforced.len()
+        ),
+    );
 
     if kd.attestation_version < 3 {
+        log_android(
+            "AEGIS-ATTEST",
+            &format!("attestation_version < 3 ({}) → -6", kd.attestation_version),
+        );
         return AttestationStatus::AttestationExtensionParseError;
     }
 
     if kd.attestation_security_level < 1 {
+        log_android(
+            "AEGIS-ATTEST",
+            &format!("security_level < 1 ({}) → -11", kd.attestation_security_level),
+        );
         return AttestationStatus::SecurityLevelSoftware;
     }
 
     if kd.attestation_challenge != expected_challenge {
+        log_android(
+            "AEGIS-ATTEST",
+            &format!(
+                "challenge MISMATCH: expected={} actual={} → -7",
+                hex_preview(expected_challenge, 8),
+                hex_preview(kd.attestation_challenge, 8)
+            ),
+        );
         return AttestationStatus::ChallengeMismatch;
     }
+    log_android("AEGIS-ATTEST", "challenge MATCH");
 
     let rot_bytes = match der_find_ctx_tag(kd.tee_enforced, 704) {
         Some(b) => b,
-        None => return AttestationStatus::AttestationExtensionMissing,
+        None => {
+            log_android(
+                "AEGIS-ATTEST",
+                "rootOfTrust tag 704 NOT FOUND in teeEnforced → -5",
+            );
+            return AttestationStatus::AttestationExtensionMissing;
+        }
     };
+    log_android(
+        "AEGIS-ATTEST",
+        &format!("rootOfTrust found: {} bytes", rot_bytes.len()),
+    );
 
     let rot = match parse_root_of_trust(rot_bytes) {
         Ok(r) => r,
-        Err(e) => return e,
+        Err(e) => {
+            log_android(
+                "AEGIS-ATTEST",
+                &format!("parse_root_of_trust FAILED: {:?} code={}", e, e.to_code()),
+            );
+            return e;
+        }
     };
+    log_android(
+        "AEGIS-ATTEST",
+        &format!(
+            "root_of_trust: device_locked={} verified_boot_state={} boot_hash_len={}",
+            rot.device_locked,
+            rot.verified_boot_state,
+            rot.verified_boot_hash.len()
+        ),
+    );
 
     if !rot.device_locked {
+        log_android("AEGIS-ATTEST", "device_locked=false → -8");
         return AttestationStatus::BootloaderUnlocked;
     }
-
     if rot.verified_boot_state != 0 {
+        log_android(
+            "AEGIS-ATTEST",
+            &format!("verified_boot_state={} != 0 → -9", rot.verified_boot_state),
+        );
         return AttestationStatus::BootStateNotVerified;
     }
-
     if rot.verified_boot_hash.is_empty() {
+        log_android("AEGIS-ATTEST", "boot_hash empty → -10");
         return AttestationStatus::BootHashMissing;
     }
 
+    log_android("AEGIS-ATTEST", "=== attestation OK ===");
     AttestationStatus::Ok
 }
 
 // =========================================================================
-// TESTS
+// TESTS (inchangés)
 // =========================================================================
 
 #[cfg(test)]
@@ -506,12 +712,8 @@ mod tests {
         assert_eq!(content, b"ABC");
     }
 
-    /// FIX 2 regression test : tag 1-byte puis tag [704], on doit trouver [704].
     #[test]
     fn test_find_ctx_tag_skips_other_tags() {
-        // teeEnforced factice :
-        //   [600] { NULL }  →  0xBF 0x84 0x58 0x02 0x05 0x00
-        //   [704] { "XY" }  →  0xBF 0x85 0x40 0x02 'X' 'Y'
         let mut data: Vec<u8> = Vec::new();
         data.extend_from_slice(&[0xBF, 0x84, 0x58, 0x02, 0x05, 0x00]);
         data.extend_from_slice(&[0xBF, 0x85, 0x40, 0x02, b'X', b'Y']);

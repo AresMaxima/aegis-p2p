@@ -481,7 +481,7 @@ pub extern "C" fn aegis_ble_mesh_reader_stop() -> i32 {
 // ─────────────────────────────────────────────────────────────────────
 
 #[no_mangle]
-pub unsafe extern "system" fn Java_com_example_aegis_1app_MainActivity_aegis_1ble_1mesh_1reader_1start(
+pub unsafe extern "system" fn Java_com_aresmaxima_aegis_MainActivity_aegis_1ble_1mesh_1reader_1start(
     _env: jni::JNIEnv,
     _this: jni::objects::JObject,
     in_fd: jni::sys::jint,
@@ -491,7 +491,7 @@ pub unsafe extern "system" fn Java_com_example_aegis_1app_MainActivity_aegis_1bl
 }
 
 #[no_mangle]
-pub unsafe extern "system" fn Java_com_example_aegis_1app_MainActivity_aegis_1ble_1mesh_1reader_1stop(
+pub unsafe extern "system" fn Java_com_aresmaxima_aegis_MainActivity_aegis_1ble_1mesh_1reader_1stop(
     _env: jni::JNIEnv,
     _this: jni::objects::JObject,
 ) -> jni::sys::jint {

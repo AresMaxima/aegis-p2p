@@ -135,6 +135,11 @@ class SessionResult {
 //   • isVaultInitialized() -> Future<bool>
 //   • initializeMasterPin(pin) -> Future<bool>
 //   • unlockSession(pin) -> Future<SessionResult>
+//
+// C80 FIX (2026-11-03) : les appels FFI `vault_init` et `vault_unlock`
+// exécutent Argon2id (~2-4 s), qui bloquait le main thread Dart → ANR.
+// Ils sont maintenant déportés dans un isolate via `Isolate.run()`
+// (cf. KeystoreBridge.vaultInitInIsolate / vaultUnlockInIsolate).
 
 class SessionVault {
   /// Délai minimum de réponse pour l'unlock (protection timing).
@@ -155,7 +160,8 @@ class SessionVault {
   /// doivent avoir réussi AVANT l'appel.
   Future<bool> initializeMasterPin(String chosenPin) async {
     if (!PasswordValidator.isAcceptable(chosenPin)) return false;
-    return KeystoreBridge.vaultInit(chosenPin);
+    // C80 FIX : Argon2id en isolate, ne bloque plus le main thread.
+    return await KeystoreBridge.vaultInitInIsolate(chosenPin);
   }
 
   /// Tente de déverrouiller le vault avec le PIN fourni.
@@ -167,7 +173,8 @@ class SessionVault {
   Future<SessionResult> unlockSession(String userPin) async {
     final Stopwatch stopwatch = Stopwatch()..start();
 
-    final status = KeystoreBridge.vaultUnlock(userPin);
+    // C80 FIX : Argon2id en isolate, ne bloque plus le main thread.
+    final status = await KeystoreBridge.vaultUnlockInIsolate(userPin);
 
     // Latence minimum : évite de révéler par timing si le verifier
     // est proche du match (le HMAC-SHA256 Rust est déjà constant-time,

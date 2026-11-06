@@ -22,6 +22,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ffi';
+import 'dart:isolate';
 import 'dart:io';
 
 import 'package:ffi/ffi.dart';
@@ -350,9 +351,22 @@ class UpdaterBridge {
 
   /// Fetch le manifest + signature via Tor (FFI Rust `aegis_tor_fetch_http`).
   ///
+  /// C81 FIX (2026-11-06) : `aegis_tor_fetch_http` fait un bootstrap Tor
+  /// synchrone (30-60s, tokio::Runtime::new + block_on dans le FFI).
+  /// Appelé sur le main thread → ANR (seuil 5s). On déporte l'appel FFI
+  /// dans un isolate Dart : le main thread reste réactif.
+  ///
   /// Retourne `(null, null)` si Tor indisponible / fetch échoué.
-  /// Les buffers sont alloués une fois (pas d'allocation dynamique itérative).
   static Future<(Uint8List?, Uint8List?)> _fetchManifestViaTor() async {
+    try {
+      return await Isolate.run(() => _fetchManifestViaTorSync());
+    } catch (_) {
+      return (null, null);
+    }
+  }
+
+  /// Corps synchrone du fetch Tor, exécuté dans un isolate dédié.
+  static (Uint8List?, Uint8List?) _fetchManifestViaTorSync() {
     final manifestBuf = calloc<Uint8>(_maxManifestBytes);
     final sigBuf = calloc<Uint8>(_sigLength);
     final manifestLen = calloc<IntPtr>();

@@ -37,6 +37,11 @@ flutter:
     - assets/logo.png
     - assets/bin/snowflake-client
 
+  fonts:
+    - family: NotoSansArabic
+      fonts:
+        - asset: assets/fonts/NotoSansArabic-Regular.ttf
+
 flutter_launcher_icons:
   android: "ic_launcher"
   ios: true
