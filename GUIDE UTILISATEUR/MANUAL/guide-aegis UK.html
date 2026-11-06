@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AEGIS P2P — Посібник зі швидкого старту</title>
+    <style>
+        :root { --primary: #fcbe0b; --bg-dark: #0d0d0e; --card-bg: #141416; --text-color: #e0e0e0; --text-muted: #a0a0a0; --border-color: #26262a; --alert-color: #ff5555; }
+        * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-dark) !important; color: var(--text-color) !important; line-height: 1.6; margin: 0; padding: 20px; text-align: justify; }
+        .container { max-width: 850px; margin: 0 auto; }
+        header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid var(--primary); padding-bottom: 15px; margin-bottom: 25px; gap: 15px; }
+        .header-title h1 { color: var(--primary) !important; margin: 0 0 5px 0; font-size: 2em; text-transform: uppercase; letter-spacing: 1px; }
+        .header-title p { color: var(--text-muted) !important; font-size: 1em; margin: 0; text-transform: uppercase; font-weight: bold; }
+        .logo { height: 60px; width: auto; max-width: 200px; object-fit: contain; }
+        section { background: var(--card-bg) !important; border: 1px solid var(--border-color); border-radius: 8px; padding: 20px 25px; margin-bottom: 20px; break-inside: avoid; page-break-inside: avoid; }
+        h2 { color: var(--primary) !important; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-top: 0; margin-bottom: 15px; font-size: 1.3em; text-transform: uppercase; }
+        h3 { color: #ffffff !important; font-size: 1.1em; margin-top: 15px; margin-bottom: 10px; }
+        p { margin-top: 0; margin-bottom: 12px; font-size: 0.95em; }
+        ul { list-style-type: none; padding-left: 0; margin-top: 0; margin-bottom: 15px; }
+        li { margin-bottom: 10px; position: relative; padding-left: 20px; font-size: 0.95em; }
+        li::before { content: "•"; color: var(--primary) !important; font-weight: bold; font-size: 1.2em; position: absolute; left: 0; top: -2px; }
+        .alert-box { background: rgba(252, 190, 11, 0.1) !important; border-left: 4px solid var(--primary) !important; padding: 15px; border-radius: 4px; margin: 15px 0; }
+        .alert-box p { margin: 0; color: #ffffff !important; }
+        .danger-box { background: rgba(255, 85, 85, 0.1) !important; border-left: 4px solid var(--alert-color) !important; padding: 15px; border-radius: 4px; margin: 15px 0; }
+        .danger-box p { margin: 0; color: #ffffff !important; }
+        strong { color: #ffffff !important; }
+        .highlight { color: var(--primary) !important; font-weight: bold; }
+        @page { size: A4; margin: 15mm; }
+        @media print { html, body { background-color: var(--bg-dark) !important; color: var(--text-color) !important; } .page-break { page-break-before: always !important; break-before: page !important; height: 0; display: block; } a { color: var(--primary) !important; text-decoration: underline !important; } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <div class="header-title">
+            <h1>AEGIS P2P</h1>
+            <p>Посібник зі швидкого старту</p>
+        </div>
+        <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima Logo" class="logo">
+    </header>
+    <section>
+        <p>Ласкаво просимо до AEGIS P2P. Цей посібник створений для того, щоб провести вас крок за кроком від встановлення додатка до вашої першої захищеної розмови. Знайдіть час, щоб прочитати його: він містить ключі до правильного використання додатка та захисту ваших даних.</p>
+    </section>
+    <section>
+        <h2>1. Встановлення додатку (Незалежність)</h2>
+        <p>Оскільки AEGIS P2P розповсюджується поза традиційними магазинами додатків (Google Play), ви встановите файл <span class="highlight">.apk</span> вручну. Це свідомий вибір, щоб гарантувати, що жоден технологічний гігант не контролює та не відслідковує ваші повідомлення.</p>
+        <ul>
+            <li><strong>Завантаження:</strong> Отримайте файл .apk, наданий з вашою ліцензією, на свій телефон.</li>
+            <li><strong>Запуск:</strong> Відкрийте завантажений файл. Ваш телефон може попросити дозвіл на встановлення з цього джерела.</li>
+            <li><strong>Відкриття:</strong> Після завершення встановлення запустіть AEGIS P2P.</li>
+        </ul>
+        <div class="alert-box">
+            <p><strong>Попередження "Play Protect":</strong> Android систематично відображатиме ЧЕРВОНЕ попередження про те, що додаток походить із невідомого джерела. <strong>Це нормально.</strong> Натисніть "Встановити все одно". Не хвилюйтеся: це попередження є саме доказом того, що додаток є незалежним і вільним від будь-якого зовнішнього контролю.</p>
+        </div>
+    </section>
+    <section>
+        <h2>2. Перший запуск: ваші коди доступу (Ваш щит)</h2>
+        <p>AEGIS <strong>ніколи</strong> не запитуватиме вашу електронну адресу, номер телефону чи ім'я. Ваша особистість невидима. Уся ваша безпека залежить від кодів, які ви зараз створите. Витратьте час на їх вибір та запам'ятовування.</p>
+        <h3>Головний PIN-код</h3>
+        <p>Виберіть код щонайменше з 6 цифр. Це ключ, який відкриває вашу справжню панель керування та розблоковує розмови.</p>
+        <div class="danger-box">
+            <p><strong>Увага:</strong> Якщо ви забудете цей код, ваші дані будуть остаточно втрачені (ніхто не зможе його скинути, навіть ми).</p>
+        </div>
+        <h3>PIN-код-приманка</h3>
+        <p>Виберіть абсолютно інший другий код. Це ваша страхувальна сітка. Якщо вас колись змусять розблокувати телефон під загрозою, введіть цей код. Додаток відкриється нормально, але відобразить фальшиву панель керування з нешкідливими та нічого не вартими повідомленнями. Ваша справжня розмова залишиться невидимою.</p>
+        <h3>Код паніки (Kill Switch)</h3>
+        <p>За замовчуванням введіть <strong>0000</strong> (або <strong>9999</strong>). У разі абсолютної небезпеки цей код запускає процедуру самознищення: додаток миттєво та безповоротно стирає всі ключі та повідомлення з пам'яті телефону, після чого закривається.</p>
+    </section>
+    <div class="page-break"></div>
+    <section>
+        <h2>3. Додавання контакту (Без центрального довідника)</h2>
+        <p>AEGIS працює за принципом "Peer-to-Peer" (від телефону до телефону). Немає центрального сервера, який зберігає ваші контакти. Щоб поспілкуватися з кимось, ви повинні спочатку "підключитися" безпосередньо до нього.</p>
+        <h3>Особисто (Найбезпечніший спосіб)</h3>
+        <ul>
+            <li>На своєму екрані перейдіть до меню та натисніть <strong>"Мій QR-код"</strong>.</li>
+            <li>Ваш контакт використовує свій додаток, натискає <strong>"Сканувати QR-код"</strong> і сканує ваш екран.</li>
+            <li>Захищене з'єднання (з наскрізним шифруванням) миттєво встановлюється.</li>
+        </ul>
+        <h3>Віддалено (Якщо ви не в одній кімнаті)</h3>
+        <ul>
+            <li>Натисніть <strong>"Копіювати мій ключ"</strong>. Це скопіює довгий код (ваш публічний ключ).</li>
+            <li>Надішліть цей код своєму контакту іншим способом (SMS, електронна пошта...). Не надсилайте його в незахищеній розмові, якщо можете цього уникнути.</li>
+            <li>Після того, як ваш контакт вставить цей ключ у свій додаток, натисніть <strong>"Підключити співрозмовника"</strong>.</li>
+        </ul>
+    </section>
+    <section>
+        <h2>4. Надсилання повідомлень і файлів (Нульовий слід)</h2>
+        <p>Після підключення розмова є повністю приватною та зашифрованою від початку до кінця.</p>
+        <ul>
+            <li><strong>Текстові повідомлення:</strong> Пишіть і надсилайте як зазвичай. Те, що ви вводите, ніколи не залишає ваш телефон без шифрування.</li>
+            <li><strong>Фото та відео:</strong> Ви можете безпечно надсилати медіафайли. AEGIS застосовує автоматичне очищення перед надсиланням:
+                <ul>
+                    <li style="margin-top: 5px;"><span class="highlight">Видалення EXIF:</span> Видаляє всі приховані дані з фотографії (наприклад, ваше місцезнаходження GPS або модель телефону).</li>
+                    <li><span class="highlight">Маскування Anti-PRNU:</span> Злегка змінює зображення, щоб розмити унікальний "відбиток" вашої камери, не дозволяючи експерту довести, що фотографія була зроблена саме вашим телефоном.</li>
+                </ul>
+            </li>
+            <li><strong>Жоден файл ніколи не зберігається у відкритому вигляді</strong> на вашому пристрої. Все обробляється на льоту в оперативній пам'яті.</li>
+        </ul>
+    </section>
+    <section>
+        <h2>5. Зміна мережі (Перемикач транспорту)</h2>
+        <p>AEGIS є унікальним, оскільки може спілкуватися трьома різними способами. Ви можете змінити метод у будь-який час у налаштуваннях, залежно від вашої ситуації:</p>
+        <ul>
+            <li><strong>Tor (Рекомендується):</strong> Максимальна анонімність. Ваша IP-адреса повністю прихована. Це трохи повільніше, але майже неможливо відстежити урядом або інтернет-провайдером.</li>
+            <li><strong>Wi-Fi Direct:</strong> Дуже швидко. Використовуйте, якщо ви перебуваєте в одній кімнаті зі співрозмовником, без використання Інтернету.</li>
+            <li><strong>BLE Mesh (Bluetooth):</strong> Для екстремальних ситуацій (режим польоту, повне відключення Інтернету). Дозволяє спілкуватися від одного пристрою до іншого через Bluetooth.</li>
+        </ul>
+    </section>
+    <section>
+        <h2>6. Кнопка екстреної допомоги та датчики</h2>
+        <p>Окрім кодів, додаток має механізми фізичного захисту.</p>
+        <ul>
+            <li><strong>Миттєве знищення:</strong> Якщо ви зайдете на панель екстрених ситуацій і натиснете "Миттєве знищення", додаток очистить всю оперативну пам'ять, зітре ваші сеансові ключі та миттєво закриється. Жодного сліду від вашої розмови не залишиться.</li>
+            <li><strong>Dead Man's Switch (Опціонально):</strong> Ви можете налаштувати додаток на самознищення, якщо він виявить аномальне струшування (телефон вирвано з рук) або різке вилучення SIM-картки.</li>
+        </ul>
+    </section>
+    <section>
+        <h2>💡 Найкращі практики</h2>
+        <ul>
+            <li><strong>Перевірте хеш:</strong> Після отримання файлу APK ви також отримаєте довгий рядок літер і цифр (хеш SHA-256). Ви можете перевірити справжність вашого файлу за допомогою додатка для перевірки хешу.</li>
+            <li><strong>Без скріншотів:</strong> Додаток технічно блокує скріншоти (FLAG_SECURE), але для безпеки не фотографуйте екран іншим пристроєм.</li>
+            <li><strong>Оновлення:</strong> Завжди встановлюйте оновлення, надані Ares Maxima. Вони містять останні виправлення безпеки.</li>
+        </ul>
+    </section>
+    <div style="text-align: center; margin-top: 40px; font-size: 0.85em; color: var(--text-muted); border-top: 1px solid var(--border-color); padding-top: 20px;">
+        <p><strong>AEGIS P2P</strong> — Суверенне рішення безпеки від <a href="https://aresmaxima.com" target="_blank" style="color: var(--primary); text-decoration: none;">Ares Maxima</a></p>
+    </div>
+</div>
+</body>
+</html>

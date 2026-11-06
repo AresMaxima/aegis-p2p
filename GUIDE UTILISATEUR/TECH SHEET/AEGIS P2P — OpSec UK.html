@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AEGIS P2P — Посібник з експлуатації та OpSec</title>
+    <style>
+        :root { --primary: #fcbe0b; --bg-dark: #0d0d0e; --card-bg: #141416; --text-color: #e0e0e0; --text-muted: #a0a0a0; --border-color: #26262a; --alert-color: #ff5555; }
+        * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-dark) !important; color: var(--text-color) !important; line-height: 1.4; margin: 0; padding: 15px; text-align: justify; }
+        .container { max-width: 800px; margin: 0 auto; }
+        header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid var(--primary); padding-bottom: 10px; margin-bottom: 15px; gap: 15px; }
+        .header-title { flex: 1; }
+        .logo { height: 50px; width: auto; max-width: 180px; object-fit: contain; }
+        h1 { color: var(--primary) !important; margin: 0 0 3px 0; font-size: 1.8em; text-transform: uppercase; letter-spacing: 1px; }
+        .subtitle { color: var(--text-muted) !important; font-size: 0.85em; margin: 0; text-transform: uppercase; }
+        section { background: var(--card-bg) !important; border: 1px solid var(--border-color); border-radius: 6px; padding: 14px; margin-bottom: 12px; break-inside: avoid; page-break-inside: avoid; }
+        h2 { color: var(--primary) !important; border-bottom: 1px solid var(--border-color); padding-bottom: 4px; margin-top: 0; margin-bottom: 8px; font-size: 1.1em; text-transform: uppercase; }
+        p { margin-top: 0; margin-bottom: 8px; font-size: 0.9em; }
+        ul { list-style-type: none; padding-left: 0; margin-top: 0; margin-bottom: 0; }
+        li { margin-bottom: 6px; position: relative; padding-left: 18px; font-size: 0.88em; }
+        li::before { content: "•"; color: var(--primary) !important; font-weight: bold; position: absolute; left: 0; }
+        .badge-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 10px 0; }
+        .badge { background: #1a1a1e !important; border-left: 3px solid var(--primary); padding: 8px; border-radius: 4px; }
+        .badge.alert { border-left-color: var(--alert-color); }
+        .badge-title { font-weight: bold; display: block; margin-bottom: 2px; font-size: 0.8em; color: #ffffff !important; }
+        .code-inline { background: #26262a !important; color: var(--primary) !important; padding: 1px 5px; border-radius: 3px; font-family: monospace; font-weight: bold; font-size: 0.88em; }
+        .cta-container { text-align: center; margin-top: 15px; padding: 12px; background: var(--card-bg) !important; border: 1px solid var(--primary); border-radius: 6px; break-inside: avoid; page-break-inside: avoid; }
+        .btn-cta { display: inline-block; background-color: var(--primary) !important; color: #000000 !important; font-weight: bold; text-decoration: none; padding: 10px 20px; border-radius: 4px; text-transform: uppercase; font-size: 0.88em; }
+        .link-url { display: block; margin-top: 6px; color: var(--primary) !important; font-size: 0.8em; text-decoration: underline; }
+        @page { size: A4; margin: 10mm; }
+        @media print { html, body { background-color: #0d0d0e !important; color: #e0e0e0 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } .page-break { page-break-before: always !important; break-before: page !important; height: 0; display: block; } a { color: var(--primary) !important; text-decoration: underline !important; } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <div class="header-title">
+            <h1>AEGIS P2P</h1>
+            <p class="subtitle">Посібник з експлуатації та OpSec — Стійкість та Анонімність</p>
+        </div>
+        <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima Logo" class="logo">
+    </header>
+    <section>
+        <h2>РОЗДІЛ 1: ПРИНЦИПИ БЕЗПЕКИ ТА ЗАПУСК</h2>
+        <p><strong>Нульове збереження секретів:</strong> AEGIS <strong>ніколи</strong> не зберігає ваш <code>master_key</code>, сеансові ключі або історію чатів на диску. Усі ці конфіденційні дані зберігаються <strong>виключно в оперативній пам'яті (RAM)</strong>. Зашифрований файл (<code>vault.json</code>) використовується лише для зберігання криптографічної солі та верифікатора HMAC, які не дозволяють відновити ваші ключі.</p>
+        <p><strong>Розблокування та коди безпеки:</strong> Під час першого запуску ви встановлюєте <strong>надійний PIN-код</strong> (6+ символів). Цей PIN використовується для виведення вашого <code>master_key</code> через HKDF-SHA256. Ви можете налаштувати <strong>другий PIN-код</strong> (режим приманки), який відкриватиме фальшиву панель.</p>
+        <div class="badge-list">
+            <div class="badge"><span class="badge-title">Основний PIN</span><span class="code-inline">На ваш вибір</span> — Відкриває справжню панель.</div>
+            <div class="badge"><span class="badge-title">PIN-приманка</span><span class="code-inline">На ваш вибір</span> — Відкриває фальшиву панель ("Нотатки").</div>
+            <div class="badge alert"><span class="badge-title">Kill Switch</span><span class="code-inline">0000 або 9999</span> — Очищує RAM і закриває додаток.</div>
+        </div>
+        <ul>
+            <li><strong>Захист від захоплення (FLAG_SECURE):</strong> Запобігає створенню скріншотів, відеозапису та маскує попередній перегляд додатка в перемикачі завдань Android.</li>
+            <li><strong>Автоматичне блокування:</strong> Після <strong>1 хвилини</strong> неактивності RAM очищується, і додаток закривається.</li>
+        </ul>
+    </section>
+    <section>
+        <h2>РОЗДІЛ 2: ОБМІН КЛЮЧАМИ ТА P2P-З'ЄДНАННЯ</h2>
+        <p><strong>Виведення ідентичності P2P:</strong> Ваша ідентичність у мережі — це публічний ключ ed25519, <strong>детерміновано виведений</strong> з вашого <code>master_key</code> через HKDF-SHA256. Таким чином, він унікальний, ефемерний (змінюється, якщо змінюється PIN) і не потребує додаткового зберігання.</p>
+        <p><strong>Встановлення з'єднання:</strong></p>
+        <ul>
+            <li><strong>Особисто:</strong> Натисніть <span class="code-inline">МІЙ QR-КОД</span>. Ваш контакт сканує код за допомогою <span class="code-inline">СКАНУВАТИ QR-КОД</span>, щоб ініціювати E2EE-рукостискання.</li>
+            <li><strong>Віддалено:</strong> Натисніть <span class="code-inline">КОПІЮВАТИ МІЙ КЛЮЧ</span> і передайте його через вторинний канал. Одержувач вставляє його в поле "Публічний ключ одержувача" і натискає <span class="code-inline">ПІДКЛЮЧИТИ СПІВРОЗМОВНИКА</span>.</li>
+        </ul>
+    </section>
+    <div class="page-break"></div>
+    <section style="margin-top: 10px;">
+        <h2>РОЗДІЛ 3: ПЕРЕМИКАЧ МЕРЕЖЕВОГО ТРАНСПОРТУ</h2>
+        <p>AEGIS може маршрутизувати ваші повідомлення через три зашифровані транспорти, які можна вибирати вручну або автоматично:</p>
+        <ul>
+            <li><strong>Tor (Максимальна анонімність):</strong> Використовує <strong>вбудований клієнт Tor (Arti)</strong> для підключення до мережі Tor та доступу до адрес <code>.onion</code>. Маскує вашу IP-адресу та обходить цензуру. (Вища затримка).</li>
+            <li><strong>Прямий (P2P):</strong> Пряме TCP/UDP-з'єднання між одноранговими вузлами через їхню IP-адресу (з використанням STUN для виявлення). Забезпечує найкращу пропускну здатність, але розкриває вашу IP-адресу співрозмовнику (якщо ви не використовуєте Tor).</li>
+            <li><strong>Офлайн / Локально (LAN / Bluetooth):</strong> Працює без Інтернету через <strong>Wi-Fi Direct</strong> або <strong>BLE Mesh</strong> для фізичних зустрічей.</li>
+            <li><strong>Гібридний режим (Авто):</strong> Автоматично перемикається між Tor, Wi-Fi Direct та BLE Mesh залежно від доступності мережі та вашої політики безпеки.</li>
+        </ul>
+    </section>
+    <section>
+        <h2>РОЗДІЛ 4: МОДУЛЬ СТЕГАНОГРАФІЇ ТА НАДЗВИЧАЙНИХ СИТУАЦІЙ</h2>
+        <ul>
+            <li><strong>Приховати ключ у тексті:</strong> Сховайте ключ або фразу в модулі стеганографії та натисніть <span class="code-inline">ПРИХОВАТИ КЛЮЧ У ВІРШІ</span>.</li>
+            <li><strong>Витягти ключ:</strong> Вставте отриманий стеганографічний текст і натисніть <span class="code-inline">ВИТЯГТИ КЛЮЧ З ТЕКСТУ</span>, щоб завантажити одержувача.</li>
+            <li><strong>Миттєве знищення:</strong> На панелі екстрених ситуацій натисніть <span class="code-inline">МИТТЄВЕ ЗНИЩЕННЯ RAM (KILL SWITCH)</span>, щоб очистити пам'ять без залишення слідів.</li>
+        </ul>
+    </section>
+    <section>
+        <h2>РОЗДІЛ 5: БЕЗПЕЧНА ОБРОБКА МЕДІА (ZERO-DISK)</h2>
+        <p><strong>Поглинання Zero-Disk:</strong> Усі фотографії, відео та документи, які ви імпортуєте в AEGIS, обробляються <strong>виключно в оперативній пам'яті</strong> через модуль <code>aegis_ingest_file_zero_disk()</code>. На пристрої не створюються тимчасові файли. Вміст знищується після закриття додатка.</p>
+        <p><strong>Безпека RAM (Поліморфна RAM):</strong> Буфери, що містять ваші медіафайли в RAM, захищені динамічною маскою XOR (зі випадковим зміщенням) та структурою "dual rail" (дві копії з канарками цілісності). Це запобігає прямому читанню пам'яті (cold boot, дамп RAM) та виявляє будь-яке втручання (bit-flip).</p>
+        <ul>
+            <li><strong>Anti-PRNU:</strong> Зображення, зняті камерою (CameraX), обробляються для пом'якшення шаблонів PRNU (Photo Response Non-Uniformity). Це унікальний відбиток сенсора, який може ідентифікувати телефон під час криміналістичного аналізу.</li>
+            <li><strong>Видалення EXIF:</strong> Усі метадані (геолокація, модель пристрою, часова мітка) видаляються із зображень перед будь-яким поширенням.</li>
+            <li><strong>Переглядач "Blind":</strong> Вміст відображається через ізольовану поверхню VRAM (BlindView). Попередній перегляд маскується в перемикачі завдань, а скріншоти блокуються глобальним FLAG_SECURE.</li>
+            <li><strong>Безпечне запечатування (опціонально):</strong> Якщо ви вирішите зберегти медіафайл на диску (через <code>aegis_seal_ram_to_disk()</code>), потік спочатку конвертується з YUV420 в RGBA, потім кодується в JPEG (якість 85) <strong>повністю в RAM</strong>, перш ніж бути записаним. На диску не залишається необроблених файлів.</li>
+        </ul>
+    </section>
+    <div class="cta-container">
+        <a href="https://uk.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="btn-cta" target="_blank">Дізнатися більше про AEGIS-P2P (UK)</a>
+        <a href="https://uk.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="link-url" target="_blank">https://uk.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/</a>
+    </div>
+</div>
+</body>
+</html>

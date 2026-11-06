@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AEGIS P2P — Guía de Operación y Manual OpSec</title>
+    <style>
+        :root { --primary: #fcbe0b; --bg-dark: #0d0d0e; --card-bg: #141416; --text-color: #e0e0e0; --text-muted: #a0a0a0; --border-color: #26262a; --alert-color: #ff5555; }
+        * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-dark) !important; color: var(--text-color) !important; line-height: 1.4; margin: 0; padding: 15px; text-align: justify; }
+        .container { max-width: 800px; margin: 0 auto; }
+        header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid var(--primary); padding-bottom: 10px; margin-bottom: 15px; gap: 15px; }
+        .header-title { flex: 1; }
+        .logo { height: 50px; width: auto; max-width: 180px; object-fit: contain; }
+        h1 { color: var(--primary) !important; margin: 0 0 3px 0; font-size: 1.8em; text-transform: uppercase; letter-spacing: 1px; }
+        .subtitle { color: var(--text-muted) !important; font-size: 0.85em; margin: 0; text-transform: uppercase; }
+        section { background: var(--card-bg) !important; border: 1px solid var(--border-color); border-radius: 6px; padding: 14px; margin-bottom: 12px; break-inside: avoid; page-break-inside: avoid; }
+        h2 { color: var(--primary) !important; border-bottom: 1px solid var(--border-color); padding-bottom: 4px; margin-top: 0; margin-bottom: 8px; font-size: 1.1em; text-transform: uppercase; }
+        p { margin-top: 0; margin-bottom: 8px; font-size: 0.9em; }
+        ul { list-style-type: none; padding-left: 0; margin-top: 0; margin-bottom: 0; }
+        li { margin-bottom: 6px; position: relative; padding-left: 18px; font-size: 0.88em; }
+        li::before { content: "•"; color: var(--primary) !important; font-weight: bold; position: absolute; left: 0; }
+        .badge-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 10px 0; }
+        .badge { background: #1a1a1e !important; border-left: 3px solid var(--primary); padding: 8px; border-radius: 4px; }
+        .badge.alert { border-left-color: var(--alert-color); }
+        .badge-title { font-weight: bold; display: block; margin-bottom: 2px; font-size: 0.8em; color: #ffffff !important; }
+        .code-inline { background: #26262a !important; color: var(--primary) !important; padding: 1px 5px; border-radius: 3px; font-family: monospace; font-weight: bold; font-size: 0.88em; }
+        .cta-container { text-align: center; margin-top: 15px; padding: 12px; background: var(--card-bg) !important; border: 1px solid var(--primary); border-radius: 6px; break-inside: avoid; page-break-inside: avoid; }
+        .btn-cta { display: inline-block; background-color: var(--primary) !important; color: #000000 !important; font-weight: bold; text-decoration: none; padding: 10px 20px; border-radius: 4px; text-transform: uppercase; font-size: 0.88em; }
+        .link-url { display: block; margin-top: 6px; color: var(--primary) !important; font-size: 0.8em; text-decoration: underline; }
+        @page { size: A4; margin: 10mm; }
+        @media print { html, body { background-color: #0d0d0e !important; color: #e0e0e0 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } .page-break { page-break-before: always !important; break-before: page !important; height: 0; display: block; } a { color: var(--primary) !important; text-decoration: underline !important; } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <div class="header-title">
+            <h1>AEGIS P2P</h1>
+            <p class="subtitle">Guía de Operación y Manual OpSec — Resiliencia y Anonimato</p>
+        </div>
+        <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima Logo" class="logo">
+    </header>
+    <section>
+        <h2>SECCIÓN 1: PRINCIPIOS DE SEGURIDAD E INICIO</h2>
+        <p><strong>Cero-Persistencia de Secretos:</strong> AEGIS <strong>nunca</strong> almacena su <code>master_key</code>, claves de sesión o historial de chats en el disco. Todos estos datos sensibles residen <strong>exclusivamente en la memoria RAM</strong>. Se utiliza un archivo cifrado (<code>vault.json</code>) únicamente para almacenar una sal criptográfica y un verificador HMAC, que no permiten recuperar sus claves.</p>
+        <p><strong>Desbloqueo y Códigos de Seguridad:</strong> En el primer inicio, usted establece un <strong>PIN fuerte</strong> (6+ caracteres). Este PIN se utiliza para derivar su <code>master_key</code> a través de HKDF-SHA256. Puede configurar un <strong>segundo PIN</strong> (modo señuelo) que abre un panel de control falso.</p>
+        <div class="badge-list">
+            <div class="badge"><span class="badge-title">PIN Principal</span><span class="code-inline">Su elección</span> — Abre el panel real.</div>
+            <div class="badge"><span class="badge-title">PIN Señuelo</span><span class="code-inline">Su elección</span> — Abre un panel falso ("Notas").</div>
+            <div class="badge alert"><span class="badge-title">Kill Switch</span><span class="code-inline">0000 o 9999</span> — Purga la RAM y cierra la aplicación.</div>
+        </div>
+        <ul>
+            <li><strong>Protección Anti-Captura (FLAG_SECURE):</strong> Evita capturas de pantalla, grabaciones de video y oculta la vista previa de la aplicación en el conmutador de tareas de Android.</li>
+            <li><strong>Bloqueo Automático:</strong> Después de <strong>1 minuto</strong> de inactividad, la RAM se purga y la aplicación se cierra.</li>
+        </ul>
+    </section>
+    <section>
+        <h2>SECCIÓN 2: INTERCAMBIO DE CLAVES Y CONEXIÓN P2P</h2>
+        <p><strong>Derivación de Identidad P2P:</strong> Su identidad en la red es una clave pública ed25519, <strong>derivada de manera determinista</strong> a partir de su <code>master_key</code> a través de HKDF-SHA256. Por lo tanto, es única, efímera (cambia si cambia el PIN) y no requiere almacenamiento adicional.</p>
+        <p><strong>Establecer una conexión:</strong></p>
+        <ul>
+            <li><strong>Cara a cara:</strong> Toque <span class="code-inline">MI CÓDIGO QR</span>. Su contacto escanea el código con <span class="code-inline">ESCANEAR UN CÓDIGO QR</span> para iniciar el apretón de manos E2EE.</li>
+            <li><strong>Remoto:</strong> Toque <span class="code-inline">COPIAR MI CLAVE</span> y transmítala a través de un canal secundario. El destinatario la pega en el campo "Clave Pública del destinatario" y toca <span class="code-inline">CONECTAR PAR</span>.</li>
+        </ul>
+    </section>
+    <div class="page-break"></div>
+    <section style="margin-top: 10px;">
+        <h2>SECCIÓN 3: CONMUTADOR DE TRANSPORTE DE RED</h2>
+        <p>AEGIS puede enrutar sus mensajes a través de tres transportes cifrados, seleccionables manual o automáticamente:</p>
+        <ul>
+            <li><strong>Tor (Máximo Anonimato):</strong> Utiliza un <strong>cliente Tor integrado (Arti)</strong> para conectarse a la red Tor y acceder a direcciones <code>.onion</code>. Oculta su dirección IP y evita la censura. (Mayor latencia).</li>
+            <li><strong>Directo (P2P):</strong> Conexión directa TCP/UDP entre pares a través de su dirección IP (con STUN para el descubrimiento). Ofrece el mejor rendimiento pero expone su IP al par (si no está detrás de Tor).</li>
+            <li><strong>Sin conexión / Local (LAN / Bluetooth):</strong> Funciona sin Internet a través de <strong>Wi-Fi Direct</strong> o <strong>BLE Mesh</strong> para reuniones físicas.</li>
+            <li><strong>Modo Híbrido (Auto):</strong> Cambia automáticamente entre Tor, Wi-Fi Direct y BLE Mesh según la disponibilidad de la red y su política de seguridad.</li>
+        </ul>
+    </section>
+    <section>
+        <h2>SECCIÓN 4: MÓDULO DE ESTEGANOGRAFÍA Y EMERGENCIA</h2>
+        <ul>
+            <li><strong>Ocultar una clave en texto:</strong> Oculte una clave o frase en el módulo de Esteganografía y toque <span class="code-inline">OCULTAR CLAVE EN UN POEMA</span>.</li>
+            <li><strong>Extraer una clave:</strong> Pegue el texto esteganográfico recibido y toque <span class="code-inline">EXTRAER CLAVE DEL TEXTO</span> para cargar el destinatario.</li>
+            <li><strong>Destrucción Inmediata:</strong> En el panel de emergencia, toque <span class="code-inline">DESTRUCCIÓN INMEDIATA DE RAM (KILL SWITCH)</span> para purgar la memoria sin dejar rastro.</li>
+        </ul>
+    </section>
+    <section>
+        <h2>SECCIÓN 5: PROCESAMIENTO SEGURO DE MEDIOS (CERO-DISCO)</h2>
+        <p><strong>Ingestión Cero-Disco:</strong> Todas las fotos, videos y documentos que importe a AEGIS se procesan <strong>exclusivamente en la memoria RAM</strong> a través del módulo <code>aegis_ingest_file_zero_disk()</code>. No se crean archivos temporales en el almacenamiento del dispositivo. El contenido se destruye al cerrar la aplicación.</p>
+        <p><strong>Seguridad de RAM (RAM Polimórfica):</strong> Los búferes que contienen sus medios en RAM están protegidos por una máscara XOR dinámica (en un desplazamiento aleatorio) y una estructura "dual rail" (dos copias con canarios de integridad). Esto evita la lectura directa de la memoria (arranque en frío, volcado de RAM) y detecta cualquier manipulación (bit-flip).</p>
+        <ul>
+            <li><strong>Anti-PRNU:</strong> Las imágenes capturadas por la cámara (CameraX) se procesan para mitigar los patrones PRNU (Photo Response Non-Uniformity). Esta es una huella digital única del sensor que podría identificar el teléfono durante un análisis forense.</li>
+            <li><strong>Eliminación de EXIF:</strong> Todos los metadatos (geolocalización, modelo del dispositivo, marca de tiempo) se eliminan de las imágenes antes de compartirlas.</li>
+            <li><strong>Visor "Ciego":</strong> El contenido se muestra a través de una superficie VRAM aislada (BlindView). La vista previa se enmascara en el conmutador de tareas y las capturas de pantalla se bloquean mediante FLAG_SECURE global.</li>
+            <li><strong>Sellado Seguro (Opcional):</strong> Si elige persistir medios en el disco (a través de <code>aegis_seal_ram_to_disk()</code>), la secuencia primero se convierte de YUV420 a RGBA, luego se codifica a JPEG (calidad 85) <strong>completamente en RAM</strong>, antes de escribirse. No se dejan archivos sin procesar en el disco.</li>
+        </ul>
+    </section>
+    <div class="cta-container">
+        <a href="https://es.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="btn-cta" target="_blank">Descubrir AEGIS-P2P (ES)</a>
+        <a href="https://es.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="link-url" target="_blank">https://es.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/</a>
+    </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AEGIS P2P — Guía de Inicio Rápido</title>
+    <style>
+        :root { --primary: #fcbe0b; --bg-dark: #0d0d0e; --card-bg: #141416; --text-color: #e0e0e0; --text-muted: #a0a0a0; --border-color: #26262a; --alert-color: #ff5555; }
+        * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-dark) !important; color: var(--text-color) !important; line-height: 1.6; margin: 0; padding: 20px; text-align: justify; }
+        .container { max-width: 850px; margin: 0 auto; }
+        header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid var(--primary); padding-bottom: 15px; margin-bottom: 25px; gap: 15px; }
+        .header-title h1 { color: var(--primary) !important; margin: 0 0 5px 0; font-size: 2em; text-transform: uppercase; letter-spacing: 1px; }
+        .header-title p { color: var(--text-muted) !important; font-size: 1em; margin: 0; text-transform: uppercase; font-weight: bold; }
+        .logo { height: 60px; width: auto; max-width: 200px; object-fit: contain; }
+        section { background: var(--card-bg) !important; border: 1px solid var(--border-color); border-radius: 8px; padding: 20px 25px; margin-bottom: 20px; break-inside: avoid; page-break-inside: avoid; }
+        h2 { color: var(--primary) !important; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-top: 0; margin-bottom: 15px; font-size: 1.3em; text-transform: uppercase; }
+        h3 { color: #ffffff !important; font-size: 1.1em; margin-top: 15px; margin-bottom: 10px; }
+        p { margin-top: 0; margin-bottom: 12px; font-size: 0.95em; }
+        ul { list-style-type: none; padding-left: 0; margin-top: 0; margin-bottom: 15px; }
+        li { margin-bottom: 10px; position: relative; padding-left: 20px; font-size: 0.95em; }
+        li::before { content: "•"; color: var(--primary) !important; font-weight: bold; font-size: 1.2em; position: absolute; left: 0; top: -2px; }
+        .alert-box { background: rgba(252, 190, 11, 0.1) !important; border-left: 4px solid var(--primary) !important; padding: 15px; border-radius: 4px; margin: 15px 0; }
+        .alert-box p { margin: 0; color: #ffffff !important; }
+        .danger-box { background: rgba(255, 85, 85, 0.1) !important; border-left: 4px solid var(--alert-color) !important; padding: 15px; border-radius: 4px; margin: 15px 0; }
+        .danger-box p { margin: 0; color: #ffffff !important; }
+        strong { color: #ffffff !important; }
+        .highlight { color: var(--primary) !important; font-weight: bold; }
+        @page { size: A4; margin: 15mm; }
+        @media print { html, body { background-color: var(--bg-dark) !important; color: var(--text-color) !important; } .page-break { page-break-before: always !important; break-before: page !important; height: 0; display: block; } a { color: var(--primary) !important; text-decoration: underline !important; } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <div class="header-title">
+            <h1>AEGIS P2P</h1>
+            <p>Guía de Inicio Rápido</p>
+        </div>
+        <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima Logo" class="logo">
+    </header>
+    <section>
+        <p>Bienvenido a AEGIS P2P. Esta guía está diseñada para acompañarte paso a paso, desde la instalación de la aplicación hasta tu primera conversación segura. Tómate el tiempo de leerla: contiene las claves para usar la aplicación correctamente y proteger tus datos.</p>
+    </section>
+    <section>
+        <h2>1. Instalación de la aplicación (La independencia)</h2>
+        <p>Dado que AEGIS P2P se distribuye fuera de las tiendas de aplicaciones tradicionales (Google Play), instalarás manualmente un archivo <span class="highlight">.apk</span>. Esta es una elección deliberada para garantizar que ningún gigante tecnológico controle o monitorice tus mensajes.</p>
+        <ul>
+            <li><strong>Descarga:</strong> Obtén el archivo .apk proporcionado con tu licencia en tu teléfono.</li>
+            <li><strong>Lanzamiento:</strong> Abre el archivo descargado. Tu teléfono podría pedirte que autorices la instalación desde esta fuente.</li>
+            <li><strong>Apertura:</strong> Una vez completada la instalación, inicia AEGIS P2P.</li>
+        </ul>
+        <div class="alert-box">
+            <p><strong>La alerta "Play Protect":</strong> Android mostrará sistemáticamente un mensaje de advertencia en rojo indicando que la aplicación proviene de una fuente desconocida. <strong>Esto es normal.</strong> Haz clic en "Instalar de todos modos". No te preocupes: esta alerta es precisamente la prueba de que la aplicación es independiente y está libre de cualquier control externo.</p>
+        </div>
+    </section>
+    <section>
+        <h2>2. Primer inicio: Tus códigos de acceso (Tu escudo)</h2>
+        <p>AEGIS <strong>nunca</strong> te pedirá tu dirección de correo electrónico, número de teléfono o nombre. Tu identidad es invisible. Toda tu seguridad depende de los códigos que vas a crear. Tómate el tiempo de elegirlos y memorizarlos.</p>
+        <h3>El PIN Principal</h3>
+        <p>Elige un código de al menos 6 dígitos. Es la clave que abre tu panel de control real y desbloquea tus conversaciones.</p>
+        <div class="danger-box">
+            <p><strong>Atención:</strong> Si olvidas este código, tus datos se perderán permanentemente (nadie puede restablecerlo, ni siquiera nosotros).</p>
+        </div>
+        <h3>El PIN Señuelo (Decoy)</h3>
+        <p>Elige un segundo código completamente diferente. Es tu red de seguridad. Si alguna vez te obligan a desbloquear tu teléfono bajo amenaza, introduce este código. La aplicación se abrirá normalmente, pero mostrará un panel de control falso con mensajes inofensivos y sin valor. Tu conversación real permanecerá invisible.</p>
+        <h3>El Código de Pánico (Kill Switch)</h3>
+        <p>Por defecto, introduce <strong>0000</strong> (o <strong>9999</strong>). En caso de peligro absoluto, este código activa un procedimiento de autodestrucción: la aplicación borra instantánea e irreversiblemente todas las claves y mensajes de la memoria del teléfono, y luego se cierra.</p>
+    </section>
+    <div class="page-break"></div>
+    <section>
+        <h2>3. Añadir un contacto (Sin directorio central)</h2>
+        <p>AEGIS funciona "Peer-to-Peer" (de teléfono a teléfono). No hay un servidor central que almacene tus contactos. Para chatear con alguien, primero debes "conectarte" directamente a él.</p>
+        <h3>Cara a cara (La forma más segura)</h3>
+        <ul>
+            <li>En tu pantalla, ve al menú y haz clic en <strong>"Mi Código QR"</strong>.</li>
+            <li>Tu contacto usa su aplicación, hace clic en <strong>"Escanear un Código QR"</strong> y escanea tu pantalla.</li>
+            <li>La conexión segura (cifrada de extremo a extremo) se establece instantáneamente.</li>
+        </ul>
+        <h3>Remoto (Si no estás en la misma habitación)</h3>
+        <ul>
+            <li>Haz clic en <strong>"Copiar mi clave"</strong>. Esto copia un código largo (tu clave pública).</li>
+            <li>Envía este código a tu contacto por otro medio (SMS, correo electrónico...). No lo envíes en una conversación no segura si puedes evitarlo.</li>
+            <li>Una vez que tu contacto haya pegado esta clave en su aplicación, haz clic en <strong>"Conectar Par"</strong>.</li>
+        </ul>
+    </section>
+    <section>
+        <h2>4. Enviar mensajes y archivos (Cero rastro)</h2>
+        <p>Una vez conectados, la conversación es completamente privada y cifrada de extremo a extremo.</p>
+        <ul>
+            <li><strong>Mensajes de texto:</strong> Escribe y envía normalmente. Lo que escribes nunca sale de tu teléfono sin ser cifrado.</li>
+            <li><strong>Fotos y videos:</strong> Puedes enviar medios de forma segura. AEGIS aplica una limpieza automática antes de enviar:
+                <ul>
+                    <li style="margin-top: 5px;"><span class="highlight">Eliminación de EXIF:</span> Elimina todos los datos ocultos de la foto (como tu ubicación GPS o el modelo de tu teléfono).</li>
+                    <li><span class="highlight">Camuflaje Anti-PRNU:</span> Altera ligeramente la imagen para difuminar la "huella digital" única de tu cámara, evitando que un experto demuestre que la foto fue tomada con tu teléfono.</li>
+                </ul>
+            </li>
+            <li><strong>Ningún archivo se guarda nunca en texto plano</strong> en tu dispositivo. Todo se procesa sobre la marcha en la memoria RAM.</li>
+        </ul>
+    </section>
+    <section>
+        <h2>5. Cambiar de red (El interruptor de transporte)</h2>
+        <p>AEGIS es único porque puede comunicarse de tres formas diferentes. Puedes cambiar el método en cualquier momento en la configuración, según tu situación:</p>
+        <ul>
+            <li><strong>Tor (Recomendado):</strong> Anonimato máximo. Tu dirección IP está completamente oculta. Es un poco más lento pero casi imposible de rastrear por un gobierno o un proveedor de servicios de Internet.</li>
+            <li><strong>Wi-Fi Direct:</strong> Muy rápido. Úsalo si estás en la misma habitación que tu contacto, sin pasar por Internet.</li>
+            <li><strong>BLE Mesh (Bluetooth):</strong> Para situaciones extremas (modo avión, corte total de Internet). Permite la comunicación salto a salto a través de Bluetooth.</li>
+        </ul>
+    </section>
+    <section>
+        <h2>6. El botón de emergencia y los sensores</h2>
+        <p>Más allá de los códigos, la aplicación tiene mecanismos de defensa física.</p>
+        <ul>
+            <li><strong>Destrucción Inmediata:</strong> Si accedes al panel de emergencia y haces clic en "Destrucción Inmediata", la aplicación purgará toda la memoria RAM, borrará tus claves de sesión y se cerrará instantáneamente. No quedará ningún rastro de tu conversación.</li>
+            <li><strong>Dead Man's Switch (Opcional):</strong> Puedes configurar la aplicación para que se autodestruya si detecta una sacudida anormal (teléfono arrebatado de las manos) o la extracción abrupta de la tarjeta SIM.</li>
+        </ul>
+    </section>
+    <section>
+        <h2>💡 Buenas prácticas de uso</h2>
+        <ul>
+            <li><strong>Verifica el Hash:</strong> Al recibir tu archivo APK, también recibirás una larga cadena de letras y números (el Hash SHA-256). Puedes verificar que tu archivo es auténtico usando una aplicación de verificación de hash.</li>
+            <li><strong>Sin capturas de pantalla:</strong> La aplicación bloquea técnicamente las capturas de pantalla (FLAG_SECURE), pero por precaución, no fotografíes tu pantalla con otro dispositivo.</li>
+            <li><strong>Actualizaciones:</strong> Instala siempre las actualizaciones proporcionadas por Ares Maxima. Contienen los últimos parches de seguridad.</li>
+        </ul>
+    </section>
+    <div style="text-align: center; margin-top: 40px; font-size: 0.85em; color: var(--text-muted); border-top: 1px solid var(--border-color); padding-top: 20px;">
+        <p><strong>AEGIS P2P</strong> — Una solución de seguridad soberana por <a href="https://aresmaxima.com" target="_blank" style="color: var(--primary); text-decoration: none;">Ares Maxima</a></p>
+    </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AEGIS P2P — دليل البدء السريع</title>
+    <style>
+        :root { --primary: #fcbe0b; --bg-dark: #0d0d0e; --card-bg: #141416; --text-color: #e0e0e0; --text-muted: #a0a0a0; --border-color: #26262a; --alert-color: #ff5555; }
+        * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        body { font-family: 'Tahoma', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-dark) !important; color: var(--text-color) !important; line-height: 1.6; margin: 0; padding: 20px; text-align: right; direction: rtl; }
+        .container { max-width: 850px; margin: 0 auto; }
+        header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid var(--primary); padding-bottom: 15px; margin-bottom: 25px; gap: 15px; }
+        .header-title h1 { color: var(--primary) !important; margin: 0 0 5px 0; font-size: 2em; text-transform: uppercase; letter-spacing: 1px; }
+        .header-title p { color: var(--text-muted) !important; font-size: 1em; margin: 0; text-transform: uppercase; font-weight: bold; }
+        .logo { height: 60px; width: auto; max-width: 200px; object-fit: contain; }
+        section { background: var(--card-bg) !important; border: 1px solid var(--border-color); border-radius: 8px; padding: 20px 25px; margin-bottom: 20px; break-inside: avoid; page-break-inside: avoid; }
+        h2 { color: var(--primary) !important; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-top: 0; margin-bottom: 15px; font-size: 1.3em; text-transform: uppercase; }
+        h3 { color: #ffffff !important; font-size: 1.1em; margin-top: 15px; margin-bottom: 10px; }
+        p { margin-top: 0; margin-bottom: 12px; font-size: 0.95em; text-align: justify; }
+        ul { list-style-type: none; padding-right: 0; padding-left: 0; margin-top: 0; margin-bottom: 15px; }
+        li { margin-bottom: 10px; position: relative; padding-right: 20px; padding-left: 0; font-size: 0.95em; text-align: right; }
+        li::before { content: "•"; color: var(--primary) !important; font-weight: bold; font-size: 1.2em; position: absolute; right: 0; left: auto; top: -2px; }
+        .alert-box { background: rgba(252, 190, 11, 0.1) !important; border-right: 4px solid var(--primary) !important; border-left: none !important; padding: 15px; border-radius: 4px; margin: 15px 0; }
+        .alert-box p { margin: 0; color: #ffffff !important; }
+        .danger-box { background: rgba(255, 85, 85, 0.1) !important; border-right: 4px solid var(--alert-color) !important; border-left: none !important; padding: 15px; border-radius: 4px; margin: 15px 0; }
+        .danger-box p { margin: 0; color: #ffffff !important; }
+        strong { color: #ffffff !important; }
+        .highlight { color: var(--primary) !important; font-weight: bold; }
+        @page { size: A4; margin: 15mm; }
+        @media print { html, body { background-color: var(--bg-dark) !important; color: var(--text-color) !important; } .page-break { page-break-before: always !important; break-before: page !important; height: 0; display: block; } a { color: var(--primary) !important; text-decoration: underline !important; } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <div class="header-title">
+            <h1>AEGIS P2P</h1>
+            <p>دليل البدء السريع</p>
+        </div>
+        <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima Logo" class="logo">
+    </header>
+    <section>
+        <p>مرحبًا بك في AEGIS P2P. تم تصميم هذا الدليل ليرشدك خطوة بخطوة، من تثبيت التطبيق إلى محادثتك الآمنة الأولى. خذ وقتك في قراءته: فهو يحتوي على مفاتيح استخدام التطبيق بشكل صحيح وحماية بياناتك.</p>
+    </section>
+    <section>
+        <h2>1. تثبيت التطبيق (الاستقلالية)</h2>
+        <p>نظرًا لأن AEGIS P2P يتم توزيعه خارج متاجر التطبيقات التقليدية (Google Play)، فستقوم بتثبيت ملف <span class="highlight">.apk</span> يدويًا. هذا خيار متعمد لضمان عدم تحكم أو مراقبة أي عملاق تقني لرسائلك.</p>
+        <ul>
+            <li><strong>التنزيل:</strong> احصل على ملف .apk المرفق مع ترخيصك على هاتفك.</li>
+            <li><strong>التشغيل:</strong> افتح الملف الذي تم تنزيله. قد يطلب منك هاتفك السماح بالتثبيت من هذا المصدر.</li>
+            <li><strong>الفتح:</strong> بمجرد اكتمال التثبيت، قم بتشغيل AEGIS P2P.</li>
+        </ul>
+        <div class="alert-box">
+            <p><strong>تنبيه "Play Protect":</strong> سيعرض Android بشكل منهجي رسالة تحذير حمراء تشير إلى أن التطبيق من مصدر غير معروف. <strong>هذا أمر طبيعي.</strong> انقر على "تثبيت على أي حال". لا تقلق: هذا التنبيه هو بالضبط دليل على أن التطبيق مستقل وخالٍ من أي سيطرة خارجية.</p>
+        </div>
+    </section>
+    <section>
+        <h2>2. التشغيل الأول: رموز الوصول الخاصة بك (درعك)</h2>
+        <p>لن يطلب منك AEGIS <strong>أبدًا</strong> عنوان بريدك الإلكتروني أو رقم هاتفك أو اسمك. هويتك غير مرئية. يعتمد أمانك بالكامل على الرموز التي ستقوم بإنشائها. خذ وقتك في اختيارها وحفظها.</p>
+        <h3>الرمز السري (PIN) الأساسي</h3>
+        <p>اختر رمزًا مكونًا من 6 أرقام على الأقل. هذا هو المفتاح الذي يفتح لوحة التحكم الحقيقية الخاصة بك ويفتح محادثاتك.</p>
+        <div class="danger-box">
+            <p><strong>تحذير:</strong> إذا نسيت هذا الرمز، ستفقد بياناتك نهائيًا (لا يمكن لأحد إعادة تعيينه، ولا حتى نحن).</p>
+        </div>
+        <h3>الرمز السري الخادع (Decoy)</h3>
+        <p>اختر رمزًا ثانيًا مختلفًا تمامًا. إنها شبكة الأمان الخاصة بك. إذا أُجبرت يومًا على فتح هاتفك تحت التهديد، فأدخل هذا الرمز. سيفتح التطبيق بشكل طبيعي، ولكنه سيعرض لوحة تحكم مزيفة تحتوي على رسائل غير ضارة وعديمة القيمة. ستبقى محادثتك الحقيقية غير مرئية.</p>
+        <h3>رمز الذعر (Kill Switch)</h3>
+        <p>بشكل افتراضي، أدخل <strong>0000</strong> (أو <strong>9999</strong>). في حالة الخطر المطلق، يؤدي هذا الرمز إلى إجراء تدمير ذاتي: يمحو التطبيق على الفور ودون إمكانية استرداد جميع المفاتيح والرسائل من ذاكرة الهاتف، ثم يغلق.</p>
+    </section>
+    <div class="page-break"></div>
+    <section>
+        <h2>3. إضافة جهة اتصال (بدون دليل مركزي)</h2>
+        <p>يعمل AEGIS بنظام "الند للند" (من هاتف إلى هاتف). لا يوجد خادم مركزي يخزن جهات الاتصال الخاصة بك. للدردشة مع شخص ما، يجب عليك أولاً "الاتصال" به مباشرة.</p>
+        <h3>وجهًا لوجه (الطريقة الأكثر أمانًا)</h3>
+        <ul>
+            <li>على شاشتك، انتقل إلى القائمة وانقر على <strong>"رمز QR الخاص بي"</strong>.</li>
+            <li>يستخدم جهة الاتصال تطبيقه، وينقر على <strong>"مسح رمز QR"</strong>، ويمسح شاشتك.</li>
+            <li>يتم إنشاء الاتصال الآمن (المشفر من طرف إلى طرف) على الفور.</li>
+        </ul>
+        <h3>عن بُعد (إذا لم تكن في نفس الغرفة)</h3>
+        <ul>
+            <li>انقر على <strong>"نسخ مفتاحي"</strong>. يؤدي هذا إلى نسخ رمز طويل (مفتاحك العام).</li>
+            <li>أرسل هذا الرمز إلى جهة الاتصال الخاصة بك عبر وسيلة أخرى (رسالة نصية، بريد إلكتروني...). لا ترسله في محادثة غير آمنة إذا كان بإمكانك تجنب ذلك.</li>
+            <li>بمجرد أن يلصق جهة الاتصال هذا المفتاح في تطبيقه، انقر على <strong>"توصيل النظير"</strong>.</li>
+        </ul>
+    </section>
+    <section>
+        <h2>4. إرسال الرسائل والملفات (بدون أثر)</h2>
+        <p>بمجرد الاتصال، تكون المحادثة خاصة تمامًا ومشفرة من طرف إلى طرف.</p>
+        <ul>
+            <li><strong>الرسائل النصية:</strong> اكتب وأرسل بشكل طبيعي. ما تكتبه لا يغادر هاتفك أبدًا دون تشفير.</li>
+            <li><strong>الصور ومقاطع الفيديو:</strong> يمكنك إرسال الوسائط بأمان. يطبق AEGIS تنظيفًا تلقائيًا قبل الإرسال:
+                <ul>
+                    <li style="margin-top: 5px;"><span class="highlight">إزالة EXIF:</span> يزيل جميع البيانات المخفية من الصورة (مثل موقع GPS الخاص بك أو طراز هاتفك).</li>
+                    <li><span class="highlight">تمويه Anti-PRNU:</span> يغير الصورة قليلاً لطمس "البصمة" الفريدة لكاميرتك، مما يمنع الخبير من إثبات أن الصورة قد التقطت بهاتفك.</li>
+                </ul>
+            </li>
+            <li><strong>لا يتم حفظ أي ملف أبدًا بنص واضح</strong> على جهازك. تتم معالجة كل شيء أثناء التنقل في ذاكرة الوصول العشوائي (RAM).</li>
+        </ul>
+    </section>
+    <section>
+        <h2>5. تغيير الشبكة (مفتاح النقل)</h2>
+        <p>AEGIS فريد من نوعه لأنه يمكنه التواصل بثلاث طرق مختلفة. يمكنك تغيير الطريقة في أي وقت في الإعدادات، اعتمادًا على موقفك:</p>
+        <ul>
+            <li><strong>Tor (موصى به):</strong> أقصى قدر من إخفاء الهوية. عنوان IP الخاص بك مخفي تمامًا. إنه أبطأ قليلاً ولكنه يكاد يكون من المستحيل تتبعه من قبل الحكومة أو مزود خدمة الإنترنت.</li>
+            <li><strong>Wi-Fi Direct:</strong> سريع جدًا. استخدمه إذا كنت في نفس الغرفة مع جهة الاتصال الخاصة بك، دون المرور عبر الإنترنت.</li>
+            <li><strong>BLE Mesh (Bluetooth):</strong> للحالات القصوى (وضع الطيران، انقطاع الإنترنت التام). يسمح بالتواصل من نقطة إلى نقطة عبر Bluetooth.</li>
+        </ul>
+    </section>
+    <section>
+        <h2>6. زر الطوارئ وأجهزة الاستشعار</h2>
+        <p>بالإضافة إلى الرموز، يحتوي التطبيق على آليات دفاع مادية.</p>
+        <ul>
+            <li><strong>التدمير الفوري:</strong> إذا قمت بالوصول إلى لوحة الطوارئ ونقرت على "التدمير الفوري"، سيقوم التطبيق بمسح كل ذاكرة الوصول العشوائي (RAM)، ومحو مفاتيح الجلسة الخاصة بك، والإغلاق على الفور. لن يبقى أي أثر لمحادثتك.</li>
+            <li><strong>Dead Man's Switch (اختياري):</strong> يمكنك تكوين التطبيق ليدمر نفسه إذا اكتشف اهتزازًا غير طبيعي (انتزاع الهاتف من اليدين) أو إزالة مفاجئة لبطاقة SIM.</li>
+        </ul>
+    </section>
+    <section>
+        <h2>💡 أفضل الممارسات</h2>
+        <ul>
+            <li><strong>تحقق من التجزئة (Hash):</strong> عند استلام ملف APK الخاص بك، ستتلقى أيضًا سلسلة طويلة من الأحرف والأرقام (تجزئة SHA-256). يمكنك التحقق من أن ملفك أصلي باستخدام تطبيق التحقق من التجزئة.</li>
+            <li><strong>لا لقطات الشاشة:</strong> يحظر التطبيق تقنيًا لقطات الشاشة (FLAG_SECURE)، ولكن كإجراء احترازي، لا تصور شاشتك بجهاز آخر.</li>
+            <li><strong>التحديثات:</strong> قم دائمًا بتثبيت التحديثات التي توفرها Ares Maxima. فهي تحتوي على أحدث تصحيحات الأمان.</li>
+        </ul>
+    </section>
+    <div style="text-align: center; margin-top: 40px; font-size: 0.85em; color: var(--text-muted); border-top: 1px solid var(--border-color); padding-top: 20px;">
+        <p><strong>AEGIS P2P</strong> — حل أمني سيادي من <a href="https://aresmaxima.com" target="_blank" style="color: var(--primary); text-decoration: none;">Ares Maxima</a></p>
+    </div>
+</div>
+</body>
+</html>
