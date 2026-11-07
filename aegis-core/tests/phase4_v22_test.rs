@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests {
     use aegis_core::secure_buffer::SecureBuffer;
+    use std::ffi::c_void;
     use aegis_core::viewer::stream_pipe::{
         aegis_control_media_player, StreamPipeController,
     };
