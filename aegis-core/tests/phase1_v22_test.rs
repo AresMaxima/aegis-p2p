@@ -4,8 +4,6 @@ mod tests {
     #[cfg(unix)]
     use aegis_core::ffi_security::init_native_security;
     use aegis_core::secure_buffer::SecureBuffer;
-    use std::process::Command;
-    use std::env;
 
     #[test]
     fn test_v22_secure_buffer_allocation() {

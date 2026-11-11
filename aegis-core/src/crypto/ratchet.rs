@@ -288,16 +288,13 @@ impl RatchetSession {
         }
     }
 
-    /// Chiffre un message : rotation forcée si MAX_CHAIN_LENGTH atteint,
-    /// puis ON-SEND step si pending, puis header + AEAD.
+    /// Chiffre un message : rotation forcée si MAX_CHAIN_LENGTH atteint
+    /// OU si un DH step est en attente après réception, puis header + AEAD.
     pub fn encrypt(&mut self, plaintext: &[u8]) -> Result<Vec<u8>, String> {
         // Rotation forcée (F4.7) : si la chaîne d'envoi atteint sa borne
-        // maximale, on force un DH ratchet step. Priorité sur le flag
-        // pending_dh_step_on_send.
-        if self.send_seq >= MAX_CHAIN_LENGTH {
-            self.dh_step_on_send();
-            self.pending_dh_step_on_send = false;
-        } else if self.pending_dh_step_on_send {
+        // maximale OU si un DH step est en attente après réception,
+        // on force un DH ratchet step.
+        if self.send_seq >= MAX_CHAIN_LENGTH || self.pending_dh_step_on_send {
             self.dh_step_on_send();
             self.pending_dh_step_on_send = false;
         }

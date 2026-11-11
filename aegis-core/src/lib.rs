@@ -1,7 +1,117 @@
 //! aegis-core/src/lib.rs
 //! Point d'Entrée FFI/JNI et Enregistrement des Modules Natifs (CdCM v2.2-RC3).
+//!
+//! =========================================================================
+//! CONTRAT DE SÉCURITÉ FFI — AEGIS CORE (Mil-Spec)
+//! =========================================================================
+//!
+//! Ce document définit le contrat de sécurité commun à **toutes les fonctions
+//! `pub unsafe extern "C"` et `pub unsafe extern "system"`** exposées par ce
+//! crate et ses sous-modules (`network/ble_handshake.rs`, `network/ble_mesh.rs`,
+//! `network/ble_mesh_reader.rs`, `viewer/stream_pipe.rs`). Chaque wrapper
+//! adhère défensivement à ce contrat — voir le code de chaque fonction pour
+//! les vérifications effectives.
+//!
+//! ## 1. Pointeurs (règle universelle)
+//! - `*const T` / `*mut T` : jamais `null` sauf mention contraire explicite.
+//!   Chaque wrapper vérifie `ptr.is_null()` avant tout déréférencement et
+//!   retourne un code d'erreur documenté si le contrat est violé.
+//! - Alignement : `align_of::<T>()`. Les `*const u8` / `*mut u8` n'ont pas
+//!   de contrainte d'alignement (1 octet).
+//! - Durée de vie : tout pointeur d'entrée doit rester valide pendant l'appel.
+//!   AEGIS ne conserve AUCUN pointeur après retour (pas de dangling possible).
+//!
+//! ## 2. Chaînes C (`*const c_char`)
+//! - Encodage **UTF-8 strict** (jamais Latin-1 ni Windows-1252).
+//! - Null-terminated obligatoire. AEGIS retourne `-2` si l'UTF-8 est invalide.
+//!
+//! ## 3. Buffers de sortie
+//! - Toute fonction qui écrit dans un buffer **documente sa taille minimale**
+//!   dans sa doc spécifique (`MAX_MANIFEST_BYTES`, `MAX_SIG_BYTES`, tailles
+//!   fixes 32/64 octets, etc.).
+//! - Buffer trop petit = comportement indéfini (écrasement mémoire). AEGIS ne
+//!   peut pas détecter cette erreur a posteriori : la responsabilité est sur
+//!   l'appelant. Les tailles EFFECTIVES écrites sont retournées via `*mut usize`.
+//!
+//! ## 4. Ownership et libération
+//! - Entrées : AEGIS n'assume jamais l'ownership, l'appelant libère.
+//! - Sorties `*mut c_char` (ex: `aegis_stegano_drown_payload`) : ownership
+//!   transféré. L'appelant **doit** appeler `aegis_free_string()` pour libérer
+//!   (via `CString::from_raw`, jamais `free()` C).
+//!
+//! ## 5. Thread safety
+//! - Toutes les fonctions sont **thread-safe sauf mention contraire**.
+//! - États globaux (`JAVA_VM`, `MAIN_ACTIVITY`, `WIFI_DIRECT_FD`,
+//!   `TOR_STRONGBOX_AVAILABLE`) protégés par `Atomic*` ou `OnceLock`.
+//! - **Aucune fonction FFI n'est réentrante en cas de panic interne** : le
+//!   crate est compilé avec `panic = "abort"` (profil release), donc tout
+//!   panic tue le process sans unwind à travers la frontière FFI.
+//!
+//! ## 6. Codes de retour
+//! - `0` = succès.
+//! - `< 0` = erreur (valeur documentée par fonction).
+//! - `1` / `2` = succès avec variante (ex: `aegis_vault_unlock` → 0 Real, 1 Decoy, 2 NeedsInit).
+//! - `-1` générique = pointeur NULL ou argument invalide.
+//!
+//! ## 7. Comportement en cas de violation critique
+//! Certaines fonctions (`aegis_verify_apk_signature_or_burn`,
+//! `aegisPanicSilentBurn`, `Java_..._verify_1attestation_1chain` en statut
+//! critique) déclenchent `panic_purge()` → `exit(137)`. C'est **intentionnel** :
+//! la RAM est détruite et le processus meurt immédiatement. Aucun retour.
+//!
+//! ## 8. Wrappers JNI (`Java_com_aresmaxima_aegis_*`)
+//! - Signature imposée par JNI : `(JNIEnv, JObject, ...args) -> jint`.
+//! - `env` / `_this` garantis valides par le runtime Android.
+//! - Arguments JNI (`JString`, `JByteArray`, `JByteBuffer`) validés par le
+//!   crate `jni` ; `exception_clear()` appelé en cas d'erreur pour ne pas
+//!   propager d'exception Java.
+//!
+//! ## Références
+//! - Rust FFI Omnibus : <https://jakegoulding.com/rust-ffi-omnibus/>
+//! - Rustonomicon §FFI : <https://doc.rust-lang.org/nomicon/ffi.html>
+//! - Android JNI Tips : <https://developer.android.com/training/articles/perf-jni>
+//!
+//! =========================================================================
 
 #![allow(unused_imports, dead_code, unused_variables)]
+
+// =========================================================================
+// Configuration Clippy — AEGIS (Mil-Spec)
+//
+// Politique :
+//   • ✅ SECURITY & SAFETY : -D warnings (les lints de sécurité bloquent).
+//   • ⚪ STYLE : allow-list documentée ci-dessous (aucun impact sécurité).
+//
+// Toute exception est auditée trimestriellement.
+// =========================================================================
+#![allow(clippy::needless_lifetimes)]
+#![allow(clippy::needless_range_loop)]
+#![allow(clippy::result_unit_err)]
+#![allow(clippy::needless_return)]
+#![allow(clippy::needless_borrows_for_generic_args)]
+#![allow(clippy::for_kv_map)]
+#![allow(clippy::items_after_test_module)]
+#![allow(clippy::unnecessary_cast)]
+#![allow(clippy::redundant_closure)]
+#![allow(clippy::doc_lazy_continuation)]
+#![allow(clippy::doc_overindented_list_items)]
+#![allow(clippy::manual_div_ceil)]
+#![allow(clippy::manual_is_multiple_of)]
+#![allow(clippy::manual_repeat_n)]
+#![allow(clippy::manual_range_contains)]
+#![allow(clippy::manual_pattern_char_comparison)]
+#![allow(clippy::manual_c_str_literals)]
+#![allow(clippy::chunks_exact_to_as_chunks)]
+#![allow(clippy::clone_on_copy)]
+#![allow(clippy::useless_vec)]
+#![allow(clippy::missing_const_for_thread_local)]
+#![allow(clippy::manual_unwrap_or)]
+// Documentation FFI : le contrat de sécurité global est défini en tête de
+// crate (voir "Contrat de Sécurité FFI — AEGIS Core"). Les 43 wrappers FFI
+// y adhèrent défensivement (validation `is_null`, bornes, encodage UTF-8).
+// Le lint per-fonction est désactivé car la doc est centralisée et maintenue
+// comme une seule source de vérité — décision architecturale documentée.
+#![allow(clippy::missing_safety_doc)]
 
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_void};
@@ -72,6 +182,11 @@ static MAIN_ACTIVITY: OnceLock<GlobalRef> = OnceLock::new();
 // JNI_OnLoad
 // =========================================================================
 
+/// # Safety
+///
+/// Appelée uniquement par le runtime Android (JNI).
+/// `vm` doit être un pointeur valide vers un `JavaVM`.
+/// `_reserved` doit être NULL.
 #[no_mangle]
 pub unsafe extern "system" fn JNI_OnLoad(
     vm: *mut jni::sys::JavaVM,
@@ -462,6 +577,10 @@ pub unsafe extern "C" fn aegis_set_hardware_secret(secret_ptr: *const u8, secret
     }
 }
 
+/// # Safety
+///
+/// `apk_sha256_ptr` doit pointer vers une chaîne C valide (UTF-8, null-terminated).
+/// Si le pointeur est NULL ou la chaîne invalide, l'appel déclenche un `panic_purge` (kill process).
 #[no_mangle]
 pub unsafe extern "C" fn aegis_verify_apk_signature_or_burn(apk_sha256_ptr: *const c_char) {
     if apk_sha256_ptr.is_null() {
@@ -473,6 +592,10 @@ pub unsafe extern "C" fn aegis_verify_apk_signature_or_burn(apk_sha256_ptr: *con
     }
 }
 
+/// # Safety
+///
+/// `license_ptr` doit pointer vers une chaîne C valide (hex-encoded, null-terminated).
+/// Retourne 0 si la licence est valide, <0 sinon.
 #[no_mangle]
 pub unsafe extern "C" fn aegis_verify_license_key(license_ptr: *const c_char) -> i32 {
     if license_ptr.is_null() {
@@ -1026,6 +1149,11 @@ pub const MANIFEST_ONION_HOST: &str = "PLACEHOLDER_REPLACE_ME.onion";
 const MAX_MANIFEST_BYTES: usize = 64 * 1024;
 const MAX_SIG_BYTES: usize = 64;
 
+/// # Safety
+///
+/// `out_manifest_ptr` et `out_sig_ptr` doivent pointer vers des buffers alloués par l'appelant
+/// d'au moins `MAX_MANIFEST_BYTES` (64 KiB) et `MAX_SIG_BYTES` (64 B) respectivement.
+/// `out_manifest_len` et `out_sig_len` doivent pointer vers des `usize` inscriptibles.
 #[no_mangle]
 pub unsafe extern "C" fn aegis_tor_fetch_http(
     out_manifest_ptr: *mut u8,

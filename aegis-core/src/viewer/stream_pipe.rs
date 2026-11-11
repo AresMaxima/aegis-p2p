@@ -157,7 +157,7 @@ impl StreamPipeController {
 // FFI : attache / détache de la surface
 // =========================================================================
 
-pub fn aegis_render_to_surface(env: JNIEnv, surface: jni::sys::jobject) -> i32 {
+pub unsafe fn aegis_render_to_surface(env: JNIEnv, surface: jni::sys::jobject) -> i32 {
     if surface.is_null() {
         return -1;
     }
