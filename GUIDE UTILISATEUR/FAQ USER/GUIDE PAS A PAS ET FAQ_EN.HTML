@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AEGIS P2P — Operational Guide & FAQ</title>
+<style>
+    :root { --primary: #FCBE0B; --bg-dark: #0d0d0e; --card-bg: #141416; --text-color: #e0e0e0; --text-muted: #a0a0a0; --border-color: #26262a; }
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-dark); color: var(--text-color); line-height: 1.6; margin: 0; padding: 20px; }
+    .container { max-width: 900px; margin: 0 auto; }
+    header { text-align: center; border-bottom: 2px solid var(--primary); padding-bottom: 20px; margin-bottom: 30px; }
+    header h1 { color: var(--primary); margin: 0 0 10px 0; font-size: 2.2em; text-transform: uppercase; letter-spacing: 1px; }
+    header p { color: var(--text-muted); margin: 0; font-size: 1.1em; }
+    .section-title { color: var(--primary); font-size: 1.6em; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-top: 40px; margin-bottom: 20px; }
+    .step-card { background: var(--card-bg); border: 1px solid var(--border-color); border-left: 4px solid var(--primary); border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+    .step-number { display: inline-block; background: var(--primary); color: #000; font-weight: bold; font-size: 1.2em; width: 30px; height: 30px; text-align: center; line-height: 30px; border-radius: 50%; margin-bottom: 10px; }
+    .step-card h3 { margin: 0 0 10px 0; color: #fff; font-size: 1.3em; }
+    .step-card p { margin: 0 0 10px 0; color: var(--text-color); }
+    .step-card ul { margin: 0; padding-left: 20px; color: var(--text-muted); }
+    .step-card li { margin-bottom: 8px; }
+    .highlight { color: var(--primary); font-weight: bold; }
+    .faq-item { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 12px; overflow: hidden; }
+    .faq-item summary { padding: 18px; font-weight: bold; font-size: 1.1em; cursor: pointer; list-style: none; position: relative; color: #fff; transition: background 0.3s; }
+    .faq-item summary::-webkit-details-marker { display: none; }
+    .faq-item summary::after { content: "+"; position: absolute; right: 20px; top: 50%; transform: translateY(-50%); font-size: 1.5em; color: var(--primary); }
+    .faq-item[open] summary::after { content: "-"; }
+    .faq-item summary:hover { background: #1a1a1e; }
+    .faq-item p { padding: 0 20px 20px 20px; margin: 0; color: var(--text-muted); border-top: 1px solid var(--border-color); padding-top: 15px; }
+    footer { text-align: center; margin-top: 50px; padding-top: 20px; border-top: 1px solid var(--border-color); color: var(--text-muted); font-size: 0.9em; }
+</style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>AEGIS P2P</h1>
+        <p>Operational Guide & FAQ</p>
+    </header>
+
+    <h2 class="section-title">1. Step-by-Step User Guide</h2>
+
+    <div class="step-card">
+        <div class="step-number">1</div>
+        <h3>Installation</h3>
+        <p>AEGIS P2P is distributed outside standard app stores to guarantee your independence.</p>
+        <ul>
+            <li>Download the <span class="highlight">.apk</span> (Android) or <span class="highlight">.ipa</span> (iOS) file from your customer portal.</li>
+            <li>On Android, open the file. If a "Play Protect" warning appears, tap <span class="highlight">"Install anyway"</span>. This proves the app is free from Google's control.</li>
+        </ul>
+    </div>
+
+    <div class="step-card">
+        <div class="step-number">2</div>
+        <h3>Creating access codes</h3>
+        <p>No email, no phone number. You define your own keys:</p>
+        <ul>
+            <li><span class="highlight">Main PIN (6+ digits):</span> Your real access key. Never forget it.</li>
+            <li><span class="highlight">Decoy PIN:</span> A second code. If forced to unlock, type this code. It opens a harmless fake dashboard.</li>
+            <li><span class="highlight">Panic Code (0000/9999):</span> Instantly wipes RAM and closes the app.</li>
+        </ul>
+    </div>
+
+    <div class="step-card">
+        <div class="step-number">3</div>
+        <h3>Adding a contact (3 methods)</h3>
+        <p>AEGIS is decentralized (Peer-to-Peer). There is no central directory.</p>
+        <ul>
+            <li><span class="highlight">1. Face-to-face:</span> Go to <span class="highlight">"My QR Code"</span>. Your contact scans your screen using <span class="highlight">"Scan QR Code"</span>.</li>
+            <li><span class="highlight">2. Remote:</span> Tap <span class="highlight">"Copy my key"</span> and send this code to your contact via another channel. They will paste it into their app.</li>
+            <li><span class="highlight">3. Stealth Mode (Steganography):</span> Copy your key, go to the Steganography module, <span class="highlight">hide the key in a poem</span>, and send this poem via any channel (even unsecured). Your contact will paste it to extract the key.</li>
+        </ul>
+    </div>
+
+    <div class="step-card">
+        <div class="step-number">4</div>
+        <h3>Choosing your network (Transport Switch)</h3>
+        <p>Adapt your communication mode to your tactical environment.</p>
+        <ul>
+            <li><span class="highlight">Tor:</span> Maximum anonymity. Masks your IP address (slightly slower).</li>
+            <li><span class="highlight">Wi-Fi Direct / BLE Mesh:</span> Local communication without Internet (ideal if the network is down or jammed).</li>
+        </ul>
+    </div>
+
+    <div class="step-card">
+        <div class="step-number">5</div>
+        <h3>Sending a secure message</h3>
+        <p>Once the contact is added, communication is end-to-end encrypted.</p>
+        <ul>
+            <li>Go to the "Chat" tab or select your contact.</li>
+            <li>Write your message in the text area at the bottom.</li>
+            <li>Tap the send icon. The message is encrypted (Double Ratchet) instantly before leaving your device.</li>
+        </ul>
+    </div>
+
+    <div class="step-card">
+        <div class="step-number">6</div>
+        <h3>Sending a photo (Zero-Disk Ingest)</h3>
+        <p>AEGIS never stores your media on the hard drive (ROM).</p>
+        <ul>
+            <li>Go to the "Vault" or "Chat" tab.</li>
+            <li>Tap <span class="highlight">"Select Media"</span> (or use the camera).</li>
+            <li>Choose your photo. AEGIS loads it <span class="highlight">directly into RAM</span>.</li>
+            <li>The system automatically strips GPS metadata (EXIF) and applies Anti-PRNU camouflage.</li>
+            <li>Tap send. Once the app is closed, the photo exists nowhere.</li>
+        </ul>
+    </div>
+
+    <div class="step-card">
+        <div class="step-number">7</div>
+        <h3>Using Steganography</h3>
+        <p>Hide keys in plain sight within harmless text.</p>
+        <ul>
+            <li>Go to the "Steganography" tab.</li>
+            <li>Enter the key (or secret message) to hide, and write a poem or cover text.</li>
+            <li>Tap <span class="highlight">"Hide key in poem"</span>. The app generates text that looks normal but contains your secret.</li>
+            <li>Send this text via any network.</li>
+        </ul>
+    </div>
+
+    <div class="step-card">
+        <div class="step-number">8</div>
+        <h3>Emergency & Destruction (Kill Switch)</h3>
+        <p>In case of physical compromise:</p>
+        <ul>
+            <li>Access the emergency panel or type your panic code (0000/9999).</li>
+            <li>RAM is instantly purged, keys are destroyed, and the app closes. No trace remains.</li>
+        </ul>
+    </div>
+
+    <h2 class="section-title">2. Frequently Asked Questions (FAQ)</h2>
+
+    <details class="faq-item"><summary>1. What is AEGIS P2P?</summary><p>AEGIS P2P is a <strong>military-grade</strong> (Mil-Spec) communication suite. It is designed for armed forces, intelligence agencies, special operations operators, and critical infrastructure. It combines post-quantum encryption (ML-KEM-1024) with a strict "Zero-Disk" architecture.</p></details>
+    <details class="faq-item"><summary>2. Why isn't the app on Google Play or the App Store?</summary><p>Tech giants impose rules (and censorship) that are incompatible with military security requirements. By distributing directly from our servers, we guarantee a secure Supply Chain, free from any interference or backdoor.</p></details>
+    <details class="faq-item"><summary>3. How does AEGIS resist state-level actors (APTs)?</summary><p>AEGIS trusts no network infrastructure. By using native Tor routing and post-quantum encryption, even a state-level adversary capable of mass traffic interception will be unable to decrypt messages or identify operators.</p></details>
+    <details class="faq-item"><summary>4. Is the "Play Protect" warning on Android dangerous?</summary><p>No. Android displays this warning for any app installed outside the Play Store. It is technical proof that the app escapes Google's control. You can install it safely.</p></details>
+    <details class="faq-item"><summary>5. What happens if I forget my Main PIN?</summary><p>Due to our "Zero-Knowledge" architecture, no one — not even the AEGIS team — can recover your code. If you forget it, the operator and their data are permanently lost.</p></details>
+    <details class="faq-item"><summary>6. How does the Decoy PIN work?</summary><p>If you are captured and forced to unlock the device, type the Decoy PIN. The app will open in a decoy environment (e.g., an empty notepad). Real OpSec communications remain completely invisible.</p></details>
+    <details class="faq-item"><summary>7. How do I use the Kill Switch (Destruction)?</summary><p>In case of imminent physical compromise, typing the code (0000/9999) triggers an instant purge of RAM, destruction of session keys, and closure of the app. No memory dump can be exploited.</p></details>
+    <details class="faq-item"><summary>8. Does AEGIS collect metadata?</summary><p>Zero. AEGIS collects no metadata, uses no trackers, and requires no identity. Operator identity is purely cryptographic and ephemeral.</p></details>
+    <details class="faq-item"><summary>9. What is "Zero-Disk" ingestion?</summary><p>When an operator sends a photo or document, AEGIS never writes it to the device's storage (ROM). Everything is processed in RAM. If the device is seized or powered off, the data is gone forever.</p></details>
+    <details class="faq-item"><summary>10. How does the "Transport Switch" work?</summary><p>It's a tactical network selector. The operator can force traffic via the Tor network (anonymity), Wi-Fi Direct (hardened local network), or Bluetooth Mesh (if Internet infrastructure is destroyed).</p></details>
+    <details class="faq-item"><summary>11. Can I use AEGIS without Internet (D3E zone)?</summary><p>Yes. In a contested environment (jamming), AEGIS uses BLE Mesh or Wi-Fi Direct to establish a local mesh (MANET). Communications propagate from terminal to terminal.</p></details>
+    <details class="faq-item"><summary>12. What is Anti-PRNU protection?</summary><p>It is a forensic counter-measure. AEGIS slightly alters the image to destroy the PRNU fingerprint (the unique "noise" of the camera sensor). It becomes impossible for a forensic lab to attribute a photo to a specific device.</p></details>
+    <details class="faq-item"><summary>13. Can I take screenshots?</summary><p>No. For COMSEC reasons, AEGIS technically blocks screenshots (FLAG_SECURE) and hides the app preview in the task manager.</p></details>
+    <details class="faq-item"><summary>14. What happens if the device is seized or stolen?</summary><p>The device contains no long-term data. If powered off or if the Kill Switch is activated, keys are wiped. An adversary will extract nothing, even via physical extraction or a Cold Boot attack.</p></details>
+    <details class="faq-item"><summary>15. Does AEGIS work on iOS?</summary><p>Yes. For European operators, we distribute an iOS version directly via our website (Web Distribution - DMA), guaranteeing a supply chain outside of Apple's control.</p></details>
+    <details class="faq-item"><summary>16. Why does installation ask to allow "unknown sources"?</summary><p>It's a requirement to bypass official stores. Manual installation guarantees the binary hasn't been modified. AEGIS is cryptographically signed by us.</p></details>
+    <details class="faq-item"><summary>17. How are updates secured?</summary><p>Each update is signed via an ed25519 private key. If an adversary attempts a Man-in-the-Middle attack to push malicious firmware, the app will reject the update.</p></details>
+    <details class="faq-item"><summary>18. Is the source code auditable?</summary><p>Yes. AEGIS's code undergoes reproducible builds and formal analysis (Miri, AWS Kani) with every commit. Security relies on mathematical proofs.</p></details>
+    <details class="faq-item"><summary>19. Is there a file size limit?</summary><p>"Zero-Disk" processing in RAM imposes physical limits. Very large files must be compressed or fragmented before transmission to avoid saturating RAM.</p></details>
+    <details class="faq-item"><summary>20. What is "Post-Quantum" encryption?</summary><p>AEGIS integrates ML-KEM-1024. It is an algorithm designed to resist attacks from a future quantum computer (capable of breaking RSA). Your communications today will remain undecipherable in 20 years.</p></details>
+
+    <footer>
+        <p><strong>AEGIS P2P</strong> by <a href="https://aresmaxima.com" style="color: var(--primary); text-decoration: none;">Ares Maxima</a> — Sovereign Security & Anti-Forensics.</p>
+    </footer>
+</div>
+</body>
+</html>

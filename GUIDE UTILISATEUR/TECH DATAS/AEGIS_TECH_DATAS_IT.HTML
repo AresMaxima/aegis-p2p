@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AEGIS P2P: Prove Tecniche e Benchmark Competitivo</title>
+<style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 1200px; margin: 0 auto; padding: 20px; }
+    h1, h2 { color: #111; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 14px; }
+    th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+    th { background-color: #f4f4f4; font-weight: bold; }
+    tr:nth-child(even) { background-color: #f9f9f9; }
+    .note { font-style: italic; color: #666; margin-bottom: 20px; }
+    .verdict { font-weight: bold; font-size: 16px; background: #eef; padding: 15px; border-left: 5px solid #0056b3; }
+</style>
+</head>
+<body>
+    <h1>PARTE 1 — AEGIS P2P: Prove Tecniche e Benchmark Competitivo</h1>
+    
+    <h2>1. Prove Interne di Sicurezza e Affidabilità</h2>
+    <p>AEGIS si basa sulla filosofia "Zero-Trust, Verify-Everything" (Fiducia zero, verifica tutto). Nessuna dichiarazione di sicurezza viene fatta senza un corrispondente test automatizzato o una prova formale nella nostra pipeline CI/CD (GitHub Actions, 10/10 verde).</p>
+    <table>
+        <thead>
+            <tr><th>Dominio di Prova</th><th>Strumento / Metodo</th><th>Cosa dimostra</th><th>Stato</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Sicurezza della Memoria</td><td>Rust / Miri</td><td>Rilevamento esaustivo di comportamenti indefiniti (UB). Previene buffer overflow, use-after-free e data race.</td><td>✅ 5/5 Job superati</td></tr>
+            <tr><td>Verifica Formale</td><td>AWS Kani</td><td>Prova matematica dell'assenza di errori di runtime (panic, overflow) nelle primitive crittografiche critiche (ML-KEM, Ed25519).</td><td>✅ Superato</td></tr>
+            <tr><td>Prevenzione delle Perdite</td><td>Valgrind / Linux mmap</td><td>Garantisce zero perdite di memoria durante le operazioni crittografiche e le allocazioni sicure.</td><td>✅ Superato</td></tr>
+            <tr><td>Attestazione Hardware</td><td>StrongBox / Keymaster</td><td>Convalida la radice di fiducia hardware del dispositivo. Fallisce in modo sicuro (Panic Purge) se la catena di attestazione Android è compromessa.</td><td>✅ Integrato e testato</td></tr>
+            <tr><td>Sicurezza FFI e Linker</td><td>JNI Symbol Verification</td><td>Verifica automatizzata che tutti i simboli nativi C/Rust (es. aegis_panic_purge) siano correttamente esportati e collegati a Kotlin.</td><td>✅ Superato (10/10)</td></tr>
+            <tr><td>Architettura Zero-Disk</td><td>Isolati solo in RAM</td><td>Le chiavi crittografiche e i dati in chiaro non toccano mai il disco. La decrittazione avviene in un ambiente Rust isolato.</td><td>✅ Dimostrato</td></tr>
+        </tbody>
+    </table>
+
+    <h2>2. Benchmark: AEGIS vs. Leader di Mercato</h2>
+    <p class="note">Nota: AEGIS è rivolto a modelli ad alta minaccia (giornalisti, attivisti, individui ad alto patrimonio, infrastrutture critiche). Sacrifica la comodità del mercato di massa per la sovranità crittografica assoluta.</p>
+    <table>
+        <thead>
+            <tr><th>Funzionalità / Criterio</th><th>AEGIS P2P</th><th>Signal</th><th>Session</th><th>Telegram</th><th>Wickr (AWS)</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Standard di Crittografia</td><td>Signal Double Ratchet + Post-Quantum (ML-KEM-1024)</td><td>Signal Protocol (PQ in corso)</td><td>Signal Protocol</td><td>MTProto (Personalizzato)</td><td>AES-256 / ECDH</td></tr>
+            <tr><td>Attestazione Hardware</td><td>Obbligatoria (StrongBox). Fallisce se rootato.</td><td>Nessuna</td><td>Nessuna</td><td>Nessuna</td><td>Opzionale</td></tr>
+            <tr><td>Anonimato di Rete</td><td>Routing Tor nativo + BLE Mesh + Wi-Fi Direct</td><td>Server centralizzati (Richiede telefono)</td><td>Routing Onion Decentralizzato</td><td>Cloud centralizzato</td><td>Cloud centralizzato</td></tr>
+            <tr><td>Anti-Forensics</td><td>Zero-Disk (solo RAM) + RAM Polimorfica + FSTRIM</td><td>DB SQLite locale (Crittografato)</td><td>DB SQLite locale (Crittografato)</td><td>Basato su cloud</td><td>DB locale</td></tr>
+            <tr><td>Protocollo Panic / Burn</td><td>Sì (Bruciatura silenziosa, wipe RAM, dead-man switch)</td><td>No</td><td>No</td><td>No</td><td>No</td></tr>
+            <tr><td>Open Source / Riproducibile</td><td>Sì (Build riproducibili, pipeline CI completa)</td><td>Sì</td><td>Sì</td><td>Solo client</td><td>No (Codice chiuso)</td></tr>
+            <tr><td>Identità</td><td>Crittografica (Nessun numero/email)</td><td>Numero di telefono</td><td>ID casuale</td><td>Numero di telefono</td><td>Email/Nome utente</td></tr>
+        </tbody>
+    </table>
+    <div class="verdict">Verdetto: AEGIS è l'unica soluzione che combina prontezza Post-Quantum, Attestazione Hardware e anti-forensics Zero-Disk in una mesh P2P decentralizzata. È uno strumento di livello "Sovrano" (Tier-1).</div>
+</body>
+</html>

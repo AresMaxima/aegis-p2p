@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AEGIS P2P: Технічні докази та конкурентний бенчмарк</title>
+<style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 1200px; margin: 0 auto; padding: 20px; }
+    h1, h2 { color: #111; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 14px; }
+    th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+    th { background-color: #f4f4f4; font-weight: bold; }
+    tr:nth-child(even) { background-color: #f9f9f9; }
+    .note { font-style: italic; color: #666; margin-bottom: 20px; }
+    .verdict { font-weight: bold; font-size: 16px; background: #eef; padding: 15px; border-left: 5px solid #0056b3; }
+</style>
+</head>
+<body>
+    <h1>ЧАСТИНА 1 — AEGIS P2P: Технічні докази та конкурентний бенчмарк</h1>
+    
+    <h2>1. Внутрішні докази безпеки та надійності</h2>
+    <p>AEGIS побудований на філософії "Zero-Trust, Verify-Everything" (Нульова довіра, все перевіряй). Жодне твердження про безпеку не робиться без відповідного автоматизованого тесту або формального доказу в нашому конвеєрі CI/CD (GitHub Actions, 10/10 зелених).</p>
+    <table>
+        <thead>
+            <tr><th>Сфера доказів</th><th>Інструмент / Метод</th><th>Що це доводить</th><th>Статус</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Безпека пам'яті</td><td>Rust / Miri</td><td>Вичерпне виявлення невизначеної поведінки (UB). Запобігає переповненню буфера, використанню після звільнення та гонкам даних.</td><td>✅ 5/5 завдань пройдено</td></tr>
+            <tr><td>Формальна верифікація</td><td>AWS Kani</td><td>Математичний доказ відсутності помилок під час виконання (паніки, переповнення) у критичних криптографічних примітивах (ML-KEM, Ed25519).</td><td>✅ Пройдено</td></tr>
+            <tr><td>Запобігання витокам</td><td>Valgrind / Linux mmap</td><td>Гарантує відсутність витоків пам'яті під час криптографічних операцій та безпечного розподілу буферів.</td><td>✅ Пройдено</td></tr>
+            <tr><td>Апаратна атестація</td><td>StrongBox / Keymaster</td><td>Перевіряє апаратний корінь довіри пристрою. Безпечна відмова (Panic Purge) у разі злому або отримання root-прав.</td><td>✅ Інтегровано та протестовано</td></tr>
+            <tr><td>Безпека FFI та лінкера</td><td>JNI Symbol Verification</td><td>Автоматична перевірка того, що всі нативні символи C/Rust (наприклад, aegis_panic_purge) правильно експортовані та прив'язані до рівня Kotlin.</td><td>✅ Пройдено (10/10)</td></tr>
+            <tr><td>Архітектура Zero-Disk</td><td>Ізоляти лише в RAM</td><td>Криптографічні ключі та відкриті дані ніколи не торкаються диска. Розшифрування сховища відбувається в ізольованому середовищі Rust.</td><td>✅ Доведено</td></tr>
+        </tbody>
+    </table>
+
+    <h2>2. Бенчмарк: AEGIS проти лідерів ринку</h2>
+    <p class="note">Примітка: AEGIS орієнтований на моделі високого ризику (журналісти, активісти, заможні особи, критична інфраструктура). Він жертвує зручністю для масового ринку заради абсолютного криптографічного суверенітету.</p>
+    <table>
+        <thead>
+            <tr><th>Функція / Критерій</th><th>AEGIS P2P</th><th>Signal</th><th>Session</th><th>Telegram</th><th>Wickr (AWS)</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Стандарт шифрування</td><td>Signal Double Ratchet + Постквантовий (ML-KEM-1024)</td><td>Signal Protocol (PQ в процесі)</td><td>Signal Protocol</td><td>MTProto (Власний)</td><td>AES-256 / ECDH</td></tr>
+            <tr><td>Апаратна атестація</td><td>Обов'язкова (StrongBox). Безпечна відмова при root.</td><td>Немає</td><td>Немає</td><td>Немає</td><td>Опціонально</td></tr>
+            <tr><td>Мережева анонімність</td><td>Нативна маршрутизація Tor + BLE Mesh + Wi-Fi Direct</td><td>Централізовані сервери (Потрібен телефон)</td><td>Децентралізована маршрутизація цибулі</td><td>Централізована хмара</td><td>Централізована хмара</td></tr>
+            <tr><td>Анти-форензика</td><td>Zero-Disk (лише RAM) + Поліморфна RAM + FSTRIM</td><td>Локальна БД SQLite (Зашифрована)</td><td>Локальна БД SQLite (Зашифрована)</td><td>На основі хмари</td><td>Локальна БД</td></tr>
+            <tr><td>Протокол паніки / спалення</td><td>Так (Тихе спалення, очищення RAM, dead-man switch)</td><td>Ні</td><td>Ні</td><td>Ні</td><td>Ні</td></tr>
+            <tr><td>Відкритий код / Відтворюваність</td><td>Так (Відтворювані збірки, повний CI конвеєр)</td><td>Так</td><td>Так</td><td>Лише клієнт</td><td>Ні (Закритий код)</td></tr>
+            <tr><td>Ідентифікація</td><td>Криптографічна (Без телефону/email)</td><td>Номер телефону</td><td>Випадковий ID</td><td>Номер телефону</td><td>Email/Ім'я користувача</td></tr>
+        </tbody>
+    </table>
+    <div class="verdict">Вердикт: AEGIS — єдине рішення, що поєднує постквантову готовність, апаратну атестацію та анти-форензику Zero-Disk у децентралізованій P2P-мережі. Це інструмент рівня "Суверен" (Tier-1).</div>
+</body>
+</html>

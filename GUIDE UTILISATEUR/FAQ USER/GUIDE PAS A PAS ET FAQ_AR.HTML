@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AEGIS P2P — الدليل التشغيلي والأسئلة الشائعة</title>
+<style>
+    :root { --primary: #FCBE0B; --bg-dark: #0d0d0e; --card-bg: #141416; --text-color: #e0e0e0; --text-muted: #a0a0a0; --border-color: #26262a; }
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Tahoma, Arial, sans-serif; background-color: var(--bg-dark); color: var(--text-color); line-height: 1.6; margin: 0; padding: 20px; }
+    .container { max-width: 900px; margin: 0 auto; }
+    header { text-align: center; border-bottom: 2px solid var(--primary); padding-bottom: 20px; margin-bottom: 30px; }
+    header h1 { color: var(--primary); margin: 0 0 10px 0; font-size: 2.2em; text-transform: uppercase; letter-spacing: 1px; }
+    header p { color: var(--text-muted); margin: 0; font-size: 1.1em; }
+    .section-title { color: var(--primary); font-size: 1.6em; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-top: 40px; margin-bottom: 20px; }
+    .step-card { background: var(--card-bg); border: 1px solid var(--border-color); border-right: 4px solid var(--primary); border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+    .step-number { display: inline-block; background: var(--primary); color: #000; font-weight: bold; font-size: 1.2em; width: 30px; height: 30px; text-align: center; line-height: 30px; border-radius: 50%; margin-bottom: 10px; }
+    .step-card h3 { margin: 0 0 10px 0; color: #fff; font-size: 1.3em; }
+    .step-card p { margin: 0 0 10px 0; color: var(--text-color); }
+    .step-card ul { margin: 0; padding-right: 20px; color: var(--text-muted); }
+    .step-card li { margin-bottom: 8px; }
+    .highlight { color: var(--primary); font-weight: bold; }
+    .faq-item { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 12px; overflow: hidden; }
+    .faq-item summary { padding: 18px; font-weight: bold; font-size: 1.1em; cursor: pointer; list-style: none; position: relative; color: #fff; transition: background 0.3s; }
+    .faq-item summary::-webkit-details-marker { display: none; }
+    .faq-item summary::after { content: "+"; position: absolute; left: 20px; top: 50%; transform: translateY(-50%); font-size: 1.5em; color: var(--primary); }
+    .faq-item[open] summary::after { content: "-"; }
+    .faq-item summary:hover { background: #1a1a1e; }
+    .faq-item p { padding: 0 20px 20px 20px; margin: 0; color: var(--text-muted); border-top: 1px solid var(--border-color); padding-top: 15px; }
+    footer { text-align: center; margin-top: 50px; padding-top: 20px; border-top: 1px solid var(--border-color); color: var(--text-muted); font-size: 0.9em; }
+</style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>AEGIS P2P</h1>
+        <p>الدليل التشغيلي والأسئلة الشائعة</p>
+    </header>
+
+    <h2 class="section-title">1. دليل المستخدم خطوة بخطوة</h2>
+
+    <div class="step-card">
+        <div class="step-number">1</div>
+        <h3>التثبيت</h3>
+        <p>يتم توزيع AEGIS P2P خارج متاجر التطبيقات القياسية لضمان استقلاليتك.</p>
+        <ul>
+            <li>قم بتنزيل ملف <span class="highlight">.apk</span> (أندرويد) أو <span class="highlight">.ipa</span> (iOS) من بوابة العملاء الخاصة بك.</li>
+            <li>على أندرويد، افتح الملف. إذا ظهر تحذير "Play Protect"، انقر على <span class="highlight">"تثبيت على أي حال"</span>. هذا يثبت أن التطبيق خالٍ من سيطرة جوجل.</li>
+        </ul>
+    </div>
+
+    <div class="step-card">
+        <div class="step-number">2</div>
+        <h3>إنشاء رموز الوصول</h3>
+        <p>لا بريد إلكتروني، لا رقم هاتف. أنت تحدد مفاتيحك الخاصة:</p>
+        <ul>
+            <li><span class="highlight">رمز PIN الرئيسي (6+ أرقام):</span> مفتاح الوصول الحقيقي الخاص بك. لا تنساه أبدًا.</li>
+            <li><span class="highlight">رمز PIN الخادع:</span> رمز ثانٍ. إذا أُجبرت على فتح الجهاز، اكتب هذا الرمز. سيفتح لوحة تحكم مزيفة غير ضارة.</li>
+            <li><span class="highlight">رمز الذعر (0000/9999):</span> يمسح ذاكرة الوصول العشوائي (RAM) على الفور ويغلق التطبيق.</li>
+        </ul>
+    </div>
+
+    <div class="step-card">
+        <div class="step-number">3</div>
+        <h3>إضافة جهة اتصال (3 طرق)</h3>
+        <p>AEGIS لامركزي (Peer-to-Peer). لا يوجد دليل مركزي.</p>
+        <ul>
+            <li><span class="highlight">1. وجهًا لوجه:</span> انتقل إلى <span class="highlight">"رمز QR الخاص بي"</span>. يقوم جهة الاتصال بمسح شاشتك باستخدام <span class="highlight">"مسح رمز QR"</span>.</li>
+            <li><span class="highlight">2. عن بُعد:</span> انقر على <span class="highlight">"نسخ مفتاحي"</span> وأرسل هذا الرمز إلى جهة الاتصال الخاصة بك عبر قناة أخرى. سيقوم بلصقه في تطبيقه.</li>
+            <li><span class="highlight">3. الوضع الخفي (إخفاء المعلومات):</span> انسخ مفتاحك، وانتقل إلى وحدة إخفاء المعلومات، و<span class="highlight">أخفِ المفتاح في قصيدة</span>، وأرسل هذه القصيدة عبر أي قناة. سيقوم جهة الاتصال بلصقها لاستخراج المفتاح.</li>
+        </ul>
+    </div>
+
+    <div class="step-card">
+        <div class="step-number">4</div>
+        <h3>اختيار الشبكة (Transport Switch)</h3>
+        <p>قم بتكييف وضع الاتصال الخاص بك مع بيئتك التكتيكية.</p>
+        <ul>
+            <li><span class="highlight">Tor:</span> إخفاء الهوية الأقصى. يخفي عنوان IP الخاص بك (أبطأ قليلاً).</li>
+            <li><span class="highlight">Wi-Fi Direct / BLE Mesh:</span> اتصال محلي بدون إنترنت (مثالي إذا كانت الشبكة معطلة أو مشوشة).</li>
+        </ul>
+    </div>
+
+    <div class="step-card">
+        <div class="step-number">5</div>
+        <h3>إرسال رسالة آمنة</h3>
+        <p>بمجرد إضافة جهة الاتصال، يكون الاتصال مشفرًا من طرف إلى طرف.</p>
+        <ul>
+            <li>انتقل إلى علامة التبويب "الدردشة" أو حدد جهة الاتصال الخاصة بك.</li>
+            <li>اكتب رسالتك في منطقة النص في الأسفل.</li>
+            <li>انقر على أيقونة الإرسال. يتم تشفير الرسالة (Double Ratchet) على الفور قبل مغادرة جهازك.</li>
+        </ul>
+    </div>
+
+    <div class="step-card">
+        <div class="step-number">6</div>
+        <h3>إرسال صورة (استيعاب Zero-Disk)</h3>
+        <p>لا يخزن AEGIS أبدًا وسائطك على القرص الصلب (ROM).</p>
+        <ul>
+            <li>انتقل إلى علامة التبويب "الخزنة" أو "الدردشة".</li>
+            <li>انقر على <span class="highlight">"تحديد وسائط"</span> (أو استخدم الكاميرا).</li>
+            <li>اختر صورتك. يقوم AEGIS بتحميلها <span class="highlight">مباشرة في ذاكرة الوصول العشوائي (RAM)</span>.</li>
+            <li>يقوم النظام تلقائيًا بإزالة بيانات GPS الوصفية (EXIF) وتطبيق تمويه Anti-PRNU.</li>
+            <li>انقر على إرسال. بمجرد إغلاق التطبيق، لا توجد الصورة في أي مكان.</li>
+        </ul>
+    </div>
+
+    <div class="step-card">
+        <div class="step-number">7</div>
+        <h3>استخدام إخفاء المعلومات (Steganography)</h3>
+        <p>إخفاء المفاتيح على مرأى من الجميع داخل نص غير ضار.</p>
+        <ul>
+            <li>انتقل إلى علامة التبويب "إخفاء المعلومات".</li>
+            <li>أدخل المفتاح (أو الرسالة السرية) المراد إخفاؤه، واكتب قصيدة أو نص غلاف.</li>
+            <li>انقر على <span class="highlight">"إخفاء المفتاح في قصيدة"</span>. ينشئ التطبيق نصًا يبدو عاديًا ولكنه يحتوي على سرك.</li>
+            <li>أرسل هذا النص عبر أي شبكة.</li>
+        </ul>
+    </div>
+
+    <div class="step-card">
+        <div class="step-number">8</div>
+        <h3>الطوارئ والتدمير (Kill Switch)</h3>
+        <p>في حالة الاختراق المادي:</p>
+        <ul>
+            <li>ادخل إلى لوحة الطوارئ أو اكتب رمز الذعر الخاص بك (0000/9999).</li>
+            <li>يتم مسح ذاكرة الوصول العشوائي (RAM) على الفور، وتدمير المفاتيح، وإغلاق التطبيق. لا يبقى أي أثر.</li>
+        </ul>
+    </div>
+
+    <h2 class="section-title">2. الأسئلة الشائعة (FAQ)</h2>
+
+    <details class="faq-item"><summary>1. ما هو AEGIS P2P؟</summary><p>AEGIS P2P هي مجموعة اتصالات <strong>بمستوى عسكري</strong> (Mil-Spec). إنها مصممة للقوات المسلحة ووكالات الاستخبارات وعمليات القوات الخاصة والبنية التحتية الحيوية. وهي تجمع بين التشفير بعد الكمومي وهندسة "Zero-Disk" الصارمة.</p></details>
+    <details class="faq-item"><summary>2. لماذا التطبيق غير موجود على Google Play أو App Store؟</summary><p>تفرض عمالقة التكنولوجيا قواعد (ورقابة) تتعارض مع متطلبات الأمن العسكري. من خلال التوزيع مباشرة من خوادمنا، نضمن سلسلة توريد آمنة، خالية من أي تدخل أو أبواب خلفية.</p></details>
+    <details class="faq-item"><summary>3. كيف يقاوم AEGIS الجهات الحكومية (APT)؟</summary><p>لا يثق AEGIS بأي بنية تحتية للشبكة. باستخدام توجيه Tor الأصلي والتشفير بعد الكمومي، حتى الخصم الحكومي القادر على اعتراض حركة المرور الجماعية لن يتمكن من فك تشفير الرسائل أو تحديد هوية المشغلين.</p></details>
+    <details class="faq-item"><summary>4. هل تحذير "Play Protect" على أندرويد خطير؟</summary><p>لا. يعرض أندرويد هذا التحذير لأي تطبيق يتم تثبيته خارج متجر Play. إنه دليل تقني على أن التطبيق يفلت من سيطرة جوجل.</p></details>
+    <details class="faq-item"><summary>5. ماذا يحدث إذا نسيت رمز PIN الرئيسي؟</summary><p>بسبب هندستنا "Zero-Knowledge"، لا يمكن لأحد - ولا حتى فريق AEGIS - استعادة رمزك. إذا نسيته، يُفقد المشغل وبياناته بشكل دائم.</p></details>
+    <details class="faq-item"><summary>6. كيف يعمل رمز PIN الخادع؟</summary><p>إذا تم القبض عليك وأُجبرت على فتح الجهاز، فاكتب رمز PIN الخادع. سيفتح التطبيق في بيئة وهمية (مثل مفكرة فارغة). تظل اتصالات OpSec الحقيقية غير مرئية تمامًا.</p></details>
+    <details class="faq-item"><summary>7. كيف أستخدم Kill Switch (التدمير)؟</summary><p>في حالة وجود خطر جسدي وشيك، فإن كتابة الرمز (0000/9999) تؤدي إلى مسح فوري لذاكرة الوصول العشوائي (RAM)، وتدمير مفاتيح الجلسة، وإغلاق التطبيق.</p></details>
+    <details class="faq-item"><summary>8. هل يجمع AEGIS بيانات التعريف (Metadata)؟</summary><p>صفر. لا يجمع AEGIS أي بيانات تعريف، ولا يستخدم أي متتبعات، ولا يتطلب هوية. هوية المشغل تشفيرية بحتة ومؤقتة.</p></details>
+    <details class="faq-item"><summary>9. ما هو استيعاب "Zero-Disk"؟</summary><p>عندما يرسل المشغل صورة أو مستندًا، لا يكتبه AEGIS أبدًا في ذاكرة التخزين (ROM) للجهاز. تتم معالجة كل شيء في ذاكرة الوصول العشوائي (RAM). إذا تمت مصادرة الجهاز أو إيقاف تشغيله، تختفي البيانات إلى الأبد.</p></details>
+    <details class="faq-item"><summary>10. كيف يعمل "Transport Switch"؟</summary><p>إنه محدد شبكة تكتيكي. يمكن للمشغل إجبار حركة المرور عبر شبكة Tor (إخفاء الهوية)، أو Wi-Fi Direct (شبكة محلية محصنة)، أو Bluetooth Mesh (إذا تم تدمير البنية التحتية للإنترنت).</p></details>
+    <details class="faq-item"><summary>11. هل يمكنني استخدام AEGIS بدون إنترنت (منطقة D3E)؟</summary><p>نعم. في بيئة متنازع عليها (بدون إنترنت، تشويش)، يستخدم AEGIS وضع BLE Mesh أو Wi-Fi Direct لإنشاء شبكة محلية (MANET).</p></details>
+    <details class="faq-item"><summary>12. ما هي حماية Anti-PRNU؟</summary><p>إنه إجراء مضاد للطب الشرعي. يقوم AEGIS بتغيير الصورة قليلاً لتدمير بصمة PRNU (الضجيج الفريد لمستشعر الكاميرا). يصبح من المستحيل على مختبر الطب الشرعي نسب صورة إلى جهاز معين.</p></details>
+    <details class="faq-item"><summary>13. هل يمكنني التقاط لقطات شاشة؟</summary><p>لا. لأسباب تتعلق بـ COMSEC، يحظر AEGIS تقنيًا لقطات الشاشة (FLAG_SECURE) ويخفي معاينة التطبيق في مدير المهام.</p></details>
+    <details class="faq-item"><summary>14. ماذا يحدث إذا تمت مصادرة الجهاز أو سرقته؟</summary><p>لا يحتوي الجهاز على بيانات طويلة الأجل. إذا تم إيقاف تشغيله أو إذا تم تنشيط Kill Switch، يتم مسح المفاتيح. لن يستخرج الخصم شيئًا، حتى من خلال الاستخراج المادي أو هجوم Cold Boot.</p></details>
+    <details class="faq-item"><summary>15. هل يعمل AEGIS على iOS؟</summary><p>نعم. للمشغلين الأوروبيين، نوزع إصدار iOS مباشرة عبر موقعنا الإلكتروني (Web Distribution - DMA)، مما يضمن سلسلة توريد خارج سيطرة Apple.</p></details>
+    <details class="faq-item"><summary>16. لماذا يطلب التثبيت السماح بـ "مصادر غير معروفة"؟</summary><p>إنه مطلب لتجاوز المتاجر الرسمية. يضمن التثبيت اليدوي عدم تعديل الملف الثنائي. AEGIS موقع تشفيريًا من قبلنا.</p></details>
+    <details class="faq-item"><summary>17. كيف يتم تأمين التحديثات؟</summary><p>يتم توقيع كل تحديث عبر مفتاح خاص ed25519. إذا حاول خصم شن هجوم رجل في المنتصف (Man-in-the-Middle) لدفع برنامج ثابت ضار، سيرفض التطبيق التحديث.</p></details>
+    <details class="faq-item"><summary>18. هل الكود المصدري قابل للتدقيق؟</summary><p>نعم. يخضع كود AEGIS لعمليات بناء قابلة للتكرار وتحليلات رسمية (Miri، AWS Kani) مع كل إصدار. يعتمد الأمان على البراهين الرياضية.</p></details>
+    <details class="faq-item"><summary>19. هل هناك حد لحجم الملف؟</summary><p>تفرض معالجة "Zero-Disk" في ذاكرة الوصول العشوائي (RAM) حدودًا مادية. يجب ضغط الملفات الكبيرة جدًا أو تقسيمها قبل الإرسال لتجنب إرهاق الذاكرة.</p></details>
+    <details class="faq-item"><summary>20. ما هو تشفير "Post-Quantum"؟</summary><p>يدمج AEGIS خوارزمية ML-KEM-1024. إنها خوارزمية مصممة لمقاومة هجمات الكمبيوتر الكمي المستقبلي (القادر على كسر RSA). ستبقى اتصالاتك اليوم غير قابلة للفك حتى بعد 20 عامًا.</p></details>
+
+    <footer>
+        <p><strong>AEGIS P2P</strong> بواسطة <a href="https://aresmaxima.com" style="color: var(--primary); text-decoration: none;">Ares Maxima</a> — أمن سيادي ومكافحة الطب الشرعي.</p>
+    </footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AEGIS P2P — Операційний посібник та FAQ</title>
+<style>
+    :root { --primary: #FCBE0B; --bg-dark: #0d0d0e; --card-bg: #141416; --text-color: #e0e0e0; --text-muted: #a0a0a0; --border-color: #26262a; }
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-dark); color: var(--text-color); line-height: 1.6; margin: 0; padding: 20px; }
+    .container { max-width: 900px; margin: 0 auto; }
+    header { text-align: center; border-bottom: 2px solid var(--primary); padding-bottom: 20px; margin-bottom: 30px; }
+    header h1 { color: var(--primary); margin: 0 0 10px 0; font-size: 2.2em; text-transform: uppercase; letter-spacing: 1px; }
+    header p { color: var(--text-muted); margin: 0; font-size: 1.1em; }
+    .section-title { color: var(--primary); font-size: 1.6em; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-top: 40px; margin-bottom: 20px; }
+    .step-card { background: var(--card-bg); border: 1px solid var(--border-color); border-left: 4px solid var(--primary); border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+    .step-number { display: inline-block; background: var(--primary); color: #000; font-weight: bold; font-size: 1.2em; width: 30px; height: 30px; text-align: center; line-height: 30px; border-radius: 50%; margin-bottom: 10px; }
+    .step-card h3 { margin: 0 0 10px 0; color: #fff; font-size: 1.3em; }
+    .step-card p { margin: 0 0 10px 0; color: var(--text-color); }
+    .step-card ul { margin: 0; padding-left: 20px; color: var(--text-muted); }
+    .step-card li { margin-bottom: 8px; }
+    .highlight { color: var(--primary); font-weight: bold; }
+    .faq-item { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 12px; overflow: hidden; }
+    .faq-item summary { padding: 18px; font-weight: bold; font-size: 1.1em; cursor: pointer; list-style: none; position: relative; color: #fff; transition: background 0.3s; }
+    .faq-item summary::-webkit-details-marker { display: none; }
+    .faq-item summary::after { content: "+"; position: absolute; right: 20px; top: 50%; transform: translateY(-50%); font-size: 1.5em; color: var(--primary); }
+    .faq-item[open] summary::after { content: "-"; }
+    .faq-item summary:hover { background: #1a1a1e; }
+    .faq-item p { padding: 0 20px 20px 20px; margin: 0; color: var(--text-muted); border-top: 1px solid var(--border-color); padding-top: 15px; }
+    footer { text-align: center; margin-top: 50px; padding-top: 20px; border-top: 1px solid var(--border-color); color: var(--text-muted); font-size: 0.9em; }
+</style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>AEGIS P2P</h1>
+        <p>Операційний посібник та FAQ</p>
+    </header>
+
+    <h2 class="section-title">1. Покрокова інструкція користувача</h2>
+
+    <div class="step-card">
+        <div class="step-number">1</div>
+        <h3>Встановлення</h3>
+        <p>AEGIS P2P розповсюджується поза стандартними магазинами додатків, щоб гарантувати вашу незалежність.</p>
+        <ul>
+            <li>Завантажте файл <span class="highlight">.apk</span> (Android) або <span class="highlight">.ipa</span> (iOS) з вашого клієнтського порталу.</li>
+            <li>На Android відкрийте файл. Якщо з'явиться попередження "Play Protect", натисніть <span class="highlight">"Встановити все одно"</span>. Це доводить, що додаток вільний від контролю Google.</li>
+        </ul>
+    </div>
+
+    <div class="step-card">
+        <div class="step-number">2</div>
+        <h3>Створення кодів доступу</h3>
+        <p>Без електронної пошти, без номера телефону. Ви самі визначаєте свої ключі:</p>
+        <ul>
+            <li><span class="highlight">Головний PIN-код (6+ цифр):</span> Ваш справжній ключ доступу. Ніколи не забувайте його.</li>
+            <li><span class="highlight">PIN-код-приманка:</span> Другий код. Якщо вас змушують розблокувати, введіть цей код. Він відкриє фальшиву, нешкідливу панель.</li>
+            <li><span class="highlight">Код паніки (0000/9999):</span> Миттєво стирає RAM і закриває додаток.</li>
+        </ul>
+    </div>
+
+    <div class="step-card">
+        <div class="step-number">3</div>
+        <h3>Додавання контакту (3 методи)</h3>
+        <p>AEGIS децентралізований (Peer-to-Peer). Центрального каталогу немає.</p>
+        <ul>
+            <li><span class="highlight">1. Особисто:</span> Перейдіть до <span class="highlight">"Мій QR-код"</span>. Ваш контакт сканує ваш екран за допомогою <span class="highlight">"Сканувати QR-код"</span>.</li>
+            <li><span class="highlight">2. Віддалено:</span> Натисніть <span class="highlight">"Копіювати мій ключ"</span> і надішліть цей код контакту іншим каналом. Він вставить його у свій додаток.</li>
+            <li><span class="highlight">3. Прихований режим (Стеганографія):</span> Скопіюйте свій ключ, перейдіть до модуля стеганографії, <span class="highlight">сховайте ключ у вірші</span> та надішліть цей вірш будь-яким каналом. Ваш контакт вставить його, щоб витягти ключ.</li>
+        </ul>
+    </div>
+
+    <div class="step-card">
+        <div class="step-number">4</div>
+        <h3>Вибір мережі (Transport Switch)</h3>
+        <p>Адаптуйте режим зв'язку до вашого тактичного середовища.</p>
+        <ul>
+            <li><span class="highlight">Tor:</span> Максимальна анонімність. Приховує вашу IP-адресу (трохи повільніше).</li>
+            <li><span class="highlight">Wi-Fi Direct / BLE Mesh:</span> Локальний зв'язок без Інтернету (ідеально, якщо мережа недоступна або заглушена).</li>
+        </ul>
+    </div>
+
+    <div class="step-card">
+        <div class="step-number">5</div>
+        <h3>Надсилання безпечного повідомлення</h3>
+        <p>Після додавання контакту зв'язок шифрується від кінця до кінця.</p>
+        <ul>
+            <li>Перейдіть на вкладку "Чат" або виберіть контакт.</li>
+            <li>Напишіть повідомлення в текстовому полі внизу.</li>
+            <li>Натисніть іконку надсилання. Повідомлення миттєво шифрується (Double Ratchet) перед виходом з пристрою.</li>
+        </ul>
+    </div>
+
+    <div class="step-card">
+        <div class="step-number">6</div>
+        <h3>Надсилання фотографії (Zero-Disk Ingest)</h3>
+        <p>AEGIS ніколи не зберігає ваші медіафайли на жорсткому диску (ROM).</p>
+        <ul>
+            <li>Перейдіть на вкладку "Сейф" або "Чат".</li>
+            <li>Натисніть <span class="highlight">"Вибрати медіа"</span> (або використовуйте камеру).</li>
+            <li>Виберіть фотографію. AEGIS завантажує її <span class="highlight">безпосередньо в RAM</span>.</li>
+            <li>Система автоматично видаляє метадані GPS (EXIF) і застосовує маскування Anti-PRNU.</li>
+            <li>Натисніть надіслати. Після закриття додатка фотографія ніде не існує.</li>
+        </ul>
+    </div>
+
+    <div class="step-card">
+        <div class="step-number">7</div>
+        <h3>Використання стеганографії</h3>
+        <p>Ховайте ключі на видному місці в нешкідливому тексті.</p>
+        <ul>
+            <li>Перейдіть на вкладку "Стеганографія".</li>
+            <li>Введіть ключ (або секретне повідомлення), який потрібно приховати, і напишіть вірш або текст обкладинки.</li>
+            <li>Натисніть <span class="highlight">"Сховати ключ у вірші"</span>. Додаток генерує текст, який виглядає нормально, але містить ваш секрет.</li>
+            <li>Надішліть цей текст через будь-яку мережу.</li>
+        </ul>
+    </div>
+
+    <div class="step-card">
+        <div class="step-number">8</div>
+        <h3>Надзвичайна ситуація та Знищення (Kill Switch)</h3>
+        <p>У разі фізичного компромісу:</p>
+        <ul>
+            <li>Увійдіть до аварійної панелі або введіть код паніки (0000/9999).</li>
+            <li>RAM миттєво очищується, ключі знищуються, а додаток закривається. Слідів не залишається.</li>
+        </ul>
+    </div>
+
+    <h2 class="section-title">2. Часті запитання (FAQ)</h2>
+
+    <details class="faq-item"><summary>1. Що таке AEGIS P2P?</summary><p>AEGIS P2P — це комплекс зв'язку <strong>військового рівня</strong> (Mil-Spec). Він призначений для збройних сил, розвідувальних агенцій, операторів сил спеціальних операцій та критичної інфраструктури. Він поєднує постквантове шифрування з суворою архітектурою "Zero-Disk".</p></details>
+    <details class="faq-item"><summary>2. Чому додатка немає в Google Play або App Store?</summary><p>Технологічні гіганти встановлюють правила (і цензуру), несумісні з вимогами військової безпеки. Розповсюджуючи безпосередньо з наших серверів, ми гарантуємо безпечний ланцюг поставок, вільний від втручання або бекдорів.</p></details>
+    <details class="faq-item"><summary>3. Як AEGIS протистоїть державним суб'єктам (APT)?</summary><p>AEGIS не довіряє жодній мережевій інфраструктурі. Використовуючи нативну маршрутизацію Tor та постквантове шифрування, навіть державний супротивник, здатний до масового перехоплення трафіку, не зможе розшифрувати повідомлення.</p></details>
+    <details class="faq-item"><summary>4. Чи небезпечне попередження "Play Protect" на Android?</summary><p>Ні. Android показує це попередження для будь-якого додатка, встановленого поза Play Store. Це технічний доказ того, що додаток виходить з-під контролю Google.</p></details>
+    <details class="faq-item"><summary>5. Що станеться, якщо я забуду свій головний PIN-код?</summary><p>Через нашу архітектуру "Zero-Knowledge" ніхто — навіть команда AEGIS — не може відновити ваш код. Якщо ви його забудете, оператор та його дані будуть втрачені назавжди.</p></details>
+    <details class="faq-item"><summary>6. Як працює PIN-код-приманка?</summary><p>Якщо вас захоплять і змусять розблокувати пристрій, введіть PIN-код-приманку. Додаток відкриється у фальшивому середовищі (наприклад, порожній блокнот). Справжні комунікації OpSec залишаться невидимими.</p></details>
+    <details class="faq-item"><summary>7. Як використовувати Kill Switch (Знищення)?</summary><p>У разі неминучого фізичного компромісу введення коду (0000/9999) запускає миттєве очищення RAM, знищення сесійних ключів і закриття додатка.</p></details>
+    <details class="faq-item"><summary>8. Чи збирає AEGIS метадані?</summary><p>Нуль. AEGIS не збирає метаданих, не використовує трекери і не вимагає ідентифікації. Ідентичність оператора є суто криптографічною та ефемерною.</p></details>
+    <details class="faq-item"><summary>9. Що таке "Zero-Disk" обробка?</summary><p>Коли оператор надсилає фотографію чи документ, AEGIS ніколи не записує його в пам'ять пристрою (ROM). Все обробляється в RAM. Якщо пристрій вилучено або вимкнено, дані зникають назавжди.</p></details>
+    <details class="faq-item"><summary>10. Як працює "Transport Switch"?</summary><p>Це тактичний перемикач мережі. Оператор може примусово спрямувати трафік через мережу Tor (анонімність), Wi-Fi Direct (посилена локальна мережа) або Bluetooth Mesh (якщо інтернет-інфраструктура знищена).</p></details>
+    <details class="faq-item"><summary>11. Чи можу я використовувати AEGIS без Інтернету (зона D3E)?</summary><p>Так. У спірному середовищі (глушіння) AEGIS використовує режим BLE Mesh або Wi-Fi Direct для створення локальної сітки (MANET).</p></details>
+    <details class="faq-item"><summary>12. Що таке захист Anti-PRNU?</summary><p>Це криміналістичний контрзахід. AEGIS трохи змінює зображення, щоб знищити відбиток PRNU (унікальний "шум" сенсора камери). Стає неможливим приписати фотографію конкретному пристрою.</p></details>
+    <details class="faq-item"><summary>13. Чи можу я робити скріншоти?</summary><p>Ні. З міркувань COMSEC AEGIS технічно блокує скріншоти (FLAG_SECURE) і приховує попередній перегляд у менеджері завдань.</p></details>
+    <details class="faq-item"><summary>14. Що станеться, якщо пристрій вилучено або вкрадено?</summary><p>Пристрій не містить довгострокових даних. Якщо його вимкнено або активовано Kill Switch, ключі стираються. Супротивник нічого не витягне, навіть шляхом фізичного вилучення чіпа.</p></details>
+    <details class="faq-item"><summary>15. Чи працює AEGIS на iOS?</summary><p>Так. Для європейських операторів ми розповсюджуємо версію для iOS безпосередньо через наш веб-сайт (Web Distribution - DMA), гарантуючи ланцюг поставок поза контролем Apple.</p></details>
+    <details class="faq-item"><summary>16. Чому встановлення вимагає дозволу "невідомих джерел"?</summary><p>Це вимога для обходу офіційних магазинів. Ручне встановлення гарантує, що двійковий файл не був змінений. AEGIS криптографічно підписаний нами.</p></details>
+    <details class="faq-item"><summary>17. Як захищені оновлення?</summary><p>Кожне оновлення підписане приватним ключем ed25519. Якщо супротивник спробує атаку Man-in-the-Middle, щоб впровадити шкідливе програмне забезпечення, додаток відхилить оновлення.</p></details>
+    <details class="faq-item"><summary>18. Чи можна перевірити вихідний код?</summary><p>Так. Код AEGIS проходить відтворювані збірки та формальний аналіз (Miri, AWS Kani) з кожним комітом. Безпека ґрунтується на математичних доказах.</p></details>
+    <details class="faq-item"><summary>19. Чи є обмеження на розмір файлу?</summary><p>Обробка "Zero-Disk" в RAM накладає фізичні обмеження. Дуже великі файли повинні бути стиснуті або розділені перед передачею, щоб не перевантажити пам'ять.</p></details>
+    <details class="faq-item"><summary>20. Що таке "Post-Quantum" шифрування?</summary><p>AEGIS інтегрує ML-KEM-1024. Це алгоритм, розроблений для протистояння атакам майбутнього квантового комп'ютера (здатного зламати RSA). Ваші сьогоднішні комунікації залишаться нерозшифрованими і через 20 років.</p></details>
+
+    <footer>
+        <p><strong>AEGIS P2P</strong> від <a href="https://aresmaxima.com" style="color: var(--primary); text-decoration: none;">Ares Maxima</a> — Суверенна Безпека та Анти-Форензика.</p>
+    </footer>
+</div>
+</body>
+</html>
