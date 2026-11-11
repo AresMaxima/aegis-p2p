@@ -5,6 +5,14 @@ mod tests {
     use aegis_core::ffi_security::init_native_security;
     use aegis_core::secure_buffer::SecureBuffer;
 
+    // Ces imports sont utilisés dans des tests #[cfg(target_os = "linux")]
+    // compilés-out sous Windows (build local), d'où le warning Clippy trompeur.
+    // Le CI (Linux) les utilise activement. Voir pitfall C52.
+    #[allow(unused_imports)]
+    use std::env;
+    #[allow(unused_imports)]
+    use std::process::Command;
+
     #[test]
     fn test_v22_secure_buffer_allocation() {
         let mut buf = SecureBuffer::new(4096);
