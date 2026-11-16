@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AEGIS P2P — Rapport d'Audit Interne 2026</title>
+<style>
+    :root { --primary: #FCBE0B; --bg-dark: #0d0d0e; --card-bg: #141416; --text-color: #e0e0e0; --text-muted: #a0a0a0; --border-color: #26262a; --success: #4ade80; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg-dark); color: var(--text-color); line-height: 1.6; margin: 0; padding: 20px; }
+    .container { max-width: 900px; margin: 0 auto; }
+    header { text-align: center; border-bottom: 2px solid var(--primary); padding-bottom: 20px; margin-bottom: 40px; }
+    header h1 { color: var(--primary); margin: 0 0 10px 0; font-size: 2.2em; text-transform: uppercase; }
+    header p { color: var(--text-muted); margin: 0; }
+    .verdict-badge { display: inline-block; background: rgba(74, 222, 128, 0.15); color: var(--success); border: 2px solid var(--success); padding: 12px 24px; border-radius: 8px; font-weight: bold; font-size: 1.2em; margin: 20px 0; }
+    h2 { color: var(--primary); font-size: 1.5em; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-top: 40px; }
+    h3 { color: #fff; font-size: 1.1em; margin-top: 25px; }
+    p, ul { color: var(--text-muted); }
+    .card { background: var(--card-bg); border: 1px solid var(--border-color); border-left: 4px solid var(--primary); border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+    .card.success { border-left-color: var(--success); }
+    table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 0.9em; }
+    th, td { border: 1px solid var(--border-color); padding: 10px; text-align: left; }
+    th { background: var(--card-bg); color: var(--primary); }
+    code { background: rgba(255,255,255,0.08); padding: 2px 6px; border-radius: 3px; color: var(--primary); font-family: monospace; }
+    footer { text-align: center; margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--border-color); color: var(--text-muted); font-size: 0.85em; }
+</style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>AEGIS P2P</h1>
+        <p>Rapport d'Audit de Sécurité Interne</p>
+        <div style="margin-top: 15px; font-size: 0.9em; color: var(--text-muted);">
+            <strong>Version :</strong> v3.4.0 (Android arm64-v8a) • <strong>Date :</strong> 12 novembre 2026<br>
+            <strong>Auditeur :</strong> Ares Maxima (équipe interne) • <strong>Classification :</strong> Public
+        </div>
+    </header>
+    <div style="text-align: center;"><div class="verdict-badge">✅ VERDICT : 0 VULNÉRABILITÉ ACTIVE</div></div>
+
+    <h2>1. Résumé Exécutif</h2>
+    <div class="card success">
+        <p><strong>L'audit de sécurité interne d'AEGIS P2P v3.4.0 a été réalisé le 12 novembre 2026.</strong></p>
+        <p>Cet audit s'inscrit dans notre engagement permanent de transparence. <strong>Résultat : aucune vulnérabilité exploitable n'a été détectée.</strong> Les 11 alertes automatiques précédentes ont été résolues ou documentées comme dépendances transitives de Tor. Le code source est désormais exempt de tout warning (Clippy).</p>
+    </div>
+
+    <h2>2. Périmètre de l'Audit</h2>
+    <p>L'audit a couvert :</p>
+    <ul>
+        <li><strong>Le cœur cryptographique Rust</strong> (503 crates dépendants).</li>
+        <li><strong>L'APK Android</strong> (release, <code>strip=true</code>, <code>panic=abort</code>).</li>
+        <li><strong>L'infrastructure CI/CD</strong> (GitHub Actions, builds reproductibles).</li>
+    </ul>
+
+    <h2>3. Méthodologie & Résultats (7 Couches)</h2>
+    <table>
+        <thead><tr><th>Couche</th><th>Outil / Méthode</th><th>Résultat</th></tr></thead>
+        <tbody>
+            <tr><td>1. Dépendances</td><td><code>cargo audit</code> (base RustSec)</td><td>✅ 0 vulnérabilité</td></tr>
+            <tr><td>2. Analyse Statique</td><td><code>cargo clippy</code> (all-targets)</td><td>✅ 0 warning</td></tr>
+            <tr><td>3. Compilation TPM</td><td><code>cargo check --features tpm</code></td><td>✅ Finished</td></tr>
+            <tr><td>4. Compilation Tests</td><td><code>cargo check --tests</code></td><td>✅ Finished</td></tr>
+            <tr><td>5. Contrat de Sécurité</td><td>Documentation FFI Mil-Spec</td><td>✅ 43 wrappers alignés</td></tr>
+            <tr><td>6. Pipeline CI</td><td>Miri, Kani, JNI, NDK, Valgrind</td><td>✅ 10/10 jobs verts</td></tr>
+            <tr><td>7. Test Runtime</td><td>Validation sur device (Login, ANR)</td><td>✅ Stable, aucun crash</td></tr>
+        </tbody>
+    </table>
+
+    <h2>4. Correctifs Appliqués (Historique)</h2>
+    <div class="card">
+        <ul>
+            <li><strong>C52 (x2)</strong> : Restauration d'imports <code>std::env</code> et <code>std::process::Command</code> dans les tests <code>cfg-gated</code> (Windows vs Linux).</li>
+            <li><strong>ICE rustc 1.98.1</strong> : Contournement du bug du compilateur sur Windows/MSVC via <code>deranged=0.5.8</code>.</li>
+            <li><strong>C81-C88</strong> : Résolution des deadlocks Isolate, fuites mémoire FFI, et fallbacks stégano triviaux.</li>
+        </ul>
+    </div>
+
+    <h2>5. Limites & Prochaines Étapes</h2>
+    <p>Cet audit est interne. Ares Maxima prépare une candidature pour un <strong>audit externe indépendant</strong> (OTF Security Lab) incluant du fuzzing et de l'analyse dynamique.</p>
+    
+    <footer>Document généré par Ares Maxima — 12/11/2026</footer>
+</div>
+</body>
+</html>

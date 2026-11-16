@@ -920,7 +920,7 @@ class _MainDashboardState extends State<MainDashboard> {
   @override
   void initState() {
     super.initState();
-    _updaterService = UpdaterService(currentVersion: '3.1.0');
+    _updaterService = UpdaterService(currentVersion: '3.5.0');
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Non-bloquant : délègue à Isolate.run() dans updater_bridge.dart.
       _updaterService.check();
