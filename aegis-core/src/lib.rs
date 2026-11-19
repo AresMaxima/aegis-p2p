@@ -644,6 +644,85 @@ pub unsafe extern "C" fn aegis_verify_license_key(license_ptr: *const c_char) ->
     }
 }
 
+/// # Safety
+///
+/// Vérifie une licence liée à un appareil spécifique.
+///
+/// Format licence : `CMD-XXX:FINGERPRINT_HEX:SIGNATURE_HEX` (encodé en hex global).
+/// Signature ed25519 vérifiée sur `LICENSE:v1:CMD-XXX:FINGERPRINT_HEX`.
+/// `device_fingerprint_ptr` doit pointer vers une chaîne C valide (64 chars hex).
+/// Retourne 0 si signature valide ET fingerprint match, <0 sinon.
+#[no_mangle]
+pub unsafe extern "C" fn aegis_verify_license_key_bound(
+    license_ptr: *const c_char,
+    device_fingerprint_ptr: *const c_char,
+) -> i32 {
+    if license_ptr.is_null() || device_fingerprint_ptr.is_null() {
+        return -1;
+    }
+
+    // 1. Decode la licence (hex)
+    let hex_lic = match unsafe { CStr::from_ptr(license_ptr) }.to_str() {
+        Ok(s) => s.trim(),
+        Err(_) => return -2,
+    };
+    let decoded_bytes = match hex::decode(hex_lic) {
+        Ok(b) => b,
+        Err(_) => return -3,
+    };
+    let decoded_str = match std::str::from_utf8(&decoded_bytes) {
+        Ok(s) => s,
+        Err(_) => return -4,
+    };
+
+    // 2. Format attendu : 3 parties (CMD:FINGERPRINT:SIG)
+    let parts: Vec<&str> = decoded_str.split(':').collect();
+    if parts.len() != 3 {
+        return -5;
+    }
+
+    let order_num = parts[0].trim();
+    let license_fingerprint = parts[1].trim();
+    let sig_bytes = match hex::decode(parts[2].trim()) {
+        Ok(b) => b,
+        Err(_) => return -6,
+    };
+    let signature_array: [u8; 64] = match sig_bytes.try_into() {
+        Ok(arr) => arr,
+        Err(_) => return -7,
+    };
+    let signature = Signature::from_bytes(&signature_array);
+
+    // 3. Decode le fingerprint de l'appareil
+    let device_fingerprint = match unsafe { CStr::from_ptr(device_fingerprint_ptr) }.to_str() {
+        Ok(s) => s.trim(),
+        Err(_) => return -10,
+    };
+
+    // 4. Comparer fingerprints
+    if device_fingerprint != license_fingerprint {
+        return -11;
+    }
+
+    // 5. Vérifier signature ed25519 sur LICENSE:v1:CMD:FINGERPRINT
+    let verifying_key = match VerifyingKey::from_bytes(&ADMIN_PUBLIC_KEY_BYTES) {
+        Ok(vk) => vk,
+        Err(_) => return -8,
+    };
+
+    let mut signed_msg = Vec::new();
+    signed_msg.extend_from_slice(crate::updater::LICENSE_DOMAIN);
+    signed_msg.extend_from_slice(order_num.as_bytes());
+    signed_msg.push(b':');
+    signed_msg.extend_from_slice(license_fingerprint.as_bytes());
+
+    if verifying_key.verify(&signed_msg, &signature).is_ok() {
+        0
+    } else {
+        -9
+    }
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn aegis_ingest_file_zero_disk(path_ptr: *const c_char) -> i32 {
     if path_ptr.is_null() {

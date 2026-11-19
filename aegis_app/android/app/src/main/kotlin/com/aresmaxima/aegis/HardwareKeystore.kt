@@ -6,7 +6,9 @@ import android.security.keystore.KeyInfo
 import android.security.keystore.KeyProperties
 import android.security.keystore.StrongBoxUnavailableException
 import android.util.Log
+import java.security.KeyPairGenerator
 import java.security.KeyStore
+import java.security.Signature
 import javax.crypto.KeyGenerator
 import javax.crypto.Mac
 import javax.crypto.SecretKey
@@ -239,5 +241,90 @@ object HardwareKeystore {
         kg.init(builder.build())
         kg.generateKey()
         Log.i(TAG, "Clé HMAC générée (strongBox=$strongBox, API=${Build.VERSION.SDK_INT}, auth=none, no-unlock-required, PIN-binder)")
+    }
+
+    // =====================================================================
+    // C89 FIX : Scellement de licence via StrongBox (Option 2)
+    // =====================================================================
+    private const val LICENSE_KEY_ALIAS = "aegis_license_hardware_key"
+
+    /**
+     * Génère une paire de clés ECDSA P-256 dans le StrongBox.
+     * Si la clé existe déjà, elle est conservée.
+     * @return true si générée ou déjà existante, false si StrongBox indisponible.
+     */
+    @JvmStatic
+    fun generateLicenseKey(): Boolean {
+        return try {
+            val keyStore = KeyStore.getInstance(PROVIDER).apply { load(null) }
+            if (keyStore.containsAlias(LICENSE_KEY_ALIAS)) return true
+
+            val kpg = KeyPairGenerator.getInstance(
+                KeyProperties.KEY_ALGORITHM_EC, PROVIDER
+            )
+            val builder = KeyGenParameterSpec.Builder(
+                LICENSE_KEY_ALIAS,
+                KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY
+            )
+                .setDigests(KeyProperties.DIGEST_SHA256)
+                .setAlgorithmParameterSpec(java.security.spec.ECGenParameterSpec("secp256r1"))
+                .setUserAuthenticationRequired(false) // Nécessaire pour signer au boot sans PIN
+
+            // Tentative de forçage StrongBox (API 28+ uniquement)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                try {
+                    builder.setIsStrongBoxBacked(true)
+                } catch (e: Exception) {
+                    Log.w(TAG, "StrongBox non disponible pour ECDSA, fallback TEE", e)
+                    // On continue avec le TEE (Trusted Execution Environment) qui est déjà très bon
+                }
+            }
+
+            kpg.initialize(builder.build())
+            kpg.generateKeyPair()
+            Log.i(TAG, "Clé de licence matérielle générée (StrongBox/TEE)")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Échec génération clé licence", e)
+            false
+        }
+    }
+
+    /**
+     * Récupère la clé publique de la licence au format Hex (X.509 DER).
+     */
+    @JvmStatic
+    fun getLicensePublicKeyHex(): String? {
+        return try {
+            val keyStore = KeyStore.getInstance(PROVIDER).apply { load(null) }
+            if (!keyStore.containsAlias(LICENSE_KEY_ALIAS)) return null
+            val cert = keyStore.getCertificate(LICENSE_KEY_ALIAS)
+            val pubKey = cert.publicKey
+            val encoded = pubKey.encoded // Format X.509 SubjectPublicKeyInfo
+            encoded?.joinToString("") { "%02x".format(it) }
+        } catch (e: Exception) {
+            Log.e(TAG, "Échec récupération pubkey licence", e)
+            null
+        }
+    }
+
+    /**
+     * Signe un challenge avec la clé privée matérielle.
+     */
+    @JvmStatic
+    fun signLicenseChallenge(challenge: ByteArray): ByteArray? {
+        return try {
+            val keyStore = KeyStore.getInstance(PROVIDER).apply { load(null) }
+            if (!keyStore.containsAlias(LICENSE_KEY_ALIAS)) return null
+            val entry = keyStore.getEntry(LICENSE_KEY_ALIAS, null) as KeyStore.PrivateKeyEntry
+            
+            val signature = Signature.getInstance("SHA256withECDSA")
+            signature.initSign(entry.privateKey)
+            signature.update(challenge)
+            signature.sign()
+        } catch (e: Exception) {
+            Log.e(TAG, "Échec signature challenge licence", e)
+            null
+        }
     }
 }

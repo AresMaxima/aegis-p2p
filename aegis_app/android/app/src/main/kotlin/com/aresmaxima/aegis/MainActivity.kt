@@ -426,6 +426,18 @@ class MainActivity : FlutterActivity() {
                         result.success(available)
                     }
 
+                    "generateLicenseKey" -> {
+                        val success = HardwareKeystore.generateLicenseKey()
+                        Log.i(TAG, "generateLicenseKey = $success")
+                        result.success(success)
+                    }
+
+                    "getLicensePublicKey" -> {
+                        val pubkey = HardwareKeystore.getLicensePublicKeyHex()
+                        Log.i(TAG, "getLicensePublicKey = ${pubkey?.take(16)}...")
+                        result.success(pubkey)
+                    }
+
                     else -> result.notImplemented()
                 }
             }

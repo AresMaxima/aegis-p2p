@@ -2,7 +2,9 @@ import 'dart:ffi';
 import 'dart:isolate';
 import 'dart:io';
 import 'package:ffi/ffi.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:cryptography/cryptography.dart';
 
 typedef AegisSetHardwareSecretC = Int32 Function(Pointer<Uint8> secretPtr, IntPtr secretLen);
 typedef AegisSetHardwareSecretDart = int Function(Pointer<Uint8> secretPtr, int secretLen);
@@ -58,6 +60,11 @@ enum VaultUnlockStatus { real, decoy, needsInitialization, error }
 ///   8. setTorStrongboxAvailable() : vérifie StrongBox via Kotlin (active
 ///      check ~50-200 ms), transmet le résultat à Rust via FFI. Rust refuse
 ///      Tor si false (fail-closed). Mode dégradé local only si absent.
+///
+/// C89 (2026-11-17) — Scellement de licence matériel :
+///   9. generateLicenseKey()   : génère la paire ECDSA P-256 dans StrongBox.
+///  10. getLicensePublicKey()  : récupère la pubkey (Hex) pour affichage.
+///  11. getLicensePublicKeyFingerprint() : calcule le SHA-256 de la pubkey.
 class KeystoreBridge {
   static const MethodChannel _channel = MethodChannel('com.aegis/keystore');
   static DynamicLibrary? _nativeLib;
@@ -307,6 +314,65 @@ class KeystoreBridge {
       return nativeFn() == 0;
     } catch (e) {
       return false;
+    }
+  }
+
+  // ==========================================================================
+  // C89 — SCELLEMENT MATÉRIEL DE LICENCE (StrongBox/TEE)
+  // ==========================================================================
+
+  /// C89 : Génère la clé de licence matérielle (StrongBox/TEE)
+  ///
+  /// Kotlin → HardwareKeystore.generateLicenseKey()
+  /// Stocke une paire ECDSA P-256 dans le StrongBox (non-exportable).
+  ///
+  /// Retourne `true` si générée ou déjà existante.
+  static Future<bool> generateLicenseKey() async {
+    try {
+      final bool? res = await _channel.invokeMethod<bool>('generateLicenseKey');
+      return res ?? false;
+    } catch (e) {
+      debugPrint('generateLicenseKey error: $e');
+      return false;
+    }
+  }
+
+  /// C89 : Récupère la clé publique de la licence (Hex)
+  ///
+  /// Kotlin → HardwareKeystore.getLicensePublicKeyHex()
+  /// Retourne la pubkey ECDSA P-256 au format X.509 DER en hex.
+  ///
+  /// Retourne `null` si la clé n'existe pas ou en cas d'erreur.
+  static Future<String?> getLicensePublicKey() async {
+    try {
+      return await _channel.invokeMethod<String>('getLicensePublicKey');
+    } catch (e) {
+      debugPrint('getLicensePublicKey error: $e');
+      return null;
+    }
+  }
+
+  /// C89 : Calcule le SHA-256 de la pubkey StrongBox (fingerprint).
+  ///
+  /// La pubkey retournée par Kotlin est en format X.509 DER (91 octets).
+  /// On la décode du hex, puis on calcule SHA-256 des bytes DER.
+  /// Résultat : 64 caractères hex = identifiant unique de l'appareil.
+  static Future<String?> getLicensePublicKeyFingerprint() async {
+    try {
+      final pubkey = await getLicensePublicKey();
+      if (pubkey == null || pubkey.isEmpty) return null;
+
+      final bytes = <int>[];
+      for (var i = 0; i < pubkey.length; i += 2) {
+        bytes.add(int.parse(pubkey.substring(i, i + 2), radix: 16));
+      }
+
+      // Correction API cryptography 2.9.0
+      final hash = await Sha256().hash(bytes);
+      return hash.bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    } catch (e) {
+      debugPrint('getLicensePublicKeyFingerprint error: $e');
+      return null;
     }
   }
 }

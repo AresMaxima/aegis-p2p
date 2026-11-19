@@ -77,6 +77,41 @@ bool verifyLicenseKeyFfi(String licenseKey) {
 }
 
 // =========================================================================
+// C89 : Vérifie une licence liée au StrongBox du téléphone.
+// =========================================================================
+Future<bool> verifyLicenseKeyFfiBound(String licenseKey) async {
+  try {
+    final fingerprint = await KeystoreBridge.getLicensePublicKeyFingerprint();
+    if (fingerprint == null || fingerprint.isEmpty) {
+      debugPrint("verifyLicenseKeyFfiBound: fingerprint null");
+      return false;
+    }
+
+    final DynamicLibrary aegisLib = Platform.isAndroid
+        ? DynamicLibrary.open('libaegis_core.so')
+        : DynamicLibrary.process();
+
+    final int Function(Pointer<Utf8>, Pointer<Utf8>) verifyLicBound = aegisLib
+        .lookup<NativeFunction<Int32 Function(Pointer<Utf8>, Pointer<Utf8>)>>('aegis_verify_license_key_bound')
+        .asFunction();
+
+    final licPtr = licenseKey.toNativeUtf8();
+    final fpPtr = fingerprint.toNativeUtf8();
+    try {
+      final res = verifyLicBound(licPtr, fpPtr);
+      debugPrint("verifyLicenseKeyFfiBound: res=$res");
+      return res == 0;
+    } finally {
+      malloc.free(licPtr);
+      malloc.free(fpPtr);
+    }
+  } catch (e) {
+    debugPrint("verifyLicenseKeyFfiBound error: $e");
+    return false;
+  }
+}
+
+// =========================================================================
 // P5 FIX : malloc.free dans finally (ingestFileZeroDisk)
 // =========================================================================
 Future<bool> ingestFileZeroDisk(String filePath) async {
@@ -242,6 +277,21 @@ void main() async {
     debugPrint("AEGIS-VAULT: setVaultDir(${docsDir.path}) = $dirOk");
   } catch (e) {
     debugPrint("AEGIS-VAULT: vaultSetDir a échoué: $e");
+  }
+
+  try {
+    final licenseKeyOk = await KeystoreBridge.generateLicenseKey();
+    debugPrint("AEGIS-LICENSE: generateLicenseKey = $licenseKeyOk");
+
+    if (licenseKeyOk) {
+      final pubkey = await KeystoreBridge.getLicensePublicKey();
+      debugPrint("AEGIS-LICENSE: Pubkey = $pubkey");
+
+      final fingerprint = await KeystoreBridge.getLicensePublicKeyFingerprint();
+      debugPrint("AEGIS-LICENSE: Fingerprint = $fingerprint");
+    }
+  } catch (e) {
+    debugPrint("AEGIS-LICENSE: init failed = $e");
   }
 
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -485,6 +535,7 @@ class _LockScreenState extends State<LockScreen> {
 
   bool _isLoading = false;
   bool? _isVaultInitialized;
+  String? _hsmFingerprint;
 
   PasswordStrength? _passwordStrength;
   String? _passwordError;
@@ -515,9 +566,14 @@ class _LockScreenState extends State<LockScreen> {
 
   Future<void> _checkVaultState() async {
     final initialized = await _vault.isVaultInitialized();
+    String? fp;
+    if (!initialized) {
+      fp = await KeystoreBridge.getLicensePublicKeyFingerprint();
+    }
     if (mounted) {
       setState(() {
         _isVaultInitialized = initialized;
+        _hsmFingerprint = fp;
       });
     }
   }
@@ -589,7 +645,8 @@ class _LockScreenState extends State<LockScreen> {
         return;
       }
 
-      if (licenseKey.isNotEmpty && !verifyLicenseKeyFfi(licenseKey)) {
+      // C89 FIX : Licence obligatoire (fail-closed si vide ou invalide)
+      if (licenseKey.isEmpty || !await verifyLicenseKeyFfiBound(licenseKey)) {
         if (!mounted) return;
         _pinController.clear();
         setState(() { _isLoading = false; });
@@ -735,6 +792,75 @@ class _LockScreenState extends State<LockScreen> {
                 ),
                 const SizedBox(height: 16),
                 if (_isVaultInitialized == false) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF141416),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white24),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: const [
+                            Icon(Icons.memory, color: brandYellow, size: 16),
+                            SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                "SCEAU MATÉRIEL HSM (STRONGBOX)",
+                                style: TextStyle(
+                                  color: brandYellow,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          _hsmFingerprint != null && _hsmFingerprint!.length == 64
+                              ? "HSM-${_hsmFingerprint!.substring(0, 8).toUpperCase()}-${_hsmFingerprint!.substring(8, 16).toUpperCase()}...${_hsmFingerprint!.substring(56, 64).toUpperCase()}"
+                              : "Initialisation de la puce...",
+                          style: const TextStyle(
+                            color: Colors.greenAccent,
+                            fontFamily: 'monospace',
+                            fontSize: 11,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 36,
+                          child: OutlinedButton.icon(
+                            onPressed: _hsmFingerprint == null
+                                ? null
+                                : () {
+                                    Clipboard.setData(ClipboardData(text: _hsmFingerprint!));
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text("Sceau matériel HSM copié dans le presse-papiers"),
+                                        duration: Duration(seconds: 2),
+                                      ),
+                                    );
+                                  },
+                            icon: const Icon(Icons.copy, size: 14, color: brandYellow),
+                            label: const Text(
+                              "COPIER LE SCEAU D'ENRÔLEMENT HSM",
+                              style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: brandYellow),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   TextField(
                     controller: _licenseController,
                     enableInteractiveSelection: false,

@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AEGIS P2P v3.5.0 — Rapport d'Audit Interne 2026 (FR / IT / ES / EN / UK / AR / PL)</title>
+<style>
+    :root {
+        --primary: #FCBE0B;
+        --bg-dark: #0d0d0e;
+        --card-bg: #141416;
+        --row-alt: #18181c;
+        --text-color: #e0e0e0;
+        --text-muted: #a0a0a0;
+        --border-color: #26262a;
+        --success: #4ade80;
+    }
+
+    * {
+        box-sizing: border-box;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background: var(--bg-dark) !important;
+        color: var(--text-color) !important;
+        line-height: 1.48;
+        margin: 0;
+        padding: 20px;
+    }
+
+    /* Barre d'outils multilingue (Masquée à l'impression PDF) */
+    .toolbar-no-print {
+        max-width: 920px;
+        margin: 0 auto 22px auto;
+        background: #1a1a1e;
+        border: 1px solid var(--primary);
+        border-radius: 8px;
+        padding: 12px 16px;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+    }
+
+    .toolbar-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .lang-btn {
+        background: var(--card-bg);
+        color: var(--text-color);
+        border: 1px solid var(--border-color);
+        padding: 6px 11px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.82em;
+        font-weight: bold;
+        transition: all 0.2s;
+    }
+
+    .lang-btn:hover, .lang-btn.active {
+        background: var(--primary);
+        color: #000000;
+        border-color: var(--primary);
+    }
+
+    .print-btn {
+        background: var(--success);
+        color: #000000;
+        border: none;
+        padding: 7px 14px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.85em;
+        font-weight: bold;
+        text-transform: uppercase;
+        transition: opacity 0.2s;
+    }
+
+    .print-btn:hover {
+        opacity: 0.9;
+    }
+
+    .container {
+        max-width: 920px;
+        margin: 0 auto;
+    }
+
+    .lang-block {
+        margin-bottom: 40px;
+    }
+
+    .lang-block[dir="rtl"] {
+        text-align: right;
+        font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+    }
+
+    header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 2px solid var(--primary);
+        padding-bottom: 12px;
+        margin-bottom: 14px;
+        gap: 15px;
+    }
+
+    .header-title h1 {
+        color: var(--primary) !important;
+        margin: 0 0 4px 0;
+        font-size: 1.8em;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .header-title p {
+        color: var(--text-muted) !important;
+        margin: 0;
+        font-size: 0.95em;
+        font-weight: bold;
+        text-transform: uppercase;
+    }
+
+    .header-meta {
+        margin-top: 6px;
+        font-size: 0.82em;
+        color: var(--text-muted) !important;
+    }
+
+    .logo {
+        height: 52px;
+        width: auto;
+        max-width: 180px;
+        object-fit: contain;
+    }
+
+    .verdict-wrap {
+        text-align: center;
+        margin: 10px 0 14px 0;
+    }
+
+    .verdict-badge {
+        display: inline-block;
+        background: rgba(74, 222, 128, 0.14) !important;
+        color: var(--success) !important;
+        border: 2px solid var(--success) !important;
+        padding: 8px 20px;
+        border-radius: 8px;
+        font-weight: bold;
+        font-size: 1.05em;
+        letter-spacing: 0.5px;
+    }
+
+    h2 {
+        color: var(--primary) !important;
+        font-size: 1.15em;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 5px;
+        margin-top: 16px;
+        margin-bottom: 10px;
+        text-transform: uppercase;
+        break-after: avoid;
+        page-break-after: avoid;
+    }
+
+    p, ul {
+        color: var(--text-color) !important;
+        font-size: 0.88em;
+        margin-top: 0;
+        margin-bottom: 8px;
+    }
+
+    ul {
+        padding-left: 20px;
+    }
+
+    .lang-block[dir="rtl"] ul {
+        padding-left: 0;
+        padding-right: 20px;
+    }
+
+    li {
+        margin-bottom: 5px;
+    }
+
+    .card {
+        background: var(--card-bg) !important;
+        border: 1px solid var(--border-color);
+        border-left: 4px solid var(--primary) !important;
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin-bottom: 12px;
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
+    .lang-block[dir="rtl"] .card {
+        border-left: 1px solid var(--border-color) !important;
+        border-right: 4px solid var(--primary) !important;
+    }
+
+    .card.success {
+        border-left-color: var(--success) !important;
+    }
+
+    .lang-block[dir="rtl"] .card.success {
+        border-right-color: var(--success) !important;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 10px 0;
+        font-size: 0.83em;
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
+    th, td {
+        border: 1px solid var(--border-color);
+        padding: 7px 10px;
+        text-align: left;
+    }
+
+    .lang-block[dir="rtl"] th,
+    .lang-block[dir="rtl"] td {
+        text-align: right;
+    }
+
+    th {
+        background: #1f1f24 !important;
+        color: var(--primary) !important;
+        text-transform: uppercase;
+        font-size: 0.88em;
+    }
+
+    tr:nth-child(even) td {
+        background: var(--row-alt) !important;
+    }
+
+    tr.hsm-row td {
+        background: rgba(74, 222, 128, 0.08) !important;
+        border-color: rgba(74, 222, 128, 0.35);
+    }
+
+    code {
+        background: rgba(255,255,255,0.08) !important;
+        padding: 1px 5px;
+        border-radius: 3px;
+        color: var(--primary) !important;
+        font-family: monospace;
+        font-size: 0.92em;
+    }
+
+    strong {
+        color: #ffffff !important;
+    }
+
+    .status-ok {
+        color: var(--success) !important;
+        font-weight: bold;
+        white-space: nowrap;
+    }
+
+    footer {
+        text-align: center;
+        margin-top: 18px;
+        padding-top: 10px;
+        border-top: 1px solid var(--border-color);
+        color: var(--text-muted) !important;
+        font-size: 0.8em;
+    }
+
+    .lang-separator-break {
+        page-break-before: always !important;
+        break-before: page !important;
+        height: 0;
+        display: block;
+    }
+
+    body.single-lang-mode .lang-separator-break {
+        page-break-before: avoid !important;
+        break-before: avoid !important;
+        display: none !important;
+    }
+
+    @page {
+        size: A4;
+        margin: 10mm;
+    }
+
+    @media print {
+        html, body {
+            background-color: var(--bg-dark) !important;
+            color: var(--text-color) !important;
+            padding: 0;
+        }
+        .toolbar-no-print {
+            display: none !important;
+        }
+        a {
+            color: var(--primary) !important;
+            text-decoration: underline !important;
+        }
+    }
+</style>
+<script>
+    const UI_TEXTS = {
+        fr: {
+            allBtn: "🌍 TOUTES LES LANGUES (7)",
+            printBtn: "🖨️ EXPORTER / IMPRIMER EN PDF",
+            title: "AEGIS P2P v3.5.0 — Rapport d'Audit de Sécurité Interne"
+        },
+        it: {
+            allBtn: "🌍 TUTTE LE LINGUE (7)",
+            printBtn: "🖨️ ESPORTA / STAMPA IN PDF",
+            title: "AEGIS P2P v3.5.0 — Rapporto di Audit di Sicurezza Interno"
+        },
+        es: {
+            allBtn: "🌍 TODOS LOS IDIOMAS (7)",
+            printBtn: "🖨️ EXPORTAR / IMPRIMIR EN PDF",
+            title: "AEGIS P2P v3.5.0 — Informe de Auditoría de Seguridad Interna"
+        },
+        en: {
+            allBtn: "🌍 ALL LANGUAGES (7)",
+            printBtn: "🖨️ EXPORT / PRINT TO PDF",
+            title: "AEGIS P2P v3.5.0 — Internal Security Audit Report"
+        },
+        uk: {
+            allBtn: "🌍 УСІ МОВИ (7)",
+            printBtn: "🖨️ ЕКСПОРТ / ДРУК У PDF",
+            title: "AEGIS P2P v3.5.0 — Звіт про Внутрішній Аудит Безпеки"
+        },
+        ar: {
+            allBtn: "🌍 جميع اللغات (7)",
+            printBtn: "🖨️ تصدير / طباعة إلى PDF",
+            title: "AEGIS P2P v3.5.0 — تقرير التدقيق الأمني الداخلي"
+        },
+        pl: {
+            allBtn: "🌍 WSZYSTKIE JĘZYKI (7)",
+            printBtn: "🖨️ EKSPORTUJ / DRUKUJ DO PDF",
+            title: "AEGIS P2P v3.5.0 — Raport z Wewnętrznego Audytu Bezpieczeństwa"
+        }
+    };
+
+    let lastActiveLang = 'fr';
+
+    function filterLang(lang) {
+        const blocks = document.querySelectorAll('.lang-block');
+        const btns = document.querySelectorAll('.lang-btn');
+        btns.forEach(b => b.classList.remove('active'));
+        const activeBtn = document.getElementById('btn-' + lang);
+        if (activeBtn) activeBtn.classList.add('active');
+
+        if (lang !== 'all' && UI_TEXTS[lang]) {
+            lastActiveLang = lang;
+            document.body.classList.add('single-lang-mode');
+            document.documentElement.lang = lang;
+        } else {
+            document.body.classList.remove('single-lang-mode');
+        }
+
+        const ui = UI_TEXTS[lastActiveLang] || UI_TEXTS.fr;
+        document.getElementById('btn-all').textContent = ui.allBtn;
+        document.getElementById('btn-print').textContent = ui.printBtn;
+        document.title = ui.title;
+
+        blocks.forEach((block) => {
+            if (lang === 'all' || block.id === 'lang-' + lang) {
+                block.style.display = 'block';
+            } else {
+                block.style.display = 'none';
+            }
+        });
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+        const navLang = (navigator.language || navigator.userLanguage || 'fr').slice(0, 2).toLowerCase();
+        if (UI_TEXTS[navLang]) {
+            lastActiveLang = navLang;
+            filterLang(navLang);
+        } else {
+            filterLang('fr');
+        }
+    });
+</script>
+</head>
+<body>
+
+<!-- BARRE D'OUTILS INTERACTIVE (Masquée à l'impression PDF) -->
+<div class="toolbar-no-print">
+    <div class="toolbar-links">
+        <button id="btn-all" class="lang-btn" onclick="filterLang('all')">🌍 TOUTES LES LANGUES (7)</button>
+        <button id="btn-fr" class="lang-btn active" onclick="filterLang('fr')">🇫🇷 FR</button>
+        <button id="btn-it" class="lang-btn" onclick="filterLang('it')">🇮🇹 IT</button>
+        <button id="btn-es" class="lang-btn" onclick="filterLang('es')">🇪🇸 ES</button>
+        <button id="btn-en" class="lang-btn" onclick="filterLang('en')">🇬🇧 EN</button>
+        <button id="btn-uk" class="lang-btn" onclick="filterLang('uk')">🇺🇦 UK</button>
+        <button id="btn-ar" class="lang-btn" onclick="filterLang('ar')">🇸🇦 AR</button>
+        <button id="btn-pl" class="lang-btn" onclick="filterLang('pl')">🇵🇱 PL</button>
+    </div>
+    <button id="btn-print" class="print-btn" onclick="window.print()">🖨️ EXPORTER / IMPRIMER EN PDF</button>
+</div>
+
+<div class="container">
+
+    <!-- ===================================================================
+         1. FRANÇAIS (FR)
+         =================================================================== -->
+    <div id="lang-fr" class="lang-block" lang="fr" dir="ltr">
+        <header>
+            <div class="header-title">
+                <h1>AEGIS P2P</h1>
+                <p>Rapport d'Audit de Sécurité Interne — Édition Scellement HSM</p>
+                <div class="header-meta">
+                    <strong>Version :</strong> v3.5.0 (Android arm64-v8a) • <strong>Date :</strong> 18 novembre 2026 • <strong>Auditeur :</strong> Ares Maxima • <strong>Classification :</strong> Public
+                </div>
+            </div>
+            <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima Logo" class="logo">
+        </header>
+
+        <div class="verdict-wrap">
+            <div class="verdict-badge">✅ VERDICT : 0 VULNÉRABILITÉ ACTIVE — SCELLEMENT HSM VALIDÉ</div>
+        </div>
+
+        <h2>1. Résumé Exécutif</h2>
+        <div class="card success">
+            <p><strong>L'audit de sécurité interne d'AEGIS P2P v3.5.0 a été finalisé le 18 novembre 2026.</strong></p>
+            <p>Cet audit s'inscrit dans notre engagement permanent de transparence et valide l'intégration du scellement matériel de licence HSM (chantier C89). <strong>Résultat : aucune vulnérabilité exploitable n'a été détectée.</strong> Les alertes automatiques antérieures sur les dépendances transitives de Tor sont résolues ou documentées, le code source Rust est exempt de tout warning (Clippy), et le verrouillage cryptographique StrongBox est certifié <em>Fail-Closed</em>.</p>
+        </div>
+
+        <h2>2. Périmètre de l'Audit</h2>
+        <ul>
+            <li><strong>Le cœur cryptographique Rust</strong> (503 crates dépendants, vérification Ed25519 liée au domaine <code>LICENSE:v1:</code>).</li>
+            <li><strong>Le pont matériel StrongBox / Android Keystore</strong> (génération ECDSA P-256 non-exportable, empreinte SHA-256 et FFI <code>aegis_verify_license_key_bound</code>).</li>
+            <li><strong>L'APK Android de production</strong> (release arm64-v8a, <code>strip=true</code>, <code>panic=abort</code>, <code>FLAG_SECURE</code>).</li>
+            <li><strong>L'infrastructure CI/CD</strong> (GitHub Actions, builds reproductibles, vérification formelle Miri &amp; AWS Kani).</li>
+        </ul>
+
+        <h2>3. Méthodologie &amp; Résultats (8 Couches)</h2>
+        <table>
+            <thead><tr><th>Couche</th><th>Outil / Méthode</th><th>Résultat</th></tr></thead>
+            <tbody>
+                <tr><td>1. Dépendances</td><td><code>cargo audit</code> (base RustSec)</td><td class="status-ok">✅ 0 vulnérabilité</td></tr>
+                <tr><td>2. Analyse Statique</td><td><code>cargo clippy</code> (all-targets)</td><td class="status-ok">✅ 0 warning</td></tr>
+                <tr><td>3. Compilation TPM</td><td><code>cargo check --features tpm</code></td><td class="status-ok">✅ Finished</td></tr>
+                <tr><td>4. Compilation Tests</td><td><code>cargo check --tests</code></td><td class="status-ok">✅ Finished</td></tr>
+                <tr><td>5. Contrat de Sécurité FFI</td><td>Documentation &amp; wrappers FFI Mil-Spec</td><td class="status-ok">✅ 44 wrappers alignés</td></tr>
+                <tr><td>6. Pipeline CI Formel</td><td>Miri, AWS Kani, JNI, NDK, Valgrind</td><td class="status-ok">✅ 10/10 jobs verts</td></tr>
+                <tr><td>7. Test Runtime</td><td>Validation sur terminal physique (Login, Isolates, ANR)</td><td class="status-ok">✅ Stable, aucun crash</td></tr>
+                <tr class="hsm-row"><td>8. Scellement Licence HSM (C89)</td><td>StrongBox ECDSA + <code>aegis_verify_license_key_bound</code></td><td class="status-ok">✅ Rejet clonage (res=-11) / Nominal (res=0)</td></tr>
+            </tbody>
+        </table>
+
+        <h2>4. Correctifs Appliqués (Historique jusqu'à v3.5.0)</h2>
+        <div class="card">
+            <ul>
+                <li><strong>C52 (x2)</strong> : Restauration d'imports <code>std::env</code> et <code>std::process::Command</code> dans les tests <code>cfg-gated</code> (Windows vs Linux).</li>
+                <li><strong>ICE rustc 1.98.1</strong> : Contournement du bug du compilateur sur Windows/MSVC via <code>deranged=0.5.8</code>.</li>
+                <li><strong>C81-C88</strong> : Résolution des deadlocks Isolate, libération mémoire FFI systématique (<code>malloc.free</code> dans <code>finally</code>) et suppression des fallbacks stégano triviaux.</li>
+                <li><strong>C89 (v3.5.0)</strong> : Scellement matériel de licence sur puce StrongBox/HSM (liaison cryptographique Ed25519 entre le numéro de commande et l'empreinte SHA-256 de la clé publique matérielle du téléphone), affichage du Sceau d'Enrôlement HSM dans l'UI et verrouillage <em>Fail-Closed</em> interdisant toute initialisation du coffre sans licence valide.</li>
+            </ul>
+        </div>
+
+        <h2>5. Limites &amp; Prochaines Étapes</h2>
+        <p>Cet audit est interne. Ares Maxima prépare une candidature pour un <strong>audit externe indépendant</strong> (OTF Security Lab) incluant du fuzzing continu et de l'analyse dynamique sur matériel dédié.</p>
+
+        <footer>Document généré par Ares Maxima — 18/11/2026 • <a href="https://aresmaxima.com" style="color: var(--primary); text-decoration: none;">aresmaxima.com</a></footer>
+    </div>
+
+    <!-- ===================================================================
+         2. ITALIANO (IT)
+         =================================================================== -->
+    <div id="lang-it" class="lang-block" lang="it" dir="ltr">
+        <div class="lang-separator-break"></div>
+        <header>
+            <div class="header-title">
+                <h1>AEGIS P2P</h1>
+                <p>Rapporto di Audit di Sicurezza Interno — Edizione Sigillo HSM</p>
+                <div class="header-meta">
+                    <strong>Versione :</strong> v3.5.0 (Android arm64-v8a) • <strong>Data :</strong> 18 novembre 2026 • <strong>Auditor :</strong> Ares Maxima • <strong>Classificazione :</strong> Pubblico
+                </div>
+            </div>
+            <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima Logo" class="logo">
+        </header>
+
+        <div class="verdict-wrap">
+            <div class="verdict-badge">✅ VERDETTO : 0 VULNERABILITÀ ATTIVE — SIGILLO HSM VALIDATO</div>
+        </div>
+
+        <h2>1. Sintesi Esecutiva</h2>
+        <div class="card success">
+            <p><strong>L'audit di sicurezza interno di AEGIS P2P v3.5.0 è stato completato il 18 novembre 2026.</strong></p>
+            <p>Questo audit rientra nel nostro impegno permanente di trasparenza e convalida l'integrazione del sigillo hardware di licenza HSM (modulo C89). <strong>Risultato : nessuna vulnerabilità sfruttabile è stata rilevata.</strong> Gli avvisi automatici precedenti sulle dipendenze transitive di Tor sono stati risolti o documentati, il codice sorgente Rust è privo di qualsiasi warning (Clippy) e il blocco crittografico StrongBox è certificato <em>Fail-Closed</em>.</p>
+        </div>
+
+        <h2>2. Perimetro dell'Audit</h2>
+        <ul>
+            <li><strong>Il core crittografico Rust</strong> (503 crate dipendenti, verifica Ed25519 vincolata al dominio <code>LICENSE:v1:</code>).</li>
+            <li><strong>Il bridge hardware StrongBox / Android Keystore</strong> (generazione ECDSA P-256 non esportabile, impronta SHA-256 e FFI <code>aegis_verify_license_key_bound</code>).</li>
+            <li><strong>L'APK Android di produzione</strong> (release arm64-v8a, <code>strip=true</code>, <code>panic=abort</code>, <code>FLAG_SECURE</code>).</li>
+            <li><strong>L'infrastruttura CI/CD</strong> (GitHub Actions, build riproducibili, verifica formale Miri &amp; AWS Kani).</li>
+        </ul>
+
+        <h2>3. Metodologia &amp; Risultati (8 Livelli)</h2>
+        <table>
+            <thead><tr><th>Livello</th><th>Strumento / Metodo</th><th>Risultato</th></tr></thead>
+            <tbody>
+                <tr><td>1. Dipendenze</td><td><code>cargo audit</code> (database RustSec)</td><td class="status-ok">✅ 0 vulnerabilità</td></tr>
+                <tr><td>2. Analisi Statica</td><td><code>cargo clippy</code> (all-targets)</td><td class="status-ok">✅ 0 warning</td></tr>
+                <tr><td>3. Compilazione TPM</td><td><code>cargo check --features tpm</code></td><td class="status-ok">✅ Finished</td></tr>
+                <tr><td>4. Compilazione Test</td><td><code>cargo check --tests</code></td><td class="status-ok">✅ Finished</td></tr>
+                <tr><td>5. Contratto di Sicurezza FFI</td><td>Documentazione &amp; wrapper FFI Mil-Spec</td><td class="status-ok">✅ 44 wrapper allineati</td></tr>
+                <tr><td>6. Pipeline CI Formale</td><td>Miri, AWS Kani, JNI, NDK, Valgrind</td><td class="status-ok">✅ 10/10 job verdi</td></tr>
+                <tr><td>7. Test Runtime</td><td>Validazione su dispositivo fisico (Login, Isolates, ANR)</td><td class="status-ok">✅ Stabile, nessun crash</td></tr>
+                <tr class="hsm-row"><td>8. Sigillo Licenza HSM (C89)</td><td>StrongBox ECDSA + <code>aegis_verify_license_key_bound</code></td><td class="status-ok">✅ Rifiuto cloni (res=-11) / Nominale (res=0)</td></tr>
+            </tbody>
+        </table>
+
+        <h2>4. Correzioni Applicate (Cronologia fino a v3.5.0)</h2>
+        <div class="card">
+            <ul>
+                <li><strong>C52 (x2)</strong> : Ripristino degli import <code>std::env</code> e <code>std::process::Command</code> nei test <code>cfg-gated</code> (Windows vs Linux).</li>
+                <li><strong>ICE rustc 1.98.1</strong> : Aggiramento del bug del compilatore su Windows/MSVC tramite <code>deranged=0.5.8</code>.</li>
+                <li><strong>C81-C88</strong> : Risoluzione dei deadlock Isolate, rilascio memoria FFI sistematico (<code>malloc.free</code> in <code>finally</code>) e rimozione dei fallback stegano banali.</li>
+                <li><strong>C89 (v3.5.0)</strong> : Sigillo hardware della licenza su chip StrongBox/HSM (legame crittografico Ed25519 tra numero d'ordine e impronta SHA-256 della chiave pubblica hardware del telefono), visualizzazione del Sigillo di Registrazione HSM nell'interfaccia e blocco <em>Fail-Closed</em> che impedisce qualsiasi inizializzazione della cassaforte senza licenza valida.</li>
+            </ul>
+        </div>
+
+        <h2>5. Limiti &amp; Prossimi Passi</h2>
+        <p>Questo audit è interno. Ares Maxima sta preparando la candidatura per un <strong>audit esterno indipendente</strong> (OTF Security Lab) comprendente fuzzing continuo e analisi dinamica su hardware dedicato.</p>
+
+        <footer>Documento generato da Ares Maxima — 18/11/2026 • <a href="https://aresmaxima.com" style="color: var(--primary); text-decoration: none;">aresmaxima.com</a></footer>
+    </div>
+
+    <!-- ===================================================================
+         3. ESPAÑOL (ES)
+         =================================================================== -->
+    <div id="lang-es" class="lang-block" lang="es" dir="ltr">
+        <div class="lang-separator-break"></div>
+        <header>
+            <div class="header-title">
+                <h1>AEGIS P2P</h1>
+                <p>Informe de Auditoría de Seguridad Interna — Edición Sellado HSM</p>
+                <div class="header-meta">
+                    <strong>Versión :</strong> v3.5.0 (Android arm64-v8a) • <strong>Fecha :</strong> 18 de noviembre de 2026 • <strong>Auditor :</strong> Ares Maxima • <strong>Clasificación :</strong> Público
+                </div>
+            </div>
+            <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima Logo" class="logo">
+        </header>
+
+        <div class="verdict-wrap">
+            <div class="verdict-badge">✅ VEREDICTO : 0 VULNERABILIDADES ACTIVAS — SELLADO HSM VALIDADO</div>
+        </div>
+
+        <h2>1. Resumen Ejecutivo</h2>
+        <div class="card success">
+            <p><strong>La auditoría de seguridad interna de AEGIS P2P v3.5.0 concluyó el 18 de noviembre de 2026.</strong></p>
+            <p>Esta auditoría forma parte de nuestro compromiso permanente con la transparencia y valida la integración del sellado de licencia por hardware HSM (módulo C89). <strong>Resultado : no se ha detectado ninguna vulnerabilidad explotable.</strong> Las alertas automáticas previas sobre dependencias transitivas de Tor han sido resueltas o documentadas, el código fuente Rust está libre de advertencias (Clippy) y el bloqueo criptográfico StrongBox está certificado como <em>Fail-Closed</em>.</p>
+        </div>
+
+        <h2>2. Alcance de la Auditoría</h2>
+        <ul>
+            <li><strong>El núcleo criptográfico Rust</strong> (503 crates dependientes, verificación Ed25519 vinculada al dominio <code>LICENSE:v1:</code>).</li>
+            <li><strong>El puente de hardware StrongBox / Android Keystore</strong> (generación ECDSA P-256 no exportable, huella SHA-256 y FFI <code>aegis_verify_license_key_bound</code>).</li>
+            <li><strong>El APK Android de producción</strong> (release arm64-v8a, <code>strip=true</code>, <code>panic=abort</code>, <code>FLAG_SECURE</code>).</li>
+            <li><strong>La infraestructura CI/CD</strong> (GitHub Actions, compilaciones reproducibles, verificación formal Miri y AWS Kani).</li>
+        </ul>
+
+        <h2>3. Metodología y Resultados (8 Capas)</h2>
+        <table>
+            <thead><tr><th>Capa</th><th>Herramienta / Método</th><th>Resultado</th></tr></thead>
+            <tbody>
+                <tr><td>1. Dependencias</td><td><code>cargo audit</code> (base RustSec)</td><td class="status-ok">✅ 0 vulnerabilidades</td></tr>
+                <tr><td>2. Análisis Estático</td><td><code>cargo clippy</code> (all-targets)</td><td class="status-ok">✅ 0 warnings</td></tr>
+                <tr><td>3. Compilación TPM</td><td><code>cargo check --features tpm</code></td><td class="status-ok">✅ Finished</td></tr>
+                <tr><td>4. Compilación Tests</td><td><code>cargo check --tests</code></td><td class="status-ok">✅ Finished</td></tr>
+                <tr><td>5. Contrato de Seguridad FFI</td><td>Documentación y wrappers FFI Mil-Spec</td><td class="status-ok">✅ 44 wrappers alineados</td></tr>
+                <tr><td>6. Pipeline CI Formal</td><td>Miri, AWS Kani, JNI, NDK, Valgrind</td><td class="status-ok">✅ 10/10 jobs en verde</td></tr>
+                <tr><td>7. Prueba Runtime</td><td>Validación en terminal físico (Login, Isolates, ANR)</td><td class="status-ok">✅ Estable, sin fallos</td></tr>
+                <tr class="hsm-row"><td>8. Sellado de Licencia HSM (C89)</td><td>StrongBox ECDSA + <code>aegis_verify_license_key_bound</code></td><td class="status-ok">✅ Rechazo clonación (res=-11) / Nominal (res=0)</td></tr>
+            </tbody>
+        </table>
+
+        <h2>4. Correcciones Aplicadas (Historial hasta v3.5.0)</h2>
+        <div class="card">
+            <ul>
+                <li><strong>C52 (x2)</strong> : Restauración de importaciones <code>std::env</code> y <code>std::process::Command</code> en pruebas <code>cfg-gated</code> (Windows vs Linux).</li>
+                <li><strong>ICE rustc 1.98.1</strong> : Mitigación del fallo del compilador en Windows/MSVC mediante <code>deranged=0.5.8</code>.</li>
+                <li><strong>C81-C88</strong> : Resolución de bloqueos en Isolate, liberación sistemática de memoria FFI (<code>malloc.free</code> en <code>finally</code>) y eliminación de fallbacks esteganográficos triviales.</li>
+                <li><strong>C89 (v3.5.0)</strong> : Sellado de licencia por hardware en chip StrongBox/HSM (vinculación criptográfica Ed25519 entre el número de pedido y la huella SHA-256 de la clave pública física del teléfono), visualización del Sello de Registro HSM en la interfaz y bloqueo <em>Fail-Closed</em> que impide cualquier inicialización de la bóveda sin licencia válida.</li>
+            </ul>
+        </div>
+
+        <h2>5. Límites y Próximos Pasos</h2>
+        <p>Esta auditoría es interna. Ares Maxima prepara una candidatura para una <strong>auditoría externa independiente</strong> (OTF Security Lab) que incluirá fuzzing continuo y análisis dinámico sobre hardware dedicado.</p>
+
+        <footer>Documento generado por Ares Maxima — 18/11/2026 • <a href="https://aresmaxima.com" style="color: var(--primary); text-decoration: none;">aresmaxima.com</a></footer>
+    </div>
+
+    <!-- ===================================================================
+         4. ENGLISH (EN)
+         =================================================================== -->
+    <div id="lang-en" class="lang-block" lang="en" dir="ltr">
+        <div class="lang-separator-break"></div>
+        <header>
+            <div class="header-title">
+                <h1>AEGIS P2P</h1>
+                <p>Internal Security Audit Report — HSM Hardware Binding Edition</p>
+                <div class="header-meta">
+                    <strong>Version:</strong> v3.5.0 (Android arm64-v8a) • <strong>Date:</strong> November 18, 2026 • <strong>Auditor:</strong> Ares Maxima • <strong>Classification:</strong> Public
+                </div>
+            </div>
+            <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima Logo" class="logo">
+        </header>
+
+        <div class="verdict-wrap">
+            <div class="verdict-badge">✅ VERDICT: 0 ACTIVE VULNERABILITIES — HSM BINDING VERIFIED</div>
+        </div>
+
+        <h2>1. Executive Summary</h2>
+        <div class="card success">
+            <p><strong>The internal security audit of AEGIS P2P v3.5.0 was completed on November 18, 2026.</strong></p>
+            <p>This audit reflects our ongoing commitment to engineering transparency and validates the integration of HSM hardware license binding (milestone C89). <strong>Result: zero exploitable vulnerabilities were detected.</strong> Previous automated advisories on transitive Tor dependencies have been resolved or documented, the Rust codebase compiles with zero Clippy warnings, and StrongBox cryptographic license locking is certified <em>Fail-Closed</em>.</p>
+        </div>
+
+        <h2>2. Audit Scope</h2>
+        <ul>
+            <li><strong>The Rust cryptographic core</strong> (503 dependent crates, Ed25519 signature verification bound to the <code>LICENSE:v1:</code> domain).</li>
+            <li><strong>The StrongBox / Android Keystore hardware bridge</strong> (non-exportable ECDSA P-256 key generation, SHA-256 public key fingerprinting, and <code>aegis_verify_license_key_bound</code> FFI).</li>
+            <li><strong>The production Android APK</strong> (release arm64-v8a, <code>strip=true</code>, <code>panic=abort</code>, <code>FLAG_SECURE</code>).</li>
+            <li><strong>The CI/CD pipeline</strong> (GitHub Actions, reproducible builds, Miri &amp; AWS Kani formal verification).</li>
+        </ul>
+
+        <h2>3. Methodology &amp; Results (8 Layers)</h2>
+        <table>
+            <thead><tr><th>Layer</th><th>Tool / Method</th><th>Result</th></tr></thead>
+            <tbody>
+                <tr><td>1. Dependencies</td><td><code>cargo audit</code> (RustSec database)</td><td class="status-ok">✅ 0 vulnerabilities</td></tr>
+                <tr><td>2. Static Analysis</td><td><code>cargo clippy</code> (all-targets)</td><td class="status-ok">✅ 0 warnings</td></tr>
+                <tr><td>3. TPM Compilation</td><td><code>cargo check --features tpm</code></td><td class="status-ok">✅ Finished</td></tr>
+                <tr><td>4. Test Suite Compilation</td><td><code>cargo check --tests</code></td><td class="status-ok">✅ Finished</td></tr>
+                <tr><td>5. FFI Security Contract</td><td>Mil-Spec FFI documentation &amp; wrappers</td><td class="status-ok">✅ 44 wrappers aligned</td></tr>
+                <tr><td>6. Formal CI Pipeline</td><td>Miri, AWS Kani, JNI, NDK, Valgrind</td><td class="status-ok">✅ 10/10 green jobs</td></tr>
+                <tr><td>7. Runtime Testing</td><td>Physical device validation (Login, Isolates, ANR)</td><td class="status-ok">✅ Stable, zero crashes</td></tr>
+                <tr class="hsm-row"><td>8. HSM License Binding (C89)</td><td>StrongBox ECDSA + <code>aegis_verify_license_key_bound</code></td><td class="status-ok">✅ Clone rejected (res=-11) / Nominal (res=0)</td></tr>
+            </tbody>
+        </table>
+
+        <h2>4. Applied Remediations (History up to v3.5.0)</h2>
+        <div class="card">
+            <ul>
+                <li><strong>C52 (x2)</strong>: Restored <code>std::env</code> and <code>std::process::Command</code> imports in <code>cfg-gated</code> tests (Windows vs. Linux).</li>
+                <li><strong>ICE rustc 1.98.1</strong>: Mitigated compiler internal error on Windows/MSVC by pinning <code>deranged=0.5.8</code>.</li>
+                <li><strong>C81-C88</strong>: Resolved Isolate deadlocks, enforced deterministic FFI memory deallocation (<code>malloc.free</code> inside <code>finally</code> blocks), and removed trivial steganography fallbacks.</li>
+                <li><strong>C89 (v3.5.0)</strong>: Hardware-bound license sealing on StrongBox/HSM (offline Ed25519 signature binding the order number to the SHA-256 fingerprint of the handset's hardware public key), HSM Enrollment Seal UI display, and <em>Fail-Closed</em> enforcement preventing vault initialization without a valid bound license.</li>
+            </ul>
+        </div>
+
+        <h2>5. Limitations &amp; Next Steps</h2>
+        <p>This report documents an internal audit. Ares Maxima is preparing an application for an <strong>independent third-party security audit</strong> (OTF Security Lab) featuring continuous fuzzing and dynamic instrumentation on dedicated hardware.</p>
+
+        <footer>Document generated by Ares Maxima — 2026-11-18 • <a href="https://aresmaxima.com" style="color: var(--primary); text-decoration: none;">aresmaxima.com</a></footer>
+    </div>
+
+    <!-- ===================================================================
+         5. УКРАЇНСЬКА (UK)
+         =================================================================== -->
+    <div id="lang-uk" class="lang-block" lang="uk" dir="ltr">
+        <div class="lang-separator-break"></div>
+        <header>
+            <div class="header-title">
+                <h1>AEGIS P2P</h1>
+                <p>Звіт про Внутрішній Аудит Безпеки — Реліз з Апаратною Печаткою HSM</p>
+                <div class="header-meta">
+                    <strong>Версія :</strong> v3.5.0 (Android arm64-v8a) • <strong>Дата :</strong> 18 листопада 2026 р. • <strong>Аудитор :</strong> Ares Maxima • <strong>Класифікація :</strong> Публічний
+                </div>
+            </div>
+            <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima Logo" class="logo">
+        </header>
+
+        <div class="verdict-wrap">
+            <div class="verdict-badge">✅ ВЕРДИКТ : 0 АКТИВНИХ ВРАЗЛИВОСТЕЙ — ПРИВ'ЯЗКУ HSM ПІДТВЕРДЖЕНО</div>
+        </div>
+
+        <h2>1. Виконавче Резюме</h2>
+        <div class="card success">
+            <p><strong>Внутрішній аудит безпеки AEGIS P2P v3.5.0 було завершено 18 листопада 2026 року.</strong></p>
+            <p>Цей аудит є частиною нашого постійного зобов'язання щодо прозорості та підтверджує інтеграцію апаратного зв'язування ліцензій HSM (етап C89). <strong>Результат : жодної експлуатованої вразливості не виявлено.</strong> Попередні автоматичні сповіщення щодо транзитивних залежностей Tor вирішені або задокументовані, вихідний код Rust не містить жодних попереджень (Clippy), а криптографічне блокування StrongBox сертифіковано як <em>Fail-Closed</em>.</p>
+        </div>
+
+        <h2>2. Периметр Аудиту</h2>
+        <ul>
+            <li><strong>Криптографічне ядро Rust</strong> (503 залежні крейти, перевірка підпису Ed25519 у домені <code>LICENSE:v1:</code>).</li>
+            <li><strong>Апаратний міст StrongBox / Android Keystore</strong> (генерація неекспортованих ключів ECDSA P-256, SHA-256 відбиток та FFI <code>aegis_verify_license_key_bound</code>).</li>
+            <li><strong>Релізний APK Android</strong> (release arm64-v8a, <code>strip=true</code>, <code>panic=abort</code>, <code>FLAG_SECURE</code>).</li>
+            <li><strong>Інфраструктура CI/CD</strong> (GitHub Actions, відтворювані збірки, формальна верифікація Miri та AWS Kani).</li>
+        </ul>
+
+        <h2>3. Методологія та Результати (8 Рівнів)</h2>
+        <table>
+            <thead><tr><th>Рівень</th><th>Інструмент / Метод</th><th>Результат</th></tr></thead>
+            <tbody>
+                <tr><td>1. Залежності</td><td><code>cargo audit</code> (база RustSec)</td><td class="status-ok">✅ 0 вразливостей</td></tr>
+                <tr><td>2. Статичний Аналіз</td><td><code>cargo clippy</code> (all-targets)</td><td class="status-ok">✅ 0 попереджень</td></tr>
+                <tr><td>3. Компіляція TPM</td><td><code>cargo check --features tpm</code></td><td class="status-ok">✅ Finished</td></tr>
+                <tr><td>4. Компіляція Тестів</td><td><code>cargo check --tests</code></td><td class="status-ok">✅ Finished</td></tr>
+                <tr><td>5. Контракт Безпеки FFI</td><td>Документація та обгортки FFI Mil-Spec</td><td class="status-ok">✅ 44 обгортки узгоджено</td></tr>
+                <tr><td>6. Формальний Конвеєр CI</td><td>Miri, AWS Kani, JNI, NDK, Valgrind</td><td class="status-ok">✅ 10/10 завдань зелені</td></tr>
+                <tr><td>7. Тестування Runtime</td><td>Перевірка на фізичному пристрої (Login, Isolates, ANR)</td><td class="status-ok">✅ Стабільно, без збоїв</td></tr>
+                <tr class="hsm-row"><td>8. Прив'язка Ліцензії HSM (C89)</td><td>StrongBox ECDSA + <code>aegis_verify_license_key_bound</code></td><td class="status-ok">✅ Відмова клонам (res=-11) / Штатно (res=0)</td></tr>
+            </tbody>
+        </table>
+
+        <h2>4. Застосовані Виправлення (Історія до v3.5.0)</h2>
+        <div class="card">
+            <ul>
+                <li><strong>C52 (x2)</strong> : Відновлено імпорти <code>std::env</code> та <code>std::process::Command</code> у <code>cfg-gated</code> тестах (Windows проти Linux).</li>
+                <li><strong>ICE rustc 1.98.1</strong> : Обхід внутрішньої помилки компілятора на Windows/MSVC через <code>deranged=0.5.8</code>.</li>
+                <li><strong>C81-C88</strong> : Усунення взаємних блокувань Isolate, гарантоване звільнення пам'яті FFI (<code>malloc.free</code> у блоках <code>finally</code>) та видалення тривіальних резервних методів стеганографії.</li>
+                <li><strong>C89 (v3.5.0)</strong> : Апаратне скріплення ліцензії на чіпі StrongBox/HSM (криптографічний зв'язок Ed25519 між номером замовлення та SHA-256 відбитком апаратного публічного ключа смартфона), відображення Печатки Реєстрації HSM в інтерфейсі та блокування <em>Fail-Closed</em>, що унеможливлює ініціалізацію сховища без дійсної ліцензії.</li>
+            </ul>
+        </div>
+
+        <h2>5. Обмеження та Наступні Кроки</h2>
+        <p>Цей аудит є внутрішнім. Ares Maxima готує заявку на <strong>незалежний зовнішній аудит</strong> (OTF Security Lab), що включатиме безперервний фаззинг та динамічний аналіз на виділеному обладнанні.</p>
+
+        <footer>Документ згенеровано Ares Maxima — 18.11.2026 • <a href="https://aresmaxima.com" style="color: var(--primary); text-decoration: none;">aresmaxima.com</a></footer>
+    </div>
+
+    <!-- ===================================================================
+         6. العربية (AR - RTL)
+         =================================================================== -->
+    <div id="lang-ar" class="lang-block" lang="ar" dir="rtl">
+        <div class="lang-separator-break"></div>
+        <header>
+            <div class="header-title">
+                <h1>AEGIS P2P</h1>
+                <p>تقرير التدقيق الأمني الداخلي — إصدار الختم المادي HSM</p>
+                <div class="header-meta">
+                    <strong>الإصدار :</strong> v3.5.0 (Android arm64-v8a) • <strong>التاريخ :</strong> 18 نوفمبر 2026 • <strong>المدقق :</strong> Ares Maxima • <strong>التصنيف :</strong> عام
+                </div>
+            </div>
+            <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima Logo" class="logo">
+        </header>
+
+        <div class="verdict-wrap">
+            <div class="verdict-badge">✅ النتيجة النهائية : 0 ثغرات نشطة — تم التحقق من الختم المادي HSM</div>
+        </div>
+
+        <h2>1. الملخص التنفيذي</h2>
+        <div class="card success">
+            <p><strong>تم إنجاز التدقيق الأمني الداخلي لنظام AEGIS P2P v3.5.0 بتاريخ 18 نوفمبر 2026.</strong></p>
+            <p>يأتي هذا التدقيق في إطار التزامنا الدائم بالشفافية الهندسية، ويؤكد دمج الختم المادي للترخيص عبر شريحة HSM (المهمة C89). <strong>النتيجة : لم يتم اكتشاف أي ثغرة أمنية قابلة للاستغلال.</strong> تمت معالجة أو توثيق التنبيهات الآلية السابقة المتعلقة بتبعيات Tor غير المباشرة، وكود المصدر بلغة Rust خالٍ تماماً من أي تحذيرات (Clippy)، كما تم اعتماد قفل الترخيص التشفيري عبر StrongBox بوضع الإغلاق الآمن (<em>Fail-Closed</em>).</p>
+        </div>
+
+        <h2>2. نطاق التدقيق</h2>
+        <ul>
+            <li><strong>النواة التشفيرية بلغة Rust</strong> (503 حزمة برمجية تابعة، التحقق من توقيع Ed25519 المرتبط بالنطاق <code>LICENSE:v1:</code>).</li>
+            <li><strong>الجسر المادي StrongBox / Android Keystore</strong> (توليد مفاتيح ECDSA P-256 غير قابلة للتصدير، بصمة SHA-256 والدالة الأصلية <code>aegis_verify_license_key_bound</code>).</li>
+            <li><strong>ملف التطبيق النهائي APK لنظام أندرويد</strong> (إصدار arm64-v8a، مع تفعيل <code>strip=true</code>، و<code>panic=abort</code>، و<code>FLAG_SECURE</code>).</li>
+            <li><strong>البنية التحتية للتكامل المستمر CI/CD</strong> (GitHub Actions، بناء قابل للتكرار، التحقق الرياضي الرسمي عبر Miri وAWS Kani).</li>
+        </ul>
+
+        <h2>3. المنهجية والنتائج (8 طبقات فحص)</h2>
+        <table>
+            <thead><tr><th>الطبقة</th><th>الأداة / المنهجية</th><th>النتيجة</th></tr></thead>
+            <tbody>
+                <tr><td>1. التبعيات البرمجية</td><td><code>cargo audit</code> (قاعدة بيانات RustSec)</td><td class="status-ok">✅ 0 ثغرات</td></tr>
+                <tr><td>2. التحليل الثابت للكود</td><td><code>cargo clippy</code> (all-targets)</td><td class="status-ok">✅ 0 تحذيرات</td></tr>
+                <tr><td>3. ترجمة وحدة TPM</td><td><code>cargo check --features tpm</code></td><td class="status-ok">✅ مكتمل بنجاح</td></tr>
+                <tr><td>4. ترجمة حزمة الاختبارات</td><td><code>cargo check --tests</code></td><td class="status-ok">✅ مكتمل بنجاح</td></tr>
+                <tr><td>5. عقد الأمان للروابط FFI</td><td>توثيق ومغلفات FFI بمعيار Mil-Spec</td><td class="status-ok">✅ 44 مغلفاً متطابقاً</td></tr>
+                <tr><td>6. خط أنابيب التحقق الرسمي CI</td><td>Miri, AWS Kani, JNI, NDK, Valgrind</td><td class="status-ok">✅ 10/10 مهام ناجحة</td></tr>
+                <tr><td>7. اختبار التشغيل الفعلي</td><td>التحقق على جهاز حقيقي (تسجيل الدخول، Isolates، استجابة الواجهة)</td><td class="status-ok">✅ مستقر، صفر انهيارات</td></tr>
+                <tr class="hsm-row"><td>8. الختم المادي للترخيص HSM (C89)</td><td>StrongBox ECDSA + <code>aegis_verify_license_key_bound</code></td><td class="status-ok">✅ رفض الاستنساخ (res=-11) / قبول الأصلي (res=0)</td></tr>
+            </tbody>
+        </table>
+
+        <h2>4. الإصلاحات المطبقة (السجل حتى الإصدار v3.5.0)</h2>
+        <div class="card">
+            <ul>
+                <li><strong>C52 (x2)</strong> : استعادة استيراد المكتبات <code>std::env</code> و<code>std::process::Command</code> في الاختبارات المشروطة بنظام التشغيل (Windows مقابل Linux).</li>
+                <li><strong>ICE rustc 1.98.1</strong> : تجاوز خطأ المترجم الداخلي على بيئة Windows/MSVC عبر تثبيت الحزمة <code>deranged=0.5.8</code>.</li>
+                <li><strong>C81-C88</strong> : حل مشاكل التوقف التبادلي في Isolates، وتحرير ذاكرة FFI بشكل حتمي (<code>malloc.free</code> داخل كتل <code>finally</code>)، وإزالة البدائل البسيطة في وحدة الإخفاء المعلوماتي.</li>
+                <li><strong>C89 (v3.5.0)</strong> : الختم المادي للترخيص على شريحة StrongBox/HSM (ربط تشفيري بتوقيع Ed25519 بين رقم الطلب وبصمة SHA-256 للمفتاح العام المادي للهاتف)، عرض ختم التسجيل HSM في واجهة المستخدم، وتطبيق قفل <em>Fail-Closed</em> يمنع تهيئة الخزنة بدون ترخيص صالح ومختوم.</li>
+            </ul>
+        </div>
+
+        <h2>5. الحدود والخطوات القادمة</h2>
+        <p>هذا التدقيق داخلي. تقوم Ares Maxima حالياً بإعداد طلب لإجراء <strong>تدقيق أمني خارجي مستقل</strong> (عبر مختبر OTF Security Lab) يتضمن اختبارات Fuzzing مستمرة وتحليلاً ديناميكياً على أجهزة مخصصة.</p>
+
+        <footer>تم إنشاء المستند بواسطة Ares Maxima — 18/11/2026 • <a href="https://aresmaxima.com" style="color: var(--primary); text-decoration: none;">aresmaxima.com</a></footer>
+    </div>
+
+    <!-- ===================================================================
+         7. POLSKI (PL)
+         =================================================================== -->
+    <div id="lang-pl" class="lang-block" lang="pl" dir="ltr">
+        <div class="lang-separator-break"></div>
+        <header>
+            <div class="header-title">
+                <h1>AEGIS P2P</h1>
+                <p>Raport z Wewnętrznego Audytu Bezpieczeństwa — Edycja Pieczęci HSM</p>
+                <div class="header-meta">
+                    <strong>Wersja :</strong> v3.5.0 (Android arm64-v8a) • <strong>Data :</strong> 18 listopada 2026 r. • <strong>Audytor :</strong> Ares Maxima • <strong>Klasyfikacja :</strong> Publiczny
+                </div>
+            </div>
+            <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima Logo" class="logo">
+        </header>
+
+        <div class="verdict-wrap">
+            <div class="verdict-badge">✅ WERDYKT : 0 AKTYWNYCH PODATNOŚCI — PIECZĘĆ HSM ZWERYFIKOWANA</div>
+        </div>
+
+        <h2>1. Podsumowanie Wykonawcze</h2>
+        <div class="card success">
+            <p><strong>Wewnętrzny audyt bezpieczeństwa AEGIS P2P v3.5.0 został zakończony 18 listopada 2026 roku.</strong></p>
+            <p>Niniejszy audyt wpisuje się w nasze stałe zobowiązanie do przejrzystości inżynieryjnej i potwierdza integrację sprzętowego wiązania licencji HSM (zadanie C89). <strong>Wynik : nie wykryto żadnych podatności możliwych do wykorzystania.</strong> Wcześniejsze automatyczne alerty dotyczące przechodnich zależności Tor zostały rozwiązane lub udokumentowane, kod źródłowy Rust jest wolny od jakichkolwiek ostrzeżeń (Clippy), a kryptograficzna blokada StrongBox posiada certyfikację <em>Fail-Closed</em>.</p>
+        </div>
+
+        <h2>2. Zakres Audytu</h2>
+        <ul>
+            <li><strong>Kryptograficzny rdzeń Rust</strong> (503 zależne pakiety crate, weryfikacja podpisu Ed25519 powiązana z domeną <code>LICENSE:v1:</code>).</li>
+            <li><strong>Most sprzętowy StrongBox / Android Keystore</strong> (generowanie nieeksportowalnych kluczy ECDSA P-256, odcisk SHA-256 oraz FFI <code>aegis_verify_license_key_bound</code>).</li>
+            <li><strong>Produkcyjny plik APK Android</strong> (release arm64-v8a, <code>strip=true</code>, <code>panic=abort</code>, <code>FLAG_SECURE</code>).</li>
+            <li><strong>Infrastruktura CI/CD</strong> (GitHub Actions, powtarzalne kompilacje, weryfikacja formalna Miri i AWS Kani).</li>
+        </ul>
+
+        <h2>3. Metodologia i Wyniki (8 Warstw)</h2>
+        <table>
+            <thead><tr><th>Warstwa</th><th>Narzędzie / Metoda</th><th>Wynik</th></tr></thead>
+            <tbody>
+                <tr><td>1. Zależności</td><td><code>cargo audit</code> (baza RustSec)</td><td class="status-ok">✅ 0 podatności</td></tr>
+                <tr><td>2. Analiza Statyczna</td><td><code>cargo clippy</code> (all-targets)</td><td class="status-ok">✅ 0 ostrzeżeń</td></tr>
+                <tr><td>3. Kompilacja TPM</td><td><code>cargo check --features tpm</code></td><td class="status-ok">✅ Finished</td></tr>
+                <tr><td>4. Kompilacja Testów</td><td><code>cargo check --tests</code></td><td class="status-ok">✅ Finished</td></tr>
+                <tr><td>5. Kontrakt Bezpieczeństwa FFI</td><td>Dokumentacja i wrappery FFI Mil-Spec</td><td class="status-ok">✅ 44 wrappery zgodne</td></tr>
+                <tr><td>6. Formalny Potok CI</td><td>Miri, AWS Kani, JNI, NDK, Valgrind</td><td class="status-ok">✅ 10/10 zadań na zielono</td></tr>
+                <tr><td>7. Testy Runtime</td><td>Walidacja na fizycznym urządzeniu (Login, Isolates, ANR)</td><td class="status-ok">✅ Stabilny, zero awarii</td></tr>
+                <tr class="hsm-row"><td>8. Pieczęć Licencji HSM (C89)</td><td>StrongBox ECDSA + <code>aegis_verify_license_key_bound</code></td><td class="status-ok">✅ Odrzucenie klonu (res=-11) / Nominalny (res=0)</td></tr>
+            </tbody>
+        </table>
+
+        <h2>4. Zastosowane Poprawki (Historia do v3.5.0)</h2>
+        <div class="card">
+            <ul>
+                <li><strong>C52 (x2)</strong> : Przywrócenie importów <code>std::env</code> oraz <code>std::process::Command</code> w testach <code>cfg-gated</code> (Windows vs Linux).</li>
+                <li><strong>ICE rustc 1.98.1</strong> : Obejście wewnętrznego błędu kompilatora na Windows/MSVC poprzez przypięcie <code>deranged=0.5.8</code>.</li>
+                <li><strong>C81-C88</strong> : Rozwiązanie zakleszczeń Isolate, deterministyczne zwalnianie pamięci FFI (<code>malloc.free</code> w blokach <code>finally</code>) oraz usunięcie trywialnych fallbacków steganograficznych.</li>
+                <li><strong>C89 (v3.5.0)</strong> : Sprzętowe zapieczętowanie licencji na układzie StrongBox/HSM (kryptograficzne powiązanie Ed25519 między numerem zamówienia a odciskiem SHA-256 sprzętowego klucza publicznego telefonu), wyświetlanie Pieczęci Rejestracji HSM w interfejsie oraz blokada <em>Fail-Closed</em> uniemożliwiająca inicjalizację sejfu bez ważnej licencji.</li>
+            </ul>
+        </div>
+
+        <h2>5. Ograniczenia i Kolejne Kroki</h2>
+        <p>Niniejszy audyt ma charakter wewnętrzny. Ares Maxima przygotowuje wniosek o <strong>niezależny audyt zewnętrzny</strong> (OTF Security Lab) obejmujący ciągły fuzzing i analizę dynamiczną na dedykowanym sprzęcie.</p>
+
+        <footer>Dokument wygenerowany przez Ares Maxima — 18.11.2026 • <a href="https://aresmaxima.com" style="color: var(--primary); text-decoration: none;">aresmaxima.com</a></footer>
+    </div>
+
+</div>
+</body>
+</html>
