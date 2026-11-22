@@ -1,4 +1,5 @@
 name: Reproducible Build, Formal Proofs & SLSA Unforgeable Audit
+
 on:
   push:
     branches: [ "main", "master" ]
@@ -12,14 +13,11 @@ permissions:
   attestations: write
 
 jobs:
-  # ============================================================
-  # JOB 1 Ã¢â‚¬â€ Kani (pin rust:1.93 pour compatibilitÃƒÂ© Kani 0.67.0)
-  # ============================================================
   kani-proofs:
     name: Formal Proofs (AWS Kani)
     runs-on: ubuntu-latest
     container:
-      image: rust:1.93-bookworm
+      image: rust:latest
     steps:
       - uses: actions/checkout@v4
       - name: Install System Dependencies & Kani
@@ -38,14 +36,11 @@ jobs:
           path: aegis-core/kani-report.txt
           retention-days: 30
 
-  # ============================================================
-  # JOB 2 Ã¢â‚¬â€ Miri (5 serveurs parallÃƒÂ¨les couvrant 100% des modules dont v3.6)
-  # ============================================================
   miri-audit:
     name: Memory Audit (Miri)
     runs-on: ubuntu-latest
     container:
-      image: rust:1.93-bookworm
+      image: rust:latest
     strategy:
       fail-fast: false
       matrix:
@@ -68,9 +63,6 @@ jobs:
             cargo +nightly-2026-09-01 miri test $mod --release
           done
 
-  # ============================================================
-  # JOB 3 Ã¢â‚¬â€ Build Android DÃƒÂ©terministe (INTACT : rust:latest = 1.98.1)
-  # ============================================================
   build-android:
     name: Android NDK Build (ARM64)
     runs-on: ubuntu-latest
@@ -112,9 +104,6 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-  # ============================================================
-  # JOB 3bis Ã¢â‚¬â€ VÃƒÂ©rification exhaustive des symboles JNI + FFI C ABI (v3.5 + v3.6)
-  # ============================================================
   jni-symbols-verification:
     name: JNI & FFI v3.6 Symbol Verification
     runs-on: ubuntu-latest
@@ -130,7 +119,7 @@ jobs:
       - name: Verify JNI symbols present (18 symbols)
         run: |
           SO=$(find /tmp/aegis-so -name "libaegis_core.so" | head -n1)
-          [ -n "$SO" ] || { echo "ERROR: libaegis_core.so introuvable"; exit 1; }
+          [ -n "$SO" ] || { echo "ERROR: libaegis_core.so missing"; exit 1; }
           SYMBOLS=$(nm -D --defined-only "$SO")
           MISSING=0
           for SYM in \
@@ -161,8 +150,7 @@ jobs:
             fi
           done
           [ "$MISSING" -eq 0 ] || exit 1
-
-      - name: Verify FFI C ABI symbols (v3.5 HSM + v3.6 C90-C94)
+      - name: Verify FFI C ABI symbols (23 symbols)
         run: |
           SO=$(find /tmp/aegis-so -name "libaegis_core.so" | head -n1)
           SYMBOLS=$(nm -D --defined-only "$SO")
@@ -201,9 +189,6 @@ jobs:
           done
           [ "$MISSING" -eq 0 ] || exit 1
 
-  # ============================================================
-  # JOB 4 Ã¢â‚¬â€ Preuve mmap/mprotect (Valgrind sur Linux natif)
-  # ============================================================
   linux-mmap-proof:
     name: Linux mmap/mprotect proof (Valgrind)
     runs-on: ubuntu-latest
@@ -217,19 +202,10 @@ jobs:
         run: |
           cd aegis-core
           cargo test --lib polymorphic --no-run
-          BIN=$(find target/debug/deps -maxdepth 1 -type f -executable -name 'aegis_core-*' | head -n 1)
+          BIN=$(find target/debug/deps -maxdepth 1 -type f -executable -name "aegis_core-*" | head -n 1)
           [ -n "$BIN" ] || exit 1
-          valgrind \
-            --error-exitcode=1 \
-            --leak-check=full \
-            --show-leak-kinds=definite \
-            --track-origins=yes \
-            --errors-for-leak-kinds=definite \
-            "$BIN" polymorphic --test-threads=1
+          valgrind --error-exitcode=1 --leak-check=full --show-leak-kinds=definite --track-origins=yes --errors-for-leak-kinds=definite "$BIN" polymorphic --test-threads=1
 
-  # ============================================================
-  # JOB 5 Ã¢â‚¬â€ Preuve TPM + Firmware BoÃƒÂ®tier MESH #![no_std] + RustSec 0-CVE
-  # ============================================================
   tpm-and-mesh-proof:
     name: TPM2, Bare-Metal Mesh Firmware & RustSec Audit
     runs-on: ubuntu-latest
@@ -247,7 +223,6 @@ jobs:
           cargo check --features tpm --tests
           cargo test --features tpm --lib tpm:: -- --test-threads=1
       - name: Verify Bare-Metal Mesh Relay Firmware (#![no_std])
-        if: hashFiles('aegis-mesh-fw/Cargo.toml') != ''
         run: |
           cd aegis-mesh-fw
           cargo test
@@ -258,10 +233,6 @@ jobs:
           cd aegis-core
           cargo audit
 
-  # ============================================================
-  # JOB 6 Ã¢â‚¬â€ SCEAU D'AUTO-AUDIT INTRAFFICABLE (SLSA v1.0 / Sigstore Rekor)
-  # Ne s'exÃƒÂ©cute QUE si Kani, les 5 Miri, Android NDK, JNI/FFI, Valgrind & RustSec sont 100% VERTS.
-  # ============================================================
   slsa-unforgeable-attestation:
     name: SLSA Build Provenance Seal (Zero Editor Trust)
     runs-on: ubuntu-latest
@@ -278,14 +249,12 @@ jobs:
         with:
           name: libaegis_core-arm64-v8a
           path: verified_release/
-
       - name: Find Binary & Display Immutable SHA-256
         id: locate
         run: |
           SO_PATH=$(find verified_release -name "libaegis_core.so" | head -n 1)
           echo "so_path=$SO_PATH" >> "$GITHUB_OUTPUT"
           sha256sum "$SO_PATH"
-
       - name: Sign Unforgeable SLSA Provenance in Public Sigstore Rekor Log
         uses: actions/attest-build-provenance@v1
         with:
