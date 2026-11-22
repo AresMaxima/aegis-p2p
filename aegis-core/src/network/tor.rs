@@ -1,28 +1,28 @@
 //! aegis-core/src/network/tor.rs
 //!
-//! Client Tor embarqué (Arti) + transport isolé par contact + rotation.
+//! Client Tor embarquÃ© (Arti) + transport isolÃ© par contact + rotation.
 //!
-//! ─────────────────────────────────────────────────────────────────────
+//! â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 //! Contenu :
 //!
-//!   1. `AegisTorClient` (legacy) — envoi d'un fichier unique via bootstrap.
+//!   1. `AegisTorClient` (legacy) â€” envoi d'un fichier unique via bootstrap.
 //!
-//!   2. `TorTransport` (P0-A.1d.1 + d.3) — transport Tor persistant avec :
-//!        • Un client de base (bootstrap unique)
-//!        • Un `HashMap<contact_id, TorClient>` isolé par contact
-//!        • Un `HashMap<contact_id, Arc<Mutex<DataStream>>>` stream persistant
-//!        • Un `HashMap<contact_id, TorCircuitRotation>` gestionnaire de rotation
+//!   2. `TorTransport` (P0-A.1d.1 + d.3) â€” transport Tor persistant avec :
+//!        â€¢ Un client de base (bootstrap unique)
+//!        â€¢ Un `HashMap<contact_id, TorClient>` isolÃ© par contact
+//!        â€¢ Un `HashMap<contact_id, Arc<Mutex<DataStream>>>` stream persistant
+//!        â€¢ Un `HashMap<contact_id, TorCircuitRotation>` gestionnaire de rotation
 //!
-//!   3. `TorTransportPerContact` (P0-A.1d.2) — wrapper qui implémente
+//!   3. `TorTransportPerContact` (P0-A.1d.2) â€” wrapper qui implÃ©mente
 //!      `EncryptedTransport` :
-//!        • Pipeline send : rotate? → strip → encrypt → prefix_len → pack → write
-//!        • Pipeline recv : rotate? → read → concat → strip_prefix → decrypt
+//!        â€¢ Pipeline send : rotate? â†’ strip â†’ encrypt â†’ prefix_len â†’ pack â†’ write
+//!        â€¢ Pipeline recv : rotate? â†’ read â†’ concat â†’ strip_prefix â†’ decrypt
 //!
-//!   4. `secure_wipe_dir` — utilitaire partagé (wipe fichiers avant Drop).
+//!   4. `secure_wipe_dir` â€” utilitaire partagÃ© (wipe fichiers avant Drop).
 //!
-//!   5. `fetch_http` (C82) — HTTP-over-Tor pour le manifest d'update.
+//!   5. `fetch_http` (C82) â€” HTTP-over-Tor pour le manifest d'update.
 //!
-//! ─────────────────────────────────────────────────────────────────────
+//! â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 use arti_client::{config::CfgPath, DataStream, TorClient, TorClientConfig};
 use std::collections::HashMap;
@@ -46,12 +46,12 @@ use crate::network::tor_rotation::{RotationReason, TorCircuitRotation};
 use crate::secure_buffer::SecureBuffer;
 
 // =========================================================================
-// Client Tor legacy — envoi d'un fichier unique
+// Client Tor legacy â€” envoi d'un fichier unique
 // =========================================================================
 
 /// Client Tor minimaliste (legacy).
 pub struct AegisTorClient {
-    client: Option<TorClient<TokioRustlsRuntime>>,
+    client: Option<Arc<TorClient<TokioRustlsRuntime>>>,
     ram_fs: Option<TempDir>,
 }
 
@@ -100,7 +100,7 @@ impl AegisTorClient {
     }
 
     pub fn inner(&self) -> &TorClient<TokioRustlsRuntime> {
-        self.client.as_ref().expect("Le client Tor a été détruit")
+        self.client.as_deref().expect("Le client Tor a Ã©tÃ© dÃ©truit")
     }
 }
 
@@ -116,16 +116,16 @@ impl Drop for AegisTorClient {
 }
 
 // =========================================================================
-// TorTransport — isolation par contact + rotation (P0-A.1d.1 + d.3)
+// TorTransport â€” isolation par contact + rotation (P0-A.1d.1 + d.3)
 // =========================================================================
 
-/// Type de stream partagé : Arc<Mutex<DataStream>>.
+/// Type de stream partagÃ© : Arc<Mutex<DataStream>>.
 pub type SharedStream = Arc<Mutex<DataStream>>;
 
-/// Transport Tor avec isolation par contact et rotation événementielle.
+/// Transport Tor avec isolation par contact et rotation Ã©vÃ©nementielle.
 pub struct TorTransport {
-    base_client: TorClient<TokioRustlsRuntime>,
-    isolated_clients: Arc<RwLock<HashMap<String, TorClient<TokioRustlsRuntime>>>>,
+    base_client: Arc<TorClient<TokioRustlsRuntime>>,
+    isolated_clients: Arc<RwLock<HashMap<String, Arc<TorClient<TokioRustlsRuntime>>>>>,
     streams: Arc<RwLock<HashMap<String, SharedStream>>>,
     rotations: Arc<RwLock<HashMap<String, TorCircuitRotation>>>,
     ram_fs: Option<TempDir>,
@@ -136,13 +136,13 @@ impl TorTransport {
     pub async fn bootstrap() -> Result<Self, Box<dyn Error>> {
         // === P0-A.1e (D42-bis) : fail-closed StrongBox ===
         //
-        // Refus de démarrer Tor si StrongBox n'est pas disponible.
-        // Le flag est mis à jour depuis Dart au démarrage via la FFI
-        // `aegis_tor_set_strongbox_available`. Valeur par défaut : false
-        // → Tor est refusé tant que l'app n'a pas confirmé StrongBox OK.
+        // Refus de dÃ©marrer Tor si StrongBox n'est pas disponible.
+        // Le flag est mis Ã  jour depuis Dart au dÃ©marrage via la FFI
+        // `aegis_tor_set_strongbox_available`. Valeur par dÃ©faut : false
+        // â†’ Tor est refusÃ© tant que l'app n'a pas confirmÃ© StrongBox OK.
         //
-        // Comportement : Flutter reçoit StrongBoxUnavailable → bascule en
-        // mode dégradé local only (D62, Wi-Fi Direct + BLE uniquement).
+        // Comportement : Flutter reÃ§oit StrongBoxUnavailable â†’ bascule en
+        // mode dÃ©gradÃ© local only (D62, Wi-Fi Direct + BLE uniquement).
         if !crate::tor_strongbox_is_available() {
             return Err(Box::new(TransportError::StrongBoxUnavailable));
         }
@@ -177,15 +177,15 @@ impl TorTransport {
         })
     }
 
-    /// Récupère (ou crée) le client isolé pour un contact.
+    /// RÃ©cupÃ¨re (ou crÃ©e) le client isolÃ© pour un contact.
     pub async fn get_or_create_isolated_client(
         &self,
         contact_id: &str,
-    ) -> Result<TorClient<TokioRustlsRuntime>, Box<dyn Error>> {
+    ) -> Result<Arc<TorClient<TokioRustlsRuntime>>, Box<dyn Error>> {
         {
             let map = self.isolated_clients.read().await;
             if let Some(client) = map.get(contact_id) {
-                return Ok(client.clone());
+                return Ok(Arc::clone(client));
             }
         }
 
@@ -194,15 +194,15 @@ impl TorTransport {
         {
             let mut map = self.isolated_clients.write().await;
             if let Some(existing) = map.get(contact_id) {
-                return Ok(existing.clone());
+                return Ok(Arc::clone(existing));
             }
-            map.insert(contact_id.to_string(), new_client.clone());
+            map.insert(contact_id.to_string(), Arc::clone(&new_client));
         }
 
         Ok(new_client)
     }
 
-    /// Récupère (ou ouvre) le stream Tor persistant pour un contact.
+    /// RÃ©cupÃ¨re (ou ouvre) le stream Tor persistant pour un contact.
     pub async fn get_or_create_stream(
         &self,
         contact_id: &str,
@@ -238,7 +238,7 @@ impl TorTransport {
         Ok(shared)
     }
 
-    /// Récupère (ou crée) le gestionnaire de rotation pour un contact.
+    /// RÃ©cupÃ¨re (ou crÃ©e) le gestionnaire de rotation pour un contact.
     async fn get_or_create_rotation(&self, contact_id: &str) -> () {
         let mut map = self.rotations.write().await;
         map.entry(contact_id.to_string())
@@ -313,7 +313,7 @@ impl TorTransport {
             map.remove(contact_id);
         }
 
-        // 2. Drop client isolé
+        // 2. Drop client isolÃ©
         {
             let mut map = self.isolated_clients.write().await;
             map.remove(contact_id);
@@ -343,7 +343,7 @@ impl Drop for TorTransport {
 }
 
 // =========================================================================
-// TorTransportPerContact — impl EncryptedTransport (P0-A.1d.2 + d.3)
+// TorTransportPerContact â€” impl EncryptedTransport (P0-A.1d.2 + d.3)
 // =========================================================================
 
 pub struct TorTransportPerContact {
@@ -511,7 +511,7 @@ impl EncryptedTransport for TorTransportPerContact {
 }
 
 // =========================================================================
-// Utilitaires partagés
+// Utilitaires partagÃ©s
 // =========================================================================
 
 pub fn secure_wipe_dir(path: &Path) {
@@ -547,17 +547,17 @@ pub fn secure_wipe_dir(path: &Path) {
 }
 
 // =========================================================================
-// C82 — fetch_http() : HTTP-over-Tor pour le manifest d'update
+// C82 â€” fetch_http() : HTTP-over-Tor pour le manifest d'update
 // =========================================================================
 //
-// Utilisé par `aegis_tor_fetch_http` (lib.rs) pour télécharger le manifest
-// de mise à jour via un service onion dédié.
+// UtilisÃ© par `aegis_tor_fetch_http` (lib.rs) pour tÃ©lÃ©charger le manifest
+// de mise Ã  jour via un service onion dÃ©diÃ©.
 //
-// Isolation : contact_id = "system:updater" → circuit Tor distinct des
-// contacts P2P (pas de corrélation possible entre le fetch manifest et
+// Isolation : contact_id = "system:updater" â†’ circuit Tor distinct des
+// contacts P2P (pas de corrÃ©lation possible entre le fetch manifest et
 // les conversations).
 
-/// Contact ID réservé pour le fetch des mises à jour.
+/// Contact ID rÃ©servÃ© pour le fetch des mises Ã  jour.
 pub const UPDATER_CONTACT_ID: &str = "system:updater";
 
 impl TorTransport {
@@ -567,7 +567,7 @@ impl TorTransport {
         target_onion: &str,
         path: &str,
     ) -> Result<Vec<u8>, TransportError> {
-        // 1. Client isolé dédié à l'updater
+        // 1. Client isolÃ© dÃ©diÃ© Ã  l'updater
         let client = self
             .get_or_create_isolated_client(UPDATER_CONTACT_ID)
             .await
@@ -579,7 +579,7 @@ impl TorTransport {
             .await
             .map_err(|e| TransportError::TransportUnavailable(e.to_string()))?;
 
-        // 3. Requête HTTP/1.1 minimale
+        // 3. RequÃªte HTTP/1.1 minimale
         let request = format!(
             "GET {} HTTP/1.1\r\nHost: {}\r\nUser-Agent: Aegis-Updater/1.0\r\nAccept: application/json, application/octet-stream\r\nConnection: close\r\n\r\n",
             path, target_onion
@@ -594,7 +594,7 @@ impl TorTransport {
             .await
             .map_err(|e| TransportError::IoError(e.to_string()))?;
 
-        // 4. Lecture complète (Connection: close → EOF)
+        // 4. Lecture complÃ¨te (Connection: close â†’ EOF)
         let mut response = Vec::new();
         stream
             .read_to_end(&mut response)
@@ -606,9 +606,9 @@ impl TorTransport {
     }
 }
 
-/// Parse une réponse HTTP/1.1 brute (200 OK uniquement).
+/// Parse une rÃ©ponse HTTP/1.1 brute (200 OK uniquement).
 fn parse_http_response(response: &[u8]) -> Result<Vec<u8>, TransportError> {
-    // 1. Séparateur headers/body
+    // 1. SÃ©parateur headers/body
     let sep_pos = response
         .windows(4)
         .position(|w| w == b"\r\n\r\n")
@@ -767,13 +767,13 @@ mod tests {
         assert!(parse_http_response(b"NOT HTTP\r\n\r\n").is_err());
     }
 
-    // ===== Tests avec bootstrap Tor (ignorés par défaut) =====
+    // ===== Tests avec bootstrap Tor (ignorÃ©s par dÃ©faut) =====
 
     #[tokio::test]
     #[ignore = "slow: requires real Tor network bootstrap (~30-60s)"]
     async fn test_tor_transport_bootstrap() {
         let result = TorTransport::bootstrap().await;
-        assert!(result.is_ok(), "bootstrap Tor échoué: {:?}", result.err());
+        assert!(result.is_ok(), "bootstrap Tor Ã©chouÃ©: {:?}", result.err());
         let transport = result.unwrap();
         assert_eq!(transport.isolated_client_count().await, 0);
         assert_eq!(transport.rotation_count().await, 0);

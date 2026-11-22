@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   # ============================================================
-  # JOB 1 â€” Kani (pin rust:1.93 pour compatibilitÃ© Kani 0.67.0)
+  # JOB 1 Ã¢â‚¬â€ Kani (pin rust:1.93 pour compatibilitÃƒÂ© Kani 0.67.0)
   # ============================================================
   kani-proofs:
     name: Formal Proofs (AWS Kani)
@@ -39,7 +39,7 @@ jobs:
           retention-days: 30
 
   # ============================================================
-  # JOB 2 â€” Miri (5 serveurs parallÃ¨les couvrant 100% des modules dont v3.6)
+  # JOB 2 Ã¢â‚¬â€ Miri (5 serveurs parallÃƒÂ¨les couvrant 100% des modules dont v3.6)
   # ============================================================
   miri-audit:
     name: Memory Audit (Miri)
@@ -69,7 +69,7 @@ jobs:
           done
 
   # ============================================================
-  # JOB 3 â€” Build Android DÃ©terministe (INTACT : rust:latest = 1.98.1)
+  # JOB 3 Ã¢â‚¬â€ Build Android DÃƒÂ©terministe (INTACT : rust:latest = 1.98.1)
   # ============================================================
   build-android:
     name: Android NDK Build (ARM64)
@@ -113,7 +113,7 @@ jobs:
           retention-days: 30
 
   # ============================================================
-  # JOB 3bis â€” VÃ©rification exhaustive des symboles JNI + FFI C ABI (v3.5 + v3.6)
+  # JOB 3bis Ã¢â‚¬â€ VÃƒÂ©rification exhaustive des symboles JNI + FFI C ABI (v3.5 + v3.6)
   # ============================================================
   jni-symbols-verification:
     name: JNI & FFI v3.6 Symbol Verification
@@ -202,13 +202,13 @@ jobs:
           [ "$MISSING" -eq 0 ] || exit 1
 
   # ============================================================
-  # JOB 4 â€” Preuve mmap/mprotect (Valgrind sur Linux natif)
+  # JOB 4 Ã¢â‚¬â€ Preuve mmap/mprotect (Valgrind sur Linux natif)
   # ============================================================
   linux-mmap-proof:
     name: Linux mmap/mprotect proof (Valgrind)
     runs-on: ubuntu-latest
     container:
-      image: rust:1.93-bookworm
+      image: rust:latest
     steps:
       - uses: actions/checkout@v4
       - name: Install Valgrind
@@ -228,7 +228,7 @@ jobs:
             "$BIN" polymorphic --test-threads=1
 
   # ============================================================
-  # JOB 5 â€” Preuve TPM + Firmware BoÃ®tier MESH #![no_std] + RustSec 0-CVE
+  # JOB 5 Ã¢â‚¬â€ Preuve TPM + Firmware BoÃƒÂ®tier MESH #![no_std] + RustSec 0-CVE
   # ============================================================
   tpm-and-mesh-proof:
     name: TPM2, Bare-Metal Mesh Firmware & RustSec Audit
@@ -259,8 +259,8 @@ jobs:
           cargo audit
 
   # ============================================================
-  # JOB 6 â€” SCEAU D'AUTO-AUDIT INTRAFFICABLE (SLSA v1.0 / Sigstore Rekor)
-  # Ne s'exÃ©cute QUE si Kani, les 5 Miri, Android NDK, JNI/FFI, Valgrind & RustSec sont 100% VERTS.
+  # JOB 6 Ã¢â‚¬â€ SCEAU D'AUTO-AUDIT INTRAFFICABLE (SLSA v1.0 / Sigstore Rekor)
+  # Ne s'exÃƒÂ©cute QUE si Kani, les 5 Miri, Android NDK, JNI/FFI, Valgrind & RustSec sont 100% VERTS.
   # ============================================================
   slsa-unforgeable-attestation:
     name: SLSA Build Provenance Seal (Zero Editor Trust)

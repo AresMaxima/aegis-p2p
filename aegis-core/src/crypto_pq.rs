@@ -1,34 +1,14 @@
 //! aegis-core/src/crypto_pq.rs
-//! Encapsulation Hybride Post-Quantique ML-KEM-1024 + X25519 (Constant-Time)
-//! et Chiffrement Vectorisé ARM NEON / Hardware Extensions (CdCM v2.2-RC1).
-//!
-//! F4 Étape 6c (29/09/2026) — Passage à ML-KEM-1024 (NIST Level 5) :
-//!   • ML-KEM-768 → ML-KEM-1024 : sécurité équivalente AES-256 (contre AES-192).
-//!   • Conforme FIPS 203, se rapproche des exigences CNSA 2.0.
-//!   • Tailles : pk=1568, sk=3168, ct=1568 octets.
-//!   • Impact perf : ~30% plus lent, ~50% plus gros (accepté pour L5).
-//!
-//! NOTE (audit 2026-09-27) :
-//!   • Les tags HKDF "AEGIS-v2.2-*" sont FIGÉS pour compatibilité vault
-//!     avec les sessions v2.2 existantes. NE PAS modifier sans migration
-//!     de vault explicite (casserait le déchiffrement des données existantes).
-//!   • La version #[cfg(kani)] de process_512b_frame_ephemeral est une
-//!     simplification qui modélise les BORNES d'accès (payload[i] avec i∈[0,512[)
-//!     mais PAS la sémantique cryptographique réelle (HKDF n'est pas
-//!     instrumentable par Kani). La preuve porte sur l'absence de panique
-//!     et de débordement, pas sur la correction du chiffrement.
-//!   • API AES-256-GCM unifiée via `encrypt_aes_256_gcm_neon` (avec AAD).
-//!     L'ancienne API `Aes256GcmEngine` (sans AAD) a été supprimée
-//!     (audit 2026-09-27 — code mort, aucun usage externe).
+//! Encapsulation Hybride Post-Quantique ML-KEM-1024 (FIPS 203 Pur Rust) + X25519
+//! et Chiffrement Vectorise AES-256-GCM (CdCM v3.6).
 
 use aes_gcm::aead::{Aead, KeyInit, Payload};
 use aes_gcm::{Aes256Gcm, Nonce};
+#[cfg(not(kani))]
+use fips203::ml_kem_1024;
+#[cfg(not(kani))]
+use fips203::traits::{Decaps, Encaps, KeyGen, SerDes};
 use hkdf::Hkdf;
-use pqcrypto_mlkem::mlkem1024::{
-    decapsulate as kyber_decapsulate, encapsulate as kyber_encapsulate, keypair as kyber_keypair,
-    Ciphertext as KyberCiphertext, PublicKey as KyberPublicKey, SecretKey as KyberSecretKey,
-};
-use pqcrypto_traits::kem::{Ciphertext, PublicKey, SharedSecret};
 use sha2::Sha256;
 use x25519_dalek::{EphemeralSecret, PublicKey as X25519PublicKey, StaticSecret as X25519SecretKey};
 use zeroize::Zeroize;
@@ -38,44 +18,37 @@ use crate::secure_buffer::SecureBuffer;
 pub const AES_256_GCM_KEY_LEN: usize = 32;
 pub const AES_256_GCM_NONCE_LEN: usize = 12;
 
-/// Clé publique hybride contenant les composantes ML-KEM-1024 et X25519
+#[cfg(not(kani))]
+pub type KyberPublicKey = ml_kem_1024::EncapsKey;
+#[cfg(not(kani))]
+pub type KyberSecretKey = ml_kem_1024::DecapsKey;
+#[cfg(not(kani))]
+pub type KyberCiphertext = ml_kem_1024::CipherText;
+
+#[cfg(not(kani))]
 #[derive(Clone)]
 pub struct HybridPublicKey {
     pub kyber_pk: KyberPublicKey,
     pub x25519_pk: X25519PublicKey,
 }
 
-/// Clé privée hybride
-///
-/// Cycle de vie :
-///   • `KyberSecretKey` implémente `Drop` via `pqcrypto_traits` (crate tierce).
-///   • `X25519SecretKey` implémente `Zeroize on Drop` via `x25519-dalek`.
-///   • Voir la NOTE en dessous de la struct pour la justification de
-///     l'absence de `Drop` custom.
+#[cfg(not(kani))]
 pub struct HybridSecretKey {
     pub kyber_sk: KyberSecretKey,
     pub x25519_sk: X25519SecretKey,
 }
 
-// NOTE (audit 2026-09-27) : pas de `impl Drop` explicite ici.
-//   • `KyberSecretKey` (pqcrypto_mlkem) : implémente `Drop` via
-//     `pqcrypto_traits::kem::SecretKey` mais NE dérive PAS `Zeroize`
-//     (trait bounds incompatibles). Sa destruction est gérée par la crate.
-//   • `X25519SecretKey` (x25519-dalek) : implémente `Zeroize on Drop`
-//     via la feature `zeroize` (activée par défaut dans le workspace).
-//   • Un `Drop` custom serait no-op sémantique ET empêcherait la
-//     dérivation automatique ; on s'appuie donc sur les crates tierces,
-//     déjà auditées.
-
-/// Paquet d'encapsulation à transmettre au pair
+#[cfg(not(kani))]
 #[derive(Clone)]
 pub struct HybridEncapsulationPayload {
     pub kyber_ct: KyberCiphertext,
     pub x25519_eph_pk: X25519PublicKey,
 }
 
+#[cfg(not(kani))]
 pub struct HybridKeyExchange;
 
+#[cfg(not(kani))]
 impl HybridKeyExchange {
     pub fn generate_keypair() -> (HybridPublicKey, HybridSecretKey) {
         generate_hybrid_keypair()
@@ -89,64 +62,65 @@ impl HybridKeyExchange {
         decapsulate_hybrid(sk, payload)
     }
 
-    /// Encapsulation directe pour vault et sessions P2P : autonome et sans boucle d'appel
-    ///
-    /// ⚠️ Tag HKDF "AEGIS-v2.2-*" figé pour compatibilité vault — ne pas modifier.
+    /// Tag HKDF "AEGIS-v2.2-*" fige pour compatibilite sessions.
     pub fn encapsulate_and_derive(
         peer_x25519_pk: &X25519PublicKey,
         peer_kyber_pk: &KyberPublicKey,
     ) -> (SecureBuffer, X25519PublicKey, KyberCiphertext) {
-        let (kyber_ss, kyber_ct) = kyber_encapsulate(peer_kyber_pk);
+        let (kyber_ss, kyber_ct) = peer_kyber_pk
+            .try_encaps()
+            .expect("Echec OS RNG lors de ML-KEM-1024 try_encaps");
+        let mut kyber_ss_bytes = kyber_ss.into_bytes();
 
         let eph_x25519_sk = EphemeralSecret::random_from_rng(rand::rngs::OsRng);
         let eph_x25519_pk = X25519PublicKey::from(&eph_x25519_sk);
         let x25519_ss = eph_x25519_sk.diffie_hellman(peer_x25519_pk);
 
-        let mut combined_ss = Vec::with_capacity(kyber_ss.as_bytes().len() + x25519_ss.as_bytes().len());
-        combined_ss.extend_from_slice(kyber_ss.as_bytes());
+        let mut combined_ss = Vec::with_capacity(kyber_ss_bytes.len() + x25519_ss.as_bytes().len());
+        combined_ss.extend_from_slice(&kyber_ss_bytes);
         combined_ss.extend_from_slice(x25519_ss.as_bytes());
+        kyber_ss_bytes.zeroize();
 
-        // Tag "v2.2" FIGÉ — voir note module.
         let hk = Hkdf::<Sha256>::new(Some(b"AEGIS-v2.2-HYBRID-HKDF-SALT"), &combined_ss);
         let mut session_key = SecureBuffer::new(AES_256_GCM_KEY_LEN);
         hk.expand(b"AEGIS-v2.2-SESSION-KEY-EXPANSION", session_key.as_slice_mut())
-            .expect("Échec d'expansion HKDF-SHA256");
+            .expect("Echec d'expansion HKDF-SHA256");
 
         combined_ss.zeroize();
-
         (session_key, eph_x25519_pk, kyber_ct)
     }
 
-    /// Décapsulation directe pour vault et sessions P2P avec EphemeralSecret
-    ///
-    /// ⚠️ Tag HKDF "AEGIS-v2.2-*" figé pour compatibilité vault — ne pas modifier.
     pub fn decapsulate_and_derive(
         x25519_sk: EphemeralSecret,
         kyber_sk: &KyberSecretKey,
         peer_x25519_pk: &X25519PublicKey,
         kyber_ct: &KyberCiphertext,
     ) -> SecureBuffer {
-        let kyber_ss = kyber_decapsulate(kyber_ct, kyber_sk);
+        let kyber_ss = kyber_sk
+            .try_decaps(kyber_ct)
+            .expect("Echec ML-KEM-1024 try_decaps");
+        let mut kyber_ss_bytes = kyber_ss.into_bytes();
         let x25519_ss = x25519_sk.diffie_hellman(peer_x25519_pk);
 
-        let mut combined_ss = Vec::with_capacity(kyber_ss.as_bytes().len() + x25519_ss.as_bytes().len());
-        combined_ss.extend_from_slice(kyber_ss.as_bytes());
+        let mut combined_ss = Vec::with_capacity(kyber_ss_bytes.len() + x25519_ss.as_bytes().len());
+        combined_ss.extend_from_slice(&kyber_ss_bytes);
         combined_ss.extend_from_slice(x25519_ss.as_bytes());
+        kyber_ss_bytes.zeroize();
 
-        // Tag "v2.2" FIGÉ — voir note module.
         let hk = Hkdf::<Sha256>::new(Some(b"AEGIS-v2.2-HYBRID-HKDF-SALT"), &combined_ss);
         let mut session_key = SecureBuffer::new(AES_256_GCM_KEY_LEN);
         hk.expand(b"AEGIS-v2.2-SESSION-KEY-EXPANSION", session_key.as_slice_mut())
-            .expect("Échec d'expansion HKDF-SHA256");
+            .expect("Echec d'expansion HKDF-SHA256");
 
         combined_ss.zeroize();
-
         session_key
     }
 }
 
+#[cfg(not(kani))]
 pub fn generate_hybrid_keypair() -> (HybridPublicKey, HybridSecretKey) {
-    let (kyber_pk, kyber_sk) = kyber_keypair();
+    let (kyber_pk, kyber_sk) =
+        ml_kem_1024::KG::try_keygen().expect("Echec OS RNG lors de ML-KEM-1024 try_keygen");
     let x25519_sk = X25519SecretKey::random_from_rng(rand::rngs::OsRng);
     let x25519_pk = X25519PublicKey::from(&x25519_sk);
 
@@ -156,6 +130,7 @@ pub fn generate_hybrid_keypair() -> (HybridPublicKey, HybridSecretKey) {
     )
 }
 
+#[cfg(not(kani))]
 pub fn encapsulate_hybrid(
     peer_pk: &HybridPublicKey,
 ) -> (HybridEncapsulationPayload, SecureBuffer) {
@@ -171,25 +146,29 @@ pub fn encapsulate_hybrid(
     )
 }
 
+#[cfg(not(kani))]
 pub fn decapsulate_hybrid(
     sk: &HybridSecretKey,
     payload: &HybridEncapsulationPayload,
 ) -> SecureBuffer {
-    let kyber_ss = kyber_decapsulate(&payload.kyber_ct, &sk.kyber_sk);
+    let kyber_ss = sk
+        .kyber_sk
+        .try_decaps(&payload.kyber_ct)
+        .expect("Echec ML-KEM-1024 try_decaps");
+    let mut kyber_ss_bytes = kyber_ss.into_bytes();
     let x25519_ss = sk.x25519_sk.diffie_hellman(&payload.x25519_eph_pk);
 
-    let mut combined_ss = Vec::with_capacity(kyber_ss.as_bytes().len() + x25519_ss.as_bytes().len());
-    combined_ss.extend_from_slice(kyber_ss.as_bytes());
+    let mut combined_ss = Vec::with_capacity(kyber_ss_bytes.len() + x25519_ss.as_bytes().len());
+    combined_ss.extend_from_slice(&kyber_ss_bytes);
     combined_ss.extend_from_slice(x25519_ss.as_bytes());
+    kyber_ss_bytes.zeroize();
 
-    // Tag "v2.2" FIGÉ — voir note module.
     let hk = Hkdf::<Sha256>::new(Some(b"AEGIS-v2.2-HYBRID-HKDF-SALT"), &combined_ss);
     let mut session_key = SecureBuffer::new(AES_256_GCM_KEY_LEN);
     hk.expand(b"AEGIS-v2.2-SESSION-KEY-EXPANSION", session_key.as_slice_mut())
-        .expect("Échec d'expansion HKDF-SHA256");
+        .expect("Echec d'expansion HKDF-SHA256");
 
     combined_ss.zeroize();
-
     session_key
 }
 
@@ -200,22 +179,14 @@ pub fn encrypt_aes_256_gcm_neon(
     aad: &[u8],
 ) -> Result<Vec<u8>, &'static str> {
     if key.len() != AES_256_GCM_KEY_LEN {
-        return Err("Taille de clé AES-256 invalide");
+        return Err("Taille de cle AES-256 invalide");
     }
-
     let cipher = Aes256Gcm::new_from_slice(key.as_slice())
-        .map_err(|_| "Échec d'initialisation de la primitive AES-256-GCM")?;
+        .map_err(|_| "Echec d'initialisation AES-256-GCM")?;
     let nonce = Nonce::from_slice(nonce_bytes);
-
     cipher
-        .encrypt(
-            nonce,
-            Payload {
-                msg: plaintext,
-                aad,
-            },
-        )
-        .map_err(|_| "Échec lors du chiffrement AES-256-GCM")
+        .encrypt(nonce, Payload { msg: plaintext, aad })
+        .map_err(|_| "Echec lors du chiffrement AES-256-GCM")
 }
 
 pub fn decrypt_aes_256_gcm_neon(
@@ -225,29 +196,19 @@ pub fn decrypt_aes_256_gcm_neon(
     aad: &[u8],
 ) -> Result<SecureBuffer, &'static str> {
     if key.len() != AES_256_GCM_KEY_LEN {
-        return Err("Taille de clé AES-256 invalide");
+        return Err("Taille de cle AES-256 invalide");
     }
-
     let cipher = Aes256Gcm::new_from_slice(key.as_slice())
-        .map_err(|_| "Échec d'initialisation de la primitive AES-256-GCM")?;
+        .map_err(|_| "Echec d'initialisation AES-256-GCM")?;
     let nonce = Nonce::from_slice(nonce_bytes);
 
-    let decrypted_vec = cipher
-        .decrypt(
-            nonce,
-            Payload {
-                msg: ciphertext,
-                aad,
-            },
-        )
-        .map_err(|_| "Échec lors du déchiffrement (intégrité GCM compromise)")?;
+    let mut decrypted_vec = cipher
+        .decrypt(nonce, Payload { msg: ciphertext, aad })
+        .map_err(|_| "Echec lors du dechiffrement (integrite GCM compromise)")?;
 
     let mut out_buf = SecureBuffer::new(decrypted_vec.len());
     out_buf.as_slice_mut().copy_from_slice(&decrypted_vec);
-
-    let mut decrypted_vec_clean = decrypted_vec;
-    decrypted_vec_clean.zeroize();
-
+    decrypted_vec.zeroize();
     Ok(out_buf)
 }
 
@@ -257,21 +218,20 @@ mod tests {
     use std::time::Instant;
 
     #[test]
-    #[cfg_attr(miri, ignore)] // Demande à Miri d'ignorer ce test FFI
+    #[cfg_attr(miri, ignore)]
     fn test_hybrid_key_exchange_roundtrip() {
         let (alice_pk, alice_sk) = HybridKeyExchange::generate_keypair();
         let (payload, bob_session_key) = HybridKeyExchange::encapsulate(&alice_pk);
         let alice_session_key = HybridKeyExchange::decapsulate(&alice_sk, &payload);
-
         assert_eq!(alice_session_key.as_slice(), bob_session_key.as_slice());
     }
 
     #[test]
-    #[cfg_attr(miri, ignore)] // Demande à Miri d'ignorer ce test FFI
+    #[cfg_attr(miri, ignore)]
     fn test_encapsulate_and_derive_direct_roundtrip() {
         let bob_x_secret = EphemeralSecret::random_from_rng(rand::rngs::OsRng);
         let bob_x_public = X25519PublicKey::from(&bob_x_secret);
-        let (kyber_pk, kyber_sk) = pqcrypto_mlkem::mlkem1024::keypair();
+        let (kyber_pk, kyber_sk) = ml_kem_1024::KG::try_keygen().unwrap();
 
         let (alice_derived, alice_x_pub, kyber_ct) =
             HybridKeyExchange::encapsulate_and_derive(&bob_x_public, &kyber_pk);
@@ -282,7 +242,6 @@ mod tests {
             &alice_x_pub,
             &kyber_ct,
         );
-
         assert_eq!(alice_derived.as_slice(), bob_derived.as_slice());
     }
 
@@ -291,17 +250,16 @@ mod tests {
         let mut key = SecureBuffer::new(32);
         key.as_slice_mut().fill(0x42);
         let nonce = [0x07u8; 12];
-        let plaintext = b"AEGIS v2.2 ZERO-DISK TEST PAYLOAD";
+        let plaintext = b"AEGIS v3.6 ZERO-DISK TEST PAYLOAD";
         let aad = b"HEADER_AAD";
 
         let ciphertext = encrypt_aes_256_gcm_neon(&key, &nonce, plaintext, aad).unwrap();
         let decrypted = decrypt_aes_256_gcm_neon(&key, &nonce, &ciphertext, aad).unwrap();
-
         assert_eq!(decrypted.as_slice(), plaintext);
     }
 
     #[test]
-    #[cfg_attr(miri, ignore)] // Demande à Miri d'ignorer ce benchmark
+    #[cfg_attr(miri, ignore)]
     fn test_benchmark_crypto_throughput() {
         let mut key = SecureBuffer::new(32);
         key.as_slice_mut().fill(0x13);
@@ -313,78 +271,40 @@ mod tests {
         let start = Instant::now();
         let ciphertext = encrypt_aes_256_gcm_neon(&key, &nonce, &plaintext, b"").unwrap();
         let duration = start.elapsed();
-
         plaintext.zeroize();
 
         let throughput_mb_s = (size as f64 / (1024.0 * 1024.0)) / duration.as_secs_f64();
-        println!("Débit Chiffrement AES-256-GCM : {:.2} Mo/s", throughput_mb_s);
-
         assert!(ciphertext.len() > size);
-
         #[cfg(debug_assertions)]
-        assert!(throughput_mb_s > 0.5, "Débit anormalement bas en profil Debug");
-
+        assert!(throughput_mb_s > 0.5);
         #[cfg(not(debug_assertions))]
-        assert!(throughput_mb_s > 50.0, "Débit insuffisant en profil Release");
+        assert!(throughput_mb_s > 50.0);
     }
 
-    /// F4 Étape 6c — Vérifie que ML-KEM-1024 est bien utilisé (NIST Level 5).
-    ///
-    /// Tailles officielles FIPS 203 pour ML-KEM-1024 :
-    ///   • Public key (ek)    : 1568 octets
-    ///   • Secret key (dk)    : 3168 octets
-    ///   • Ciphertext (ct)    : 1568 octets
-    ///   • Shared secret      :   32 octets
     #[test]
-    #[cfg_attr(miri, ignore)] // FFI C (pqcrypto-mlkem) non supporté par Miri
-    fn test_mlkem_1024_sizes() {
-        // Import local : le trait SecretKey fournit `.as_bytes()` sur `sk`.
-        use pqcrypto_traits::kem::SecretKey;
+    #[cfg_attr(miri, ignore)]
+    fn test_mlkem_1024_sizes_and_fips203_modulus_check() {
+        let (pk, sk) = ml_kem_1024::KG::try_keygen().unwrap();
+        let pk_bytes = pk.clone().into_bytes();
+        let sk_bytes = sk.clone().into_bytes();
 
-        let (pk, sk) = pqcrypto_mlkem::mlkem1024::keypair();
+        assert_eq!(pk_bytes.len(), 1568);
+        assert_eq!(sk_bytes.len(), 3168);
 
-        assert_eq!(
-            pk.as_bytes().len(),
-            1568,
-            "ML-KEM-1024 pk doit faire 1568 octets (FIPS 203)"
-        );
-        assert_eq!(
-            sk.as_bytes().len(),
-            3168,
-            "ML-KEM-1024 sk doit faire 3168 octets (FIPS 203)"
-        );
+        let (ss, ct) = pk.try_encaps().unwrap();
+        let ct_bytes = ct.clone().into_bytes();
+        assert_eq!(ct_bytes.len(), 1568);
+        assert_eq!(ss.clone().into_bytes().len(), 32);
 
-        // ⚠️ L'API pqcrypto retourne (SharedSecret, Ciphertext) dans cet ordre.
-        let (ss, ct) = pqcrypto_mlkem::mlkem1024::encapsulate(&pk);
-        assert_eq!(
-            ct.as_bytes().len(),
-            1568,
-            "ML-KEM-1024 ct doit faire 1568 octets (FIPS 203)"
-        );
-        assert_eq!(
-            ss.as_bytes().len(),
-            32,
-            "ML-KEM-1024 shared secret doit faire 32 octets (FIPS 203)"
-        );
+        let ss2 = sk.try_decaps(&ct).unwrap();
+        assert_eq!(ss.into_bytes(), ss2.into_bytes());
 
-        // Vérification croisée : décapsulation produit le même ss
-        let ss2 = pqcrypto_mlkem::mlkem1024::decapsulate(&ct, &sk);
-        assert_eq!(
-            ss.as_bytes(),
-            ss2.as_bytes(),
-            "ML-KEM-1024 decaps doit redonner le même shared secret"
-        );
+        // Preuve anti-RUSTSEC-2026-0585 : une cle remplie de 0xFF viole coeff < q (3329) et DOIT etre rejetee !
+        let forged_ek = [0xFFu8; 1568];
+        assert!(ml_kem_1024::EncapsKey::try_from_bytes(forged_ek).is_err());
     }
 }
 
-/// Ephemeral 512B frame processing on-the-fly
-///
-/// ⚠️ Version #[cfg(kani)] — SIMPLIFIÉE pour la vérification formelle :
-///   • Modélise les BORNES d'accès (`payload[i]` avec `i ∈ [0, 512[`).
-///   • Ne modélise PAS la sémantique cryptographique (HKDF n'est pas
-///     instrumentable par Kani car appel à `sha2` non-formalisé).
-///   • La preuve porte sur : absence de panique + absence de débordement.
-///   • La version réelle (chiffrement HKDF-SHA256) est en #[cfg(not(kani))].
 #[cfg(kani)]
 pub fn process_512b_frame_ephemeral(
     master_key: &[u8; 32],
@@ -394,13 +314,10 @@ pub fn process_512b_frame_ephemeral(
     if master_key.len() != 32 || payload.len() != 512 {
         return Err("INVALID_BOUNDS");
     }
-
-    // Invariant pur Rust sans assembleur SIMD pour la preuve formelle
     let key_byte = master_key[0] ^ (frame_index as u8);
     for i in 0..512 {
         payload[i] ^= key_byte;
     }
-
     Ok(())
 }
 
@@ -410,22 +327,13 @@ pub fn process_512b_frame_ephemeral(
     frame_index: u64,
     payload: &mut [u8; 512],
 ) -> Result<(), ()> {
-    use zeroize::Zeroize;
-    use hkdf::Hkdf;
-    use sha2::Sha256;
-
     let mut ephemeral_key = [0u8; 32];
     let info = frame_index.to_le_bytes();
-
     let hk = Hkdf::<Sha256>::new(Some(b"AEGIS-EPHEMERAL-FRAME-SALT"), master_key);
     hk.expand(&info, &mut ephemeral_key).map_err(|_| ())?;
-
-    // Chiffrement / Déchiffrement In-Place du bloc de 512 octets
     for (i, byte) in payload.iter_mut().enumerate() {
         *byte ^= ephemeral_key[i % 32];
     }
-
-    // Destruction sub-milliseconde de la clé dérivée
     ephemeral_key.zeroize();
     Ok(())
 }

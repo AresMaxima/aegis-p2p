@@ -1,9 +1,9 @@
 //! aegis-core/src/qr_pairing.rs
-//! Encodage et décodage de la charge utile d'appariement Out-of-Band (QR Code Version 40)
+//! Encodage et decodage de la charge utile d'appariement Out-of-Band (QR Code Version 40)
 
 use ed25519_dalek::VerifyingKey as Ed25519PublicKey;
-use pqcrypto_mlkem::mlkem768::PublicKey as KyberPublicKey;
-use pqcrypto_traits::kem::PublicKey;
+use fips203::ml_kem_768;
+use fips203::traits::SerDes as _;
 use zeroize::Zeroize;
 
 pub const QR_VERSION_40_MAX_PAYLOAD: usize = 2710;
@@ -27,7 +27,6 @@ impl OutOfBandPairingPayload {
                 + ED25519_PK_LEN
                 + TOR_V3_ONION_ADDR_LEN,
         );
-
         out.extend_from_slice(PAIRING_HEADER_MAGIC);
         out.extend_from_slice(&self.kyber_pk_bytes);
         out.extend_from_slice(&self.ed25519_pk_bytes);
@@ -46,13 +45,11 @@ impl OutOfBandPairingPayload {
         if bytes.len() != expected_len {
             return Err("Taille du QR code d'appariement invalide");
         }
-
         if &bytes[..4] != PAIRING_HEADER_MAGIC {
-            return Err("Magic bytes de l'en-tête d'appariement invalides");
+            return Err("Magic bytes de l'en-tete d'appariement invalides");
         }
 
         let mut offset = 4;
-
         let mut kyber_pk_bytes = [0u8; KYBER768_PK_LEN];
         kyber_pk_bytes.copy_from_slice(&bytes[offset..offset + KYBER768_PK_LEN]);
         offset += KYBER768_PK_LEN;
@@ -64,12 +61,12 @@ impl OutOfBandPairingPayload {
         let mut tor_onion_address = [0u8; TOR_V3_ONION_ADDR_LEN];
         tor_onion_address.copy_from_slice(&bytes[offset..offset + TOR_V3_ONION_ADDR_LEN]);
 
-        if KyberPublicKey::from_bytes(&kyber_pk_bytes).is_err() {
-            return Err("Clé publique ML-KEM-768 corrompue dans le QR Code");
+        // Verification stricte FIPS 203 Section 7.2 (modulus check coeff < 3329)
+        if ml_kem_768::EncapsKey::try_from_bytes(kyber_pk_bytes).is_err() {
+            return Err("Cle publique ML-KEM-768 corrompue ou non-conforme FIPS 203");
         }
-
         if Ed25519PublicKey::from_bytes(&ed25519_pk_bytes).is_err() {
-            return Err("Clé d'identité Ed25519 corrompue dans le QR Code");
+            return Err("Cle d'identite Ed25519 corrompue dans le QR Code");
         }
 
         Ok(Self {
@@ -91,23 +88,20 @@ impl Drop for OutOfBandPairingPayload {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use fips203::traits::KeyGen as _;
 
     #[test]
     #[cfg_attr(miri, ignore)]
     fn test_qr_payload_serialize_deserialize() {
-        let dummy_payload = OutOfBandPairingPayload {
-            kyber_pk_bytes: [0x55u8; KYBER768_PK_LEN],
-            ed25519_pk_bytes: [0xAAu8; ED25519_PK_LEN],
+        let (kyber_pk, _) = ml_kem_768::KG::try_keygen().unwrap();
+        let ed_sk = ed25519_dalek::SigningKey::from_bytes(&[0x42u8; 32]);
+        let ed_pk = ed_sk.verifying_key();
+
+        let valid_payload = OutOfBandPairingPayload {
+            kyber_pk_bytes: kyber_pk.into_bytes(),
+            ed25519_pk_bytes: *ed_pk.as_bytes(),
             tor_onion_address: *b"v3onionaddress56byteslongexample1234567890abcdefgh.onion",
         };
-
-        let (kyber_pk, _) = pqcrypto_mlkem::mlkem768::keypair();
-        let mut valid_payload = dummy_payload;
-        valid_payload.kyber_pk_bytes.copy_from_slice(kyber_pk.as_bytes());
-
-        let ed_sk = ed25519_dalek::SigningKey::generate(&mut rand::thread_rng());
-        let ed_pk = ed_sk.verifying_key();
-        valid_payload.ed25519_pk_bytes.copy_from_slice(ed_pk.as_bytes());
 
         let binary_qr = valid_payload.serialize();
         assert_eq!(binary_qr.len(), 4 + 1184 + 32 + 56);

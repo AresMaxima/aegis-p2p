@@ -1,0 +1,26 @@
+# ==============================================================================
+# AEGIS P2P v3.6 — Politique RustSec Transparente & Verifiable par Tiers
+# ==============================================================================
+# Toutes les primitives cryptographiques directes d'AEGIS P2P (fips203 ML-KEM,
+# fips204 ML-DSA, x25519-dalek, ed25519-dalek, aes-gcm, chacha20poly1305, ring 0.17)
+# ont 0 CVE.
+#
+# Les 3 exceptions ci-dessous proviennent EXCLUSIVEMENT des dependances internes
+# amont du client officiel Tor Project `arti-client v0.48.0` et ne sont pas
+# exploitables dans le modele d'execution d'AEGIS :
+#   1. RUSTSEC-2023-0071 (rsa 0.9.10 via tor-llcrypto) : Marvin timing attack sur
+#      dechiffrement RSA PKCS#1 v1.5 cle privee. Arti n'utilise RSA QUE pour
+#      verifier des signatures publiques d'annuaire Tor (aucun dechiffrement).
+#   2. RUSTSEC-2026-0387 (crypto-bigint 0.5.5) : tire transitivement par rsa 0.9.10,
+#      aucune cle privee RSA/ECDSA n'est manipulee via crypto-bigint dans AEGIS.
+#   3. RUSTSEC-2026-0459 (libsqlite3-sys 0.38.2 via rusqlite 0.40.2 / tor-dirmgr) :
+#      Arti 0.48 verrouille rusqlite 0.40 (SQLite interne du cache de consensus Tor
+#      en dossier ephemere). AEGIS P2P n'execute aucune requete SQL utilisateur.
+# ==============================================================================
+
+[advisories]
+ignore = [
+    "RUSTSEC-2023-0071",
+    "RUSTSEC-2026-0387",
+    "RUSTSEC-2026-0459",
+]

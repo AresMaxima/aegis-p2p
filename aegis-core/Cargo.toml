@@ -7,7 +7,6 @@ edition = "2021"
 crate-type = ["cdylib", "rlib", "staticlib"]
 
 [dependencies]
-# --- SÃƒÂ©curitÃƒÂ© mÃƒÂ©moire & crypto classique / post-quantique ---
 zeroize = { version = "1.7", features = ["alloc", "derive"] }
 getrandom = "0.2"
 argon2 = "0.5"
@@ -19,10 +18,9 @@ hmac = "0.12"
 x25519-dalek = { version = "2.0", features = ["static_secrets"] }
 ed25519-dalek = "2.1"
 
-# --- Post-Quantique : Migration temporaire (pqcrypto -> ml-kem) ---
-pqcrypto-mlkem = "0.1"
-pqcrypto-mldsa = "0.1"
-pqcrypto-traits = "0.3"
+# --- Post-Quantique Pur Rust Certifie NIST (FIPS 203 ML-KEM & FIPS 204 ML-DSA) ---
+fips203 = "0.5"
+fips204 = "0.5"
 
 bip39 = "2.0"
 hex = "0.4"
@@ -31,54 +29,24 @@ thiserror = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
-# --- JNI : pont Kotlin <-> Rust ---
 jni = "0.21"
-
-# --- FFI bas niveau (libc, errno, etc.) ---
 libc = "0.2"
-
-# --- Hardening systÃƒÂ¨me, BDD, signaux OS ---
 signal-hook = "0.3"
 ffi-support = "0.4"
-# Requis uniquement pour lier arti-client (tor-dirmgr) sur Windows MSVC / Android NDK.
-# AEGIS P2P n'utilise aucune BDD SQLite pour les messages, clés ou médias (100 % RAM).
-libsqlite3-sys = { version = "0.28", features = ["bundled"] }
 tempfile = "3.8"
 
-# --- RÃƒÂ©seau asynchrone, P2P, Tor embarquÃƒÂ© ---
+# --- Reseau asynchrone, P2P, Tor embarque (Arti 0.48 + static-sqlite interne) ---
 tokio = { version = "1.35", features = ["full"] }
-arti-client = { version = "0.18", default-features = false, features = ["tokio", "rustls"] }
-tor-rtcompat = { version = "0.18", default-features = false, features = ["tokio", "rustls"] }
+arti-client = { version = "0.48", default-features = false, features = ["tokio", "rustls", "onion-service-client", "static-sqlite"] }
+tor-rtcompat = { version = "0.48", default-features = false, features = ["tokio", "rustls"] }
 subtle = "2.6.1"
 lazy_static = "1.5.0"
 futures = "0.3.34"
 
-# --- VÃƒÂ©rification d'attestation Android (Niveau 3) ---
-# Parsing des chaÃƒÂ®nes de certificats X.509 retournÃƒÂ©es par Android KeyStore.
-# UtilisÃƒÂ© par aegis_verify_attestation_chain() dans lib.rs.
-# La feature `verify` (activÃƒÂ©e par dÃƒÂ©faut) apporte la vÃƒÂ©rification
-# cryptographique des signatures ECDSA P-256 via `ring`.
 x509-parser = "0.16"
-# VÃƒÂ©rification cryptographique des signatures (ECDSA P-256, RSA).
-# DÃƒÂ©jÃƒÂ  prÃƒÂ©sent transitivement via rustls 0.23 / arti-client, on le dÃƒÂ©clare
-# explicitement pour l'utiliser directement dans notre code.
 ring = "0.17"
-# DÃƒÂ©codage base64 pour les extensions d'attestation (OID ASN.1).
 base64 = "0.22"
-
-# --- DÃƒÂ©codage/encodage image pour le rendu VRAM rÃƒÂ©el (viewer/decoder.rs) ---
-# UtilisÃƒÂ© par :
-#   Ã¢â‚¬Â¢ aegis_decode_and_blit_file()   Ã¢â€ â€™ JPEG/PNG disque Ã¢â€ â€™ RGBA Ã¢â€ â€™ VRAM
-#   Ã¢â‚¬Â¢ aegis_seal_ram_to_disk()       Ã¢â€ â€™ YUV420 Ã¢â€ â€™ RGBA Ã¢â€ â€™ JPEG q85 Ã¢â€ â€™ disque
-#
-# default-features = false Ã¢â€ â€™ uniquement jpeg + png (exclut webp/tiff/avif/gif/bmp)
-# afin de limiter la taille du .so final sur arm64-v8a.
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
-
-# NOTE : pas de dÃƒÂ©pendance `ndk-sys` / `ndk`.
-# Les symboles ANativeWindow_* de libandroid.so sont dÃƒÂ©clarÃƒÂ©s inline dans
-# `src/viewer/stream_pipe.rs` via `#[link(name = "android")]`.
-# Cela ÃƒÂ©vite une dÃƒÂ©pendance transitive lourde pour seulement 2 fonctions.
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.52", features = [
@@ -90,38 +58,19 @@ windows-sys = { version = "0.52", features = [
 [target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
 tss-esapi = { version = "7.3", optional = true }
 
-# =========================================================================
-# PROFILS DE COMPILATION
-# =========================================================================
-
-# --- Profil Release : durcissement anti-forensics & rÃƒÂ©duction d'empreinte ---
 [profile.release]
-opt-level = "z"     # Taille minimale du binaire natif
-lto = false         # F6-C (30/09/26) : LTO ("fat" ET "thin") ÃƒÂ©liminait les
-                    # symboles FFI appelÃƒÂ©s uniquement depuis Dart. On dÃƒÂ©sactive
-                    # LTO pour garantir les exports aegis_vault_*. CoÃƒÂ»t : ~10-20%
-                    # de taille .so. Version script linker prÃƒÂ©vue en v3.1 si besoin.
-codegen-units = 1   # Optimisations maximales
-panic = "abort"     # CRITIQUE : pas d'unwinding ÃƒÂ  travers la frontiÃƒÂ¨re FFI
-strip = true        # Efface symboles et tables de dÃƒÂ©bogage
+opt-level = "z"
+lto = false
+codegen-units = 1
+panic = "abort"
+strip = true
 
-# Surcote locale : le dÃƒÂ©codeur JPEG/PNG est une boucle chaude en VRAM.
-# En O3 pour ÃƒÂ©viter les micro-lags d'affichage sur 1080p.
-# CoÃƒÂ»t : ~30-50 Ko sur libaegis_core.so.
-#
-# NOTE : `image 0.25` utilise `zune-jpeg` (pas `jpeg-decoder`), confirmÃƒÂ© par
-# les logs de build. La surcote sur `jpeg-decoder` a ÃƒÂ©tÃƒÂ© retirÃƒÂ©e (crate absent
-# Ã¢â€ â€™ warning Cargo silencieux).
 [profile.release.package.image]
 opt-level = 3
 [profile.release.package.zune-jpeg]
 opt-level = 3
 [profile.release.package.png]
 opt-level = 3
-
-# =========================================================================
-# DEV / LINT / FEATURES
-# =========================================================================
 
 [dev-dependencies]
 proptest = "1.4"
@@ -133,14 +82,7 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(kani)'] }
 [features]
 default = ["software_alpha_shields"]
 software_alpha_shields = []
-
-# Feature TPM Ã¢â‚¬â€ compilÃƒÂ©e uniquement ÃƒÂ  la demande (nÃƒÂ©cessite libtss2-dev).
-# Non-default car : (1) libtss2 n'est pas disponible sur Windows/Android,
-# (2) requiert un device TPM rÃƒÂ©el pour les tests natifs.
-# Preuve de compilation : job CI `tpm-feature-proof`.
 tpm = ["dep:tss-esapi"]
-
-# DESIGN CONCEPTUEL NON COMPILÃƒâ€° PAR DÃƒâ€°FAUT (PHASE 9 B2G)
 b2g_phase9_soc = ["efuse_access", "hw_zeroization_mesh"]
 efuse_access = []
 hw_zeroization_mesh = []

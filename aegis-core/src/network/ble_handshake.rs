@@ -1,29 +1,13 @@
 // src/network/ble_handshake.rs
-//
-// P0-A.4a (2026-10-17) — Handshake ed25519 + ML-KEM-1024 + ML-DSA-87.
-//
-// Ce module implémente le protocole v2, résistant au quantique :
-//   • KEM    : ML-KEM-1024 (NIST Level 5)
-//   • Auth   : ed25519 || ML-DSA-87 (NIST Level 5) — AND vérification (D99)
-//   • KDF    : HKDF-SHA384
+// Handshake ed25519 + ML-KEM-1024 (FIPS 203) + ML-DSA-87 (FIPS 204) Pur Rust.
 
 use std::sync::Mutex;
 use std::time::Instant;
 
-use pqcrypto_mlkem::mlkem1024::{
-    self as mlkem, Ciphertext as KemCiphertext, PublicKey as KemPublicKey,
-    SecretKey as KemSecretKey,
-};
-use pqcrypto_mldsa::mldsa87::{
-    self as mldsa, PublicKey as DsaPublicKey, SecretKey as DsaSecretKey,
-    SignedMessage as DsaSignedMessage,
-};
-use pqcrypto_traits::kem::{
-    Ciphertext as _, PublicKey as _, SecretKey as _, SharedSecret as _,
-};
-use pqcrypto_traits::sign::{
-    PublicKey as _, SignedMessage as _, SecretKey as _,
-};
+use fips203::ml_kem_1024;
+use fips203::traits::{Decaps as _, Encaps as _, KeyGen as _, SerDes as KemSerDes};
+use fips204::ml_dsa_87;
+use fips204::traits::{SerDes as DsaSerDes, Signer as _, Verifier as _};
 
 use crate::{ed25519_sign_safe, ed25519_verify_safe};
 
@@ -32,7 +16,6 @@ pub const MSG2_LEN: usize = 10483;
 pub const MSG3_LEN: usize = 6259;
 
 pub const HANDSHAKE_TIMEOUT_SECS: u64 = 30;
-const HKDF_INFO: &[u8] = b"AEGIS-BLE-HANDSHAKE-v2";
 const HKDF_SALT: &[u8] = b"AEGIS-BLE-HANDSHAKE-v2-SALT";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -90,16 +73,16 @@ impl HandshakeState {
     pub fn new(role: HandshakeRole, peer_fingerprint: [u8; 32]) -> Result<Self, HandshakeError> {
         let own_nonce = generate_nonce()?;
         let own_ed_pubkey = own_ed25519_pubkey()?;
-        let (mlkem_pk, mlkem_sk) = mlkem::keypair();
-        let (mldsa_pk, mldsa_sk) = mldsa::keypair();
+        let (mlkem_pk, mlkem_sk) = ml_kem_1024::KG::try_keygen().map_err(|_| HandshakeError::CryptoUnavailable)?;
+        let (mldsa_pk, mldsa_sk) = ml_dsa_87::try_keygen().map_err(|_| HandshakeError::CryptoUnavailable)?;
 
         Ok(Self {
             role, phase: HandshakePhase::Idle, peer_fingerprint,
             own_nonce, own_ed_pubkey,
-            own_mlkem_pk: mlkem_pk.as_bytes().to_vec(),
-            own_mlkem_sk: mlkem_sk.as_bytes().to_vec(),
-            own_mldsa_pk: mldsa_pk.as_bytes().to_vec(),
-            own_mldsa_sk: mldsa_sk.as_bytes().to_vec(),
+            own_mlkem_pk: KemSerDes::into_bytes(mlkem_pk).to_vec(),
+            own_mlkem_sk: KemSerDes::into_bytes(mlkem_sk).to_vec(),
+            own_mldsa_pk: DsaSerDes::into_bytes(mldsa_pk).to_vec(),
+            own_mldsa_sk: DsaSerDes::into_bytes(mldsa_sk).to_vec(),
             peer_ed_pubkey: None, peer_mlkem_pk: None, peer_mldsa_pk: None, peer_nonce: None,
             mlkem_ss_i_to_r: None, mlkem_ss_r_to_i: None, shared_secret: None,
             rx_buffer: Vec::new(), started_at: Instant::now(),
@@ -136,7 +119,9 @@ impl HandshakeState {
     }
 
     pub fn initiator_start(&mut self) -> Result<Vec<u8>, HandshakeError> {
-        if self.role != HandshakeRole::Initiator || self.phase != HandshakePhase::Idle { return Err(HandshakeError::WrongPhase); }
+        if self.role != HandshakeRole::Initiator || self.phase != HandshakePhase::Idle {
+            return Err(HandshakeError::WrongPhase);
+        }
         let mut msg = Vec::with_capacity(MSG1_LEN);
         msg.extend_from_slice(&self.own_nonce);
         msg.extend_from_slice(&self.own_ed_pubkey);
@@ -168,19 +153,20 @@ impl HandshakeState {
             self.phase = HandshakePhase::Failed; return Err(HandshakeError::InvalidSignature);
         }
 
-        let ct = KemCiphertext::from_bytes(mlkem_ct_r_to_i).map_err(|_| HandshakeError::CryptoUnavailable)?;
-        let sk = KemSecretKey::from_bytes(&self.own_mlkem_sk).map_err(|_| HandshakeError::CryptoUnavailable)?;
-        let ss = mlkem::decapsulate(&ct, &sk);
-        let mut ss_r_to_i = [0u8; 32]; ss_r_to_i.copy_from_slice(ss.as_bytes());
-        self.mlkem_ss_r_to_i = Some(ss_r_to_i);
+        let ct_arr: [u8; ml_kem_1024::CT_LEN] = mlkem_ct_r_to_i.try_into().map_err(|_| HandshakeError::CryptoUnavailable)?;
+        let sk_arr: [u8; ml_kem_1024::DK_LEN] = self.own_mlkem_sk.as_slice().try_into().map_err(|_| HandshakeError::CryptoUnavailable)?;
+        let ct = ml_kem_1024::CipherText::try_from_bytes(ct_arr).map_err(|_| HandshakeError::CryptoUnavailable)?;
+        let sk = ml_kem_1024::DecapsKey::try_from_bytes(sk_arr).map_err(|_| HandshakeError::CryptoUnavailable)?;
+        let ss = sk.try_decaps(&ct).map_err(|_| HandshakeError::CryptoUnavailable)?;
+        self.mlkem_ss_r_to_i = Some(KemSerDes::into_bytes(ss));
 
-        let pk_r = KemPublicKey::from_bytes(mlkem_pk_r).map_err(|_| HandshakeError::CryptoUnavailable)?;
-        let (ss_i_to_r, ct_i_to_r) = mlkem::encapsulate(&pk_r);
-        let mut ss_i_to_r_arr = [0u8; 32]; ss_i_to_r_arr.copy_from_slice(ss_i_to_r.as_bytes());
-        self.mlkem_ss_i_to_r = Some(ss_i_to_r_arr);
+        let pk_r_arr: [u8; ml_kem_1024::EK_LEN] = mlkem_pk_r.try_into().map_err(|_| HandshakeError::CryptoUnavailable)?;
+        let pk_r = ml_kem_1024::EncapsKey::try_from_bytes(pk_r_arr).map_err(|_| HandshakeError::CryptoUnavailable)?;
+        let (ss_i_to_r, ct_i_to_r) = pk_r.try_encaps().map_err(|_| HandshakeError::CryptoUnavailable)?;
+        self.mlkem_ss_i_to_r = Some(KemSerDes::into_bytes(ss_i_to_r));
 
         let mut msg3 = Vec::with_capacity(MSG3_LEN);
-        msg3.extend_from_slice(ct_i_to_r.as_bytes());
+        msg3.extend_from_slice(&KemSerDes::into_bytes(ct_i_to_r));
         let sig3 = sign_hybrid(&msg3, &self.own_mldsa_sk)?;
         msg3.extend_from_slice(&sig3);
 
@@ -217,17 +203,17 @@ impl HandshakeState {
             self.phase = HandshakePhase::Failed; return Err(HandshakeError::InvalidSignature);
         }
 
-        let pk_i = KemPublicKey::from_bytes(mlkem_pk_i).map_err(|_| HandshakeError::CryptoUnavailable)?;
-        let (ss_r_to_i, ct_r_to_i) = mlkem::encapsulate(&pk_i);
-        let mut ss_r_to_i_arr = [0u8; 32]; ss_r_to_i_arr.copy_from_slice(ss_r_to_i.as_bytes());
-        self.mlkem_ss_r_to_i = Some(ss_r_to_i_arr);
+        let pk_i_arr: [u8; ml_kem_1024::EK_LEN] = mlkem_pk_i.try_into().map_err(|_| HandshakeError::CryptoUnavailable)?;
+        let pk_i = ml_kem_1024::EncapsKey::try_from_bytes(pk_i_arr).map_err(|_| HandshakeError::CryptoUnavailable)?;
+        let (ss_r_to_i, ct_r_to_i) = pk_i.try_encaps().map_err(|_| HandshakeError::CryptoUnavailable)?;
+        self.mlkem_ss_r_to_i = Some(KemSerDes::into_bytes(ss_r_to_i));
 
         let mut msg2 = Vec::with_capacity(MSG2_LEN);
         msg2.extend_from_slice(&self.own_nonce);
         msg2.extend_from_slice(&self.own_ed_pubkey);
         msg2.extend_from_slice(&self.own_mlkem_pk);
         msg2.extend_from_slice(&self.own_mldsa_pk);
-        msg2.extend_from_slice(ct_r_to_i.as_bytes());
+        msg2.extend_from_slice(&KemSerDes::into_bytes(ct_r_to_i));
         let sig2 = sign_hybrid(&msg2, &self.own_mldsa_sk)?;
         msg2.extend_from_slice(&sig2);
 
@@ -254,11 +240,12 @@ impl HandshakeState {
             self.phase = HandshakePhase::Failed; return Err(HandshakeError::InvalidSignature);
         }
 
-        let ct = KemCiphertext::from_bytes(mlkem_ct_i_to_r).map_err(|_| HandshakeError::CryptoUnavailable)?;
-        let sk = KemSecretKey::from_bytes(&self.own_mlkem_sk).map_err(|_| HandshakeError::CryptoUnavailable)?;
-        let ss = mlkem::decapsulate(&ct, &sk);
-        let mut ss_i_to_r = [0u8; 32]; ss_i_to_r.copy_from_slice(ss.as_bytes());
-        self.mlkem_ss_i_to_r = Some(ss_i_to_r);
+        let ct_arr: [u8; ml_kem_1024::CT_LEN] = mlkem_ct_i_to_r.try_into().map_err(|_| HandshakeError::CryptoUnavailable)?;
+        let sk_arr: [u8; ml_kem_1024::DK_LEN] = self.own_mlkem_sk.as_slice().try_into().map_err(|_| HandshakeError::CryptoUnavailable)?;
+        let ct = ml_kem_1024::CipherText::try_from_bytes(ct_arr).map_err(|_| HandshakeError::CryptoUnavailable)?;
+        let sk = ml_kem_1024::DecapsKey::try_from_bytes(sk_arr).map_err(|_| HandshakeError::CryptoUnavailable)?;
+        let ss = sk.try_decaps(&ct).map_err(|_| HandshakeError::CryptoUnavailable)?;
+        self.mlkem_ss_i_to_r = Some(KemSerDes::into_bytes(ss));
 
         let nonce_i = self.peer_nonce.ok_or(HandshakeError::WrongPhase)?;
         self.shared_secret = Some(derive_shared_secret(
@@ -270,10 +257,6 @@ impl HandshakeState {
         Ok(())
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────
-// Helpers crypto
-// ─────────────────────────────────────────────────────────────────────
 
 fn generate_nonce() -> Result<[u8; 32], HandshakeError> {
     use rand::RngCore;
@@ -297,9 +280,7 @@ fn verify_peer_fingerprint(pubkey: &[u8; 32], expected_fp: &[u8; 32]) -> Result<
     Ok(computed.as_slice() == expected_fp)
 }
 
-/// Signe avec ed25519 ET ML-DSA-87 (D99).
 fn sign_hybrid(data: &[u8], mldsa_sk: &[u8]) -> Result<Vec<u8>, HandshakeError> {
-    // 1. Signature ed25519 (64 octets)
     let ed_sig = match data.len() {
         32 => ed25519_sign_safe(data.try_into().unwrap()).map_err(|_| HandshakeError::CryptoUnavailable)?,
         _ => {
@@ -311,26 +292,21 @@ fn sign_hybrid(data: &[u8], mldsa_sk: &[u8]) -> Result<Vec<u8>, HandshakeError> 
         }
     };
 
-    // 2. Signature ML-DSA-87
-    let sk = DsaSecretKey::from_bytes(mldsa_sk).map_err(|_| HandshakeError::CryptoUnavailable)?;
-    let signed_msg = mldsa::sign(data, &sk);
-    // pqcrypto::sign::SignedMessage.as_bytes() retourne sig || msg.
-    // On extrait uniquement la signature (taille 4627 pour ML-DSA-87).
-    let mldsa_sig = signed_msg.as_bytes()[0..4627].to_vec();
+    let sk_arr: [u8; ml_dsa_87::SK_LEN] = mldsa_sk.try_into().map_err(|_| HandshakeError::CryptoUnavailable)?;
+    let sk = ml_dsa_87::PrivateKey::try_from_bytes(sk_arr).map_err(|_| HandshakeError::CryptoUnavailable)?;
+    let mldsa_sig = sk.try_sign(data, &[]).map_err(|_| HandshakeError::CryptoUnavailable)?;
 
-    let mut out = Vec::with_capacity(64 + 4627);
+    let mut out = Vec::with_capacity(64 + ml_dsa_87::SIG_LEN);
     out.extend_from_slice(&ed_sig);
     out.extend_from_slice(&mldsa_sig);
     Ok(out)
 }
 
-/// Vérifie ed25519 ET ML-DSA-87 (AND) (D99).
 fn verify_hybrid(data: &[u8], sig: &[u8], ed_pk: &[u8; 32], mldsa_pk: &[u8]) -> bool {
-    if sig.len() < 64 { return false; }
+    if sig.len() != 64 + ml_dsa_87::SIG_LEN { return false; }
     let ed_sig = &sig[0..64];
     let mldsa_sig = &sig[64..];
 
-    // 1. Vérifier ed25519
     let ed_ok = match data.len() {
         32 => {
             let mut arr = [0u8; 32]; arr.copy_from_slice(data);
@@ -348,16 +324,10 @@ fn verify_hybrid(data: &[u8], sig: &[u8], ed_pk: &[u8; 32], mldsa_pk: &[u8]) -> 
     };
     if !ed_ok { return false; }
 
-    // 2. Vérifier ML-DSA-87
-    // pqcrypto::sign::SignedMessage attend sig || msg.
-    let mut signed_msg_bytes = Vec::with_capacity(mldsa_sig.len() + data.len());
-    signed_msg_bytes.extend_from_slice(mldsa_sig);
-    signed_msg_bytes.extend_from_slice(data);
-
-    let signed_msg = match DsaSignedMessage::from_bytes(&signed_msg_bytes) { Ok(m) => m, Err(_) => return false };
-    let pk = match DsaPublicKey::from_bytes(mldsa_pk) { Ok(k) => k, Err(_) => return false };
-
-    mldsa::open(&signed_msg, &pk).is_ok()
+    let pk_arr: [u8; ml_dsa_87::PK_LEN] = match mldsa_pk.try_into() { Ok(a) => a, Err(_) => return false };
+    let sig_arr: [u8; ml_dsa_87::SIG_LEN] = match mldsa_sig.try_into() { Ok(a) => a, Err(_) => return false };
+    let pk = match ml_dsa_87::PublicKey::try_from_bytes(pk_arr) { Ok(k) => k, Err(_) => return false };
+    pk.verify(data, &sig_arr, &[])
 }
 
 fn derive_shared_secret(mlkem_ss_i_to_r: &[u8; 32], mlkem_ss_r_to_i: &[u8; 32], nonce_i: &[u8; 32], nonce_r: &[u8; 32], ed_pk_i: &[u8; 32], ed_pk_r: &[u8; 32]) -> Result<[u8; 32], HandshakeError> {
@@ -373,10 +343,6 @@ fn derive_shared_secret(mlkem_ss_i_to_r: &[u8; 32], mlkem_ss_r_to_i: &[u8; 32], 
     use zeroize::Zeroize; ikm.zeroize();
     Ok(okm)
 }
-
-// ─────────────────────────────────────────────────────────────────────
-// État global
-// ─────────────────────────────────────────────────────────────────────
 
 static HANDSHAKE_STATE: Mutex<Option<HandshakeState>> = Mutex::new(None);
 
@@ -421,21 +387,17 @@ pub fn reset() {
     if let Ok(mut g) = HANDSHAKE_STATE.lock() { *g = None; }
 }
 
-// ─────────────────────────────────────────────────────────────────────
-// FFI exporté
-// ─────────────────────────────────────────────────────────────────────
-
 #[no_mangle]
 pub unsafe extern "C" fn aegis_ble_handshake_start_initiator(fp_ptr: *const u8) -> i32 {
     if fp_ptr.is_null() { return HandshakeError::InvalidLength.to_code(); }
-    let mut fp = [0u8; 32]; fp.copy_from_slice(std::slice::from_raw_parts(fp_ptr, 32));
+    let mut fp = [0u8; 32]; unsafe { fp.copy_from_slice(std::slice::from_raw_parts(fp_ptr, 32)) };
     match start_initiator(fp) { Ok(()) => 0, Err(e) => e.to_code() }
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn aegis_ble_handshake_start_responder(fp_ptr: *const u8) -> i32 {
     if fp_ptr.is_null() { return HandshakeError::InvalidLength.to_code(); }
-    let mut fp = [0u8; 32]; fp.copy_from_slice(std::slice::from_raw_parts(fp_ptr, 32));
+    let mut fp = [0u8; 32]; unsafe { fp.copy_from_slice(std::slice::from_raw_parts(fp_ptr, 32)) };
     match start_responder(fp) { Ok(()) => 0, Err(e) => e.to_code() }
 }
 
@@ -444,10 +406,6 @@ pub extern "C" fn aegis_ble_handshake_is_complete() -> i32 { if is_complete() { 
 
 #[no_mangle]
 pub extern "C" fn aegis_ble_handshake_reset() -> i32 { reset(); 0 }
-
-// ─────────────────────────────────────────────────────────────────────
-// Wrappers JNI
-// ─────────────────────────────────────────────────────────────────────
 
 #[no_mangle]
 pub unsafe extern "system" fn Java_com_aresmaxima_aegis_MainActivity_aegis_1ble_1handshake_1start_1initiator(env: jni::JNIEnv, _this: jni::objects::JObject, fp: jni::objects::JByteArray) -> jni::sys::jint {
@@ -475,10 +433,6 @@ pub unsafe extern "system" fn Java_com_aresmaxima_aegis_MainActivity_aegis_1ble_
     reset(); 0
 }
 
-// ─────────────────────────────────────────────────────────────────────
-// Tests — C31 : Miri ne supporte pas le FFI C (pqcrypto) → exclu
-// ─────────────────────────────────────────────────────────────────────
-
 #[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
@@ -502,7 +456,6 @@ mod tests {
         fp
     }
 
-    /// Retourne la clé PUBLIQUE ed25519 (32 octets), pas le fingerprint.
     fn own_ed_pubkey() -> [u8; 32] {
         let mut pk = [0u8; 32];
         let rc = unsafe { crate::aegis_ed25519_public_key(pk.as_mut_ptr()) };
@@ -514,10 +467,12 @@ mod tests {
     fn test_hybrid_sign_verify_roundtrip() {
         let _g = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         setup_master_key();
-        let (pk, sk) = mldsa::keypair();
+        let (pk, sk) = ml_dsa_87::try_keygen().unwrap();
+        let pk_bytes = DsaSerDes::into_bytes(pk);
+        let sk_bytes = DsaSerDes::into_bytes(sk);
         let data = b"test message";
-        let sig = sign_hybrid(data, sk.as_bytes()).unwrap();
-        assert!(verify_hybrid(data, &sig, &own_ed_pubkey(), pk.as_bytes()));
+        let sig = sign_hybrid(data, &sk_bytes).unwrap();
+        assert!(verify_hybrid(data, &sig, &own_ed_pubkey(), &pk_bytes));
         teardown();
     }
 
@@ -525,10 +480,12 @@ mod tests {
     fn test_hybrid_sign_rejects_wrong_message() {
         let _g = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         setup_master_key();
-        let (pk, sk) = mldsa::keypair();
+        let (pk, sk) = ml_dsa_87::try_keygen().unwrap();
+        let pk_bytes = DsaSerDes::into_bytes(pk);
+        let sk_bytes = DsaSerDes::into_bytes(sk);
         let data = b"message A";
-        let sig = sign_hybrid(data, sk.as_bytes()).unwrap();
-        assert!(!verify_hybrid(b"message B", &sig, &own_ed_pubkey(), pk.as_bytes()));
+        let sig = sign_hybrid(data, &sk_bytes).unwrap();
+        assert!(!verify_hybrid(b"message B", &sig, &own_ed_pubkey(), &pk_bytes));
         teardown();
     }
 
@@ -553,7 +510,6 @@ mod tests {
 
         resp.responder_process_msg3(&msg3).unwrap();
         assert_eq!(resp.phase, HandshakePhase::Complete);
-
         assert_eq!(init.shared_secret, resp.shared_secret);
         teardown();
     }
