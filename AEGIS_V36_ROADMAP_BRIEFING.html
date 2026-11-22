@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AEGIS P2P v3.6 — Fiche d'Architecture, Boîtier MESH & Protocole d'Audit Sans Confiance</title>
+    <style>
+        :root {
+            --primary: #FCBE0B;
+            --primary-dim: rgba(252, 190, 11, 0.14);
+            --bg-dark: #0d0d0e;
+            --sheet-bg: #121215;
+            --card-bg: #17171b;
+            --card-inner: #1d1d23;
+            --text-color: #e6e6ea;
+            --text-muted: #a2a2ac;
+            --border-color: #292930;
+            --hsm-green: #4ade80;
+            --hsm-green-dim: rgba(74, 222, 128, 0.12);
+        }
+
+        @page {
+            size: A4 portrait;
+            margin: 0mm;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-dark) !important;
+            color: var(--text-color) !important;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-size: 8.4pt;
+            line-height: 1.36;
+        }
+
+        p, li {
+            text-align: justify !important;
+            text-justify: inter-word;
+            -webkit-hyphens: none !important;
+            hyphens: none !important;
+            text-align-last: left;
+        }
+
+        .toolbar-no-print {
+            width: 210mm;
+            max-width: 96%;
+            margin: 16px auto;
+            background: var(--sheet-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 6px 24px rgba(0, 0, 0, 0.65);
+        }
+
+        .toolbar-no-print span {
+            color: var(--primary);
+            font-weight: 800;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .print-btn {
+            background: var(--hsm-green);
+            color: #000000;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.85em;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .a4-sheet {
+            width: 210mm;
+            min-height: 297mm;
+            margin: 0 auto 20px auto;
+            background: var(--sheet-bg) !important;
+            border: 1px solid var(--border-color);
+            border-top: 4px solid var(--primary);
+            padding: 10.5mm 13mm 8.5mm 13mm;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-shadow: 0 12px 38px rgba(0, 0, 0, 0.8);
+        }
+
+        .sheet-body {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .stack {
+            display: flex;
+            flex-direction: column;
+            gap: 9px;
+        }
+
+        header.doc-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 8px;
+            gap: 16px;
+        }
+
+        .tag {
+            display: inline-block;
+            background: var(--hsm-green-dim) !important;
+            color: var(--hsm-green) !important;
+            border: 1px solid rgba(74, 222, 128, 0.4);
+            font-family: "Courier New", Courier, monospace;
+            font-size: 7.2pt;
+            font-weight: 700;
+            padding: 1.5px 7px;
+            border-radius: 3px;
+            margin-bottom: 3px;
+            text-transform: uppercase;
+        }
+
+        h1 {
+            color: #ffffff !important;
+            margin: 0 0 2px 0;
+            font-size: 14.8pt;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        h1 span { color: var(--primary) !important; }
+
+        .subtitle {
+            color: var(--text-muted) !important;
+            font-size: 8pt;
+            margin: 0;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+
+        .logo {
+            height: 42px;
+            width: auto;
+            object-fit: contain;
+        }
+
+        .mini-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 5px;
+        }
+
+        .mini-header span {
+            font-family: "Courier New", Courier, monospace;
+            font-size: 7.6pt;
+            font-weight: 700;
+            color: var(--primary) !important;
+            text-transform: uppercase;
+        }
+
+        .logo-sm { height: 23px; width: auto; }
+
+        .phase-card {
+            background: var(--card-bg) !important;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 10px 13px;
+        }
+
+        h2 {
+            color: var(--primary) !important;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 4px;
+            margin: 0 0 8px 0;
+            font-size: 9.4pt;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            align-items: stretch;
+        }
+
+        .mod-box {
+            background: var(--card-inner) !important;
+            border: 1px solid var(--border-color);
+            border-left: 3px solid var(--primary);
+            border-radius: 5px;
+            padding: 8px 10px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .mod-box.green {
+            border-left-color: var(--hsm-green);
+            background: rgba(74, 222, 128, 0.05) !important;
+        }
+
+        .mod-box h3 {
+            margin: 0 0 4px 0;
+            font-size: 8.3pt;
+            color: #ffffff !important;
+        }
+
+        .mod-box p {
+            margin: 0;
+            font-size: 7.8pt;
+            color: var(--text-muted) !important;
+            line-height: 1.33;
+        }
+
+        ul {
+            list-style-type: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        li {
+            position: relative;
+            padding-left: 12px;
+            margin-bottom: 4.5px;
+            font-size: 8pt;
+            line-height: 1.34;
+        }
+
+        li:last-child { margin-bottom: 0; }
+
+        li::before {
+            content: "▪";
+            color: var(--primary);
+            font-weight: bold;
+            position: absolute;
+            left: 0;
+            top: 0;
+        }
+
+        table.spec-table {
+            width: 100%;
+            table-layout: fixed;
+            border-collapse: collapse;
+            margin-top: 6px;
+            font-size: 7.8pt;
+        }
+
+        table.spec-table th, table.spec-table td {
+            border: 1px solid var(--border-color);
+            padding: 6px 8px;
+            vertical-align: middle;
+        }
+
+        table.spec-table th {
+            background: #1d1d24 !important;
+            color: var(--primary) !important;
+            text-transform: uppercase;
+            font-size: 7.3pt;
+            text-align: left;
+        }
+
+        code {
+            font-family: "Courier New", Courier, monospace;
+            color: var(--primary) !important;
+            background: rgba(252, 190, 11, 0.09);
+            padding: 0 4px;
+            border-radius: 3px;
+            font-size: 0.92em;
+        }
+
+        strong { color: #ffffff !important; }
+
+        .sheet-footer {
+            margin-top: 8px;
+            padding-top: 5px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            font-size: 7.2pt;
+            color: var(--text-muted) !important;
+        }
+
+        .page-num {
+            font-family: "Courier New", Courier, monospace;
+            font-weight: 700;
+            color: var(--primary) !important;
+        }
+
+        @media print {
+            html, body {
+                width: 210mm !important;
+                background-color: var(--sheet-bg) !important;
+            }
+            .toolbar-no-print { display: none !important; }
+            .a4-sheet {
+                width: 210mm !important;
+                height: 297mm !important;
+                min-height: 297mm !important;
+                max-height: 297mm !important;
+                margin: 0 !important;
+                padding: 10mm 12.5mm 8mm 12.5mm !important;
+                border: none !important;
+                border-top: 4px solid var(--primary) !important;
+                box-shadow: none !important;
+                page-break-after: always !important;
+                break-after: page !important;
+                overflow: hidden !important;
+            }
+            .a4-sheet:last-of-type {
+                page-break-after: auto !important;
+                break-after: auto !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="toolbar-no-print">
+    <span>AEGIS P2P v3.6 — Fiche d'Ingénierie & Briefing Opérationnel</span>
+    <button type="button" class="print-btn" onclick="window.print()">🖨️ Télécharger le PDF</button>
+</div>
+
+<!-- ======================= PAGE 1 / 2 ======================= -->
+<div class="a4-sheet">
+    <div class="sheet-body">
+        <div class="stack">
+            <header class="doc-header">
+                <div>
+                    <div class="tag">BRIEFING TECHNIQUE &amp; FEUILLE DE ROUTE D'EXÉCUTION • ANSSI N° 35567570</div>
+                    <h1>AEGIS <span>P2P v3.6 &amp; MESH RELAY</span></h1>
+                    <p class="subtitle">Durcissement Anti-SIGINT, Pont Radio LoRa Zéro-Disque &amp; Protocole d'Audit Sans Confiance</p>
+                </div>
+                <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima" class="logo">
+            </header>
+
+            <section class="phase-card">
+                <h2>Phase 1 — Durcissement Cryptographique &amp; Anti-SIGINT du Noyau (v3.6)</h2>
+                <div class="grid-2">
+                    <div class="mod-box">
+                        <h3>C90 • Chasseur de Trafic Factice (Dummy Chaffing)</h3>
+                        <p>Pour neutraliser l'analyse de corrélation temporelle sur Tor ou en radio locale, activation d'un flux continu de trames aléatoires indiscernables de <strong>512 octets fixes</strong> toutes les <em>X</em> secondes entre pairs connectés. Un observateur réseau ne peut plus distinguer une frappe clavier réelle d'un paquet de bruit (<code>FrameType::Chaff = 0x00</code> ignoré en RAM).</p>
+                    </div>
+                    <div class="mod-box">
+                        <h3>C91 • Attestation Matérielle Mutuelle P2P</h3>
+                        <p>Extension du scellement local StrongBox au handshake distant : lors de l'accord ML-KEM-1024, Alice exige une chaîne de certificats X.509 signée par la puce <strong>Titan M2 / Knox Vault</strong> de Bob prouvant un bootloader verrouillé (<code>VerifiedBootState::Verified</code>) et l'absence d'émulateur d'interception avant d'autoriser le canal.</p>
+                    </div>
+                    <div class="mod-box">
+                        <h3>C92 • Pont Optique Air-Gap (Fountain QR)</h3>
+                        <p>Mode <strong>Zéro Émission Radioélectrique (0 RF)</strong> pour environnements sous écoute SIGINT : transfert unidirectionnel ou bidirectionnel de messages/documents entre deux terminaux en Mode Avion strict (Wi-Fi et BLE coupés) par flux de QR codes animés à 15 fps encodés en codes fontaines (<em>Luby Transform</em>) via caméra isolée en RAM.</p>
+                    </div>
+                    <div class="mod-box">
+                        <h3>C93 • Enveloppes Dead-Drop Aveugles en RAM</h3>
+                        <p>Résolution de l'asynchronisme P2P sans serveur central : encapsule les messages destinés à un pair hors-ligne dans une enveloppe <strong>ML-KEM-1024 + ChaCha20-Poly1305</strong> sans métadonnée d'expéditeur (tag aveugle dérivé sur fenêtre horaire), stockée temporairement (TTL 12h–24h) uniquement dans la SRAM volatile d'un nœud relais.</p>
+                    </div>
+                </div>
+                <div class="mod-box green" style="margin-top: 8px;">
+                    <h3>C94 • Verrouillage Anti-Usurpation par Jeton Externe NFC / USB-C (Optionnel VIP)</h3>
+                    <p>Si l'historique est déjà immatériel (Zero-Disk), la saisie du PIN Principal sous contrainte permettrait à un adversaire de redériver l'identité Ed25519 pour usurper l'opérateur en direct. En option sans surcoût logiciel, la dérivation <code>HKDF-SHA256</code> peut combiner <strong>PIN Principal + Challenge-Response HMAC-SHA1 sur clé YubiKey 5 NFC</strong> : sans le jeton physique séparé, l'identité réseau demeure mathématiquement impossible à reconstruire.</p>
+                </div>
+            </section>
+
+            <section class="phase-card">
+                <h2>Phase 2 — Boîtier Relais Matériel « AEGIS Mesh Node » (Pont BLE ↔ LoRa COTS)</h2>
+                <p>Extension de la portée hors-ligne du smartphone de 50 mètres (BLE interne) à <strong>5–15 kilomètres</strong> sans carte SIM ni infrastructure opérateur, tout en restant un équipement radio civil standard pré-certifié CE/FCC (bandes ISM libres 868 MHz EU / 915 MHz US / 2.4 GHz, hors contrôle militaire).</p>
+                <table class="spec-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 24%;">Composant / Couche</th>
+                            <th style="width: 34%;">Spécification Technique</th>
+                            <th style="width: 42%;">Avantage Décisif vs. Meshtastic Standard</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Architecture Matérielle</strong></td>
+                            <td>MCU <code>nRF52840</code> (BLE 5.3) + Radio LoRa <code>Semtech SX1262</code> + Enclave <code>ATECC608B</code></td>
+                            <td>Consommation ultra-basse, modules radio pré-certifiés CE/FCC, aucun récepteur GPS embarqué (zéro trace de géolocalisation).</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Firmware Rust Bare-Metal</strong></td>
+                            <td><code>aegis-mesh-fw</code> (Rust <code>no_std</code> / Embassy) — Zéro écriture Flash</td>
+                            <td>Meshtastic écrit les messages et nœuds en Flash extractible par USB. AEGIS stocke 0 octet sur Flash : transit pur en SRAM volatile.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Chiffrement &amp; Dead-Drop</strong></td>
+                            <td>Relais aveugle Zero-Knowledge + Tampon circulaire SRAM (TTL 12h–24h)</td>
+                            <td>Aucune clé de déchiffrement dans le boîtier (E2EE ML-KEM-1024 de smartphone à smartphone). Rétention temporaire en RAM pour pairs décalés.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Autoprotection Physique</strong></td>
+                            <td>Port USB Data/SWD verrouillé + Bouton &amp; Switch Tamper de coupure SRAM</td>
+                            <td>En cas d'ouverture forcée du boîtier ou d'appui panique, coupure électrique instantanée de la SRAM vidant toutes les enveloppes en transit.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+        </div>
+    </div>
+    <footer class="sheet-footer">
+        <span>ARESMAXIMA LLC • Ingénierie Souveraine AEGIS P2P v3.6 — COTS ECCN 5D992.c • Déclaration ANSSI n° 35567570</span>
+        <span class="page-num">1 / 2</span>
+    </footer>
+</div>
+
+<!-- ======================= PAGE 2 / 2 ======================= -->
+<div class="a4-sheet">
+    <div class="sheet-body">
+        <div class="stack">
+            <div class="mini-header">
+                <span>AEGIS P2P v3.6 — PHASE 3 : PROTOCOLE D'AUTO-AUDIT INFALSIFIABLE (ZÉRO CONFIANCE ÉDITEUR)</span>
+                <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima" class="logo-sm">
+            </div>
+
+            <section class="phase-card">
+                <h2>Phase 3 — Architecture d'Auto-Audit « Intrafficable » (Vérifiable par Tiers)</h2>
+                <p>Un rapport d'audit PDF rédigé par l'éditeur lui-même n'a aucune valeur probante devant un spécialiste du renseignement technique ou un RSSI. Pour établir une preuve mathématique incontestable sans dépendre d'une confiance aveugle envers AresMaxima, l'humain est intégralement retiré de la boucle de validation via trois verrous publics :</p>
+
+                <div class="mod-box" style="margin: 8px 0;">
+                    <h3>Verrou 1 • Exécution CI/CD sur Infrastructure Neutre &amp; Attestation SLSA Niveau 3</h3>
+                    <ul>
+                        <li><strong>Serveurs éphémères tiers (GitHub Hosted Runners) :</strong> L'intégralité de la suite de preuves formelles (<code>AWS Kani</code>), d'analyse mémoire dynamique (<code>Rust Miri</code>, <code>Valgrind</code>), d'audit statique (<code>cargo clippy</code>, <code>cargo audit</code> RustSec) et de compilation NDK ARM64 s'exécute sur une machine virtuelle vierge contrôlée par GitHub/Microsoft, jamais sur le poste du développeur.</li>
+                        <li><strong>Signature Sigstore &amp; Attestation de Provenance :</strong> Dès la compilation achevée, l'action officielle <code>actions/attest-build-provenance</code> génère un certificat cryptographique inaltérable (standard <strong>SLSA v1.0</strong> consigné dans le registre transparent immuable <em>Sigstore Rekor</em>) liant le hash SHA-256 exact de l'APK au log d'exécution non-modifiable du runner.</li>
+                        <li><strong>Vérification en 1 commande par l'auditeur :</strong> Tout expert externe peut exécuter <code>gh attestation verify aegis-v3.6.apk --owner AresMaxima</code> pour vérifier avec la clé publique de GitHub que ce binaire précis est sorti d'un pipeline 100 % vert sans intervention humaine.</li>
+                    </ul>
+                </div>
+
+                <div class="mod-box" style="margin-bottom: 8px;">
+                    <h3>Verrou 2 • Harnais Forensique Reproductible en Boîte Noire (Script Open-Source Labo)</h3>
+                    <ul>
+                        <li><strong>Principe « Don't Trust, Run It Yourself » :</strong> Publication sur le dépôt GitHub d'un script d'audit automatisé (<code>aegis_blackbox_forensic_verify.sh</code>) que n'importe quel auditeur ou ancien opérationnel peut lancer sur <strong>son propre smartphone de laboratoire</strong> en moins de 10 minutes.</li>
+                        <li><strong>Scénario de stress forensique :</strong> Le script installe l'APK officiel, injecte un marqueur haute entropie unique (<em>Canary Token</em> choisi par l'auditeur), transfère des photos HD, déclenche le <em>Kill Switch</em>, puis inspecte l'intégralité du répertoire <code>/data/data/</code>, des caches système, de `logcat` et des descripteurs de fichiers.</li>
+                        <li><strong>Contrôle MVT &amp; Capture Réseau PCAP :</strong> Couplage automatique avec <strong>Mobile Verification Toolkit (MVT)</strong> d'Amnesty Tech et capture <code>tcpdump</code> prouvant : (1) <strong>0 base SQLite / 0 résidu du Canary Token</strong> sur mémoire flash, (2) <strong>0 requête DNS/TLS vers Google/GAFAM</strong>, et (3) alignement strict des trames sur multiples de <strong>512 octets</strong>.</li>
+                    </ul>
+                </div>
+
+                <div class="mod-box green">
+                    <h3>Verrou 3 • Ancrage Cryptographique Horodaté Public (RFC 3161 / OpenTimestamps)</h3>
+                    <ul>
+                        <li><strong>Immuabilité antérieure à toute inspection :</strong> À chaque release, l'arbre de Merkle regroupant le hash SHA-256 de l'APK signé, les journaux bruts Kani/Miri et le manifeste SBOM des crates Rust est scellé via <strong>RFC 3161</strong> et <strong>OpenTimestamps</strong> (ancrage sur la blockchain Bitcoin). Il devient mathématiquement impossible de modifier rétroactivement un log ou un binaire.</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section class="phase-card">
+                <h2>Séquence d'Implémentation Immédiate (Plan d'Action)</h2>
+                <table class="spec-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 16%;">Étape</th>
+                            <th style="width: 34%;">Livrable Technique</th>
+                            <th style="width: 50%;">Cible dans le Code &amp; Validation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Sprint 1 (Immédiat)</strong></td>
+                            <td>Module Rust <code>chaffing.rs</code> + <code>dead_drop.rs</code> + FFI C90/C93</td>
+                            <td>Ajout du générateur de trames factices 512 B à cadence constante et format d'enveloppe aveugle ML-KEM-1024 avec TTL RAM.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Sprint 2</strong></td>
+                            <td>Attestation P2P <code>peer_attest.rs</code> + Air-Gap QR + Option NFC</td>
+                            <td>Vérification X.509 Key Attestation Android (Titan M2 / Knox Vault) au handshake P2P et encodeur/décodeur Fountain QR 0-RF.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Sprint 3</strong></td>
+                            <td>Protocole GATT BLE ↔ LoRa &amp; Firmware <code>aegis-mesh-fw</code></td>
+                            <td>Définition du service BLE GATT aveugle sur nRF52840 + SX1262 (kit dev RAK4631 / Heltec T114) pour tests terrain 5–12 km.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Sprint 4</strong></td>
+                            <td>Workflow SLSA GitHub + Script <code>blackbox_forensic_verify.sh</code></td>
+                            <td>Activation de l'attestation cryptographique publique sur GitHub Actions et publication du banc d'essai forensique reproductible.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+        </div>
+    </div>
+    <footer class="sheet-footer">
+        <span>Copyright © 2026 AresMaxima LLC and its Licensors. All Rights Reserved. • Document d'Architecture &amp; d'Assurance Sécurité</span>
+        <span class="page-num">2 / 2</span>
+    </footer>
+</div>
+
+</body>
+</html>

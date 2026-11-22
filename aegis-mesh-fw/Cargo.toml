@@ -1,0 +1,12 @@
+[package]
+name = "aegis-mesh-fw"
+version = "0.1.0"
+edition = "2021"
+description = "AEGIS Zero-Disk Blind LoRa/BLE Relay Node Firmware Core (nRF52840 + SX1262)"
+
+[lib]
+name = "aegis_mesh_fw"
+path = "src/lib.rs"
+
+[dependencies]
+zeroize = { version = "1.7", default-features = false }

@@ -1,6 +1,7 @@
 #![cfg(not(miri))]
-//
+
 use aegis_core::{
+    attestation::compute_peer_attestation_challenge,
     crypto::{
         integrity::AegisIntegrityMonitor,
         keys::{derive_keys_from_mnemonic, generate_mnemonic},
@@ -14,7 +15,10 @@ use aegis_core::{
     keystore::HardwareKeystore,
     mesh::SneakernetMesh,
     network::{
+        chaffing::{ChaffScheduler, WireCell512, WireCellKind},
+        dead_drop::{derive_hourly_blind_tag, fragment_for_lora_relay, RamDeadDropVault},
         hopping::TransportSelector,
+        optical_fountain::{encode_optical_fountain_stream, OpticalFountainDecoder},
         p2p_transfer::MetadataStripper,
         tor::secure_wipe_dir,
     },
@@ -24,18 +28,15 @@ use aegis_core::{
     session::OpaqueSessionVault,
     signals::{setup_signal_handler, MemoryNoiseCanary},
     stegano::drowning::{extract_mnemonic_from_text, get_random_cover_poem, hide_mnemonic_in_text},
-    storage::{db::AegisDatabase, vault::AegisVault},
+    storage::vault::AegisVault,
     transport::{DynamicTransportRouter, TransportMode},
 };
 
-// Import TPM — uniquement si la feature `tpm` est activée.
-// Sans elle, le module `crypto::tpm` n'existe pas dans le crate
-// (voir crypto/mod.rs — `#[cfg(feature = "tpm")] pub mod tpm;`).
 #[cfg(feature = "tpm")]
 use aegis_core::crypto::tpm::AegisTpmManager;
 
 #[test]
-fn test_blindspots_full_26_modules_sweep() {
+fn test_blindspots_full_v36_modules_sweep() {
     let mut sbuf = SecureBuffer::new(64);
     sbuf.as_slice_mut()[0] = 0xA5;
     let _ = sbuf.as_slice();
@@ -51,17 +52,45 @@ fn test_blindspots_full_26_modules_sweep() {
     let _ = pb.as_slice();
     purge_all_secrets();
 
-    let salt = [0u8; 16];
-    if let Ok(mk) = AegisVault::derive_master_key(b"passphrase_test", &salt) {
-        let mut sess = OpaqueSessionVault::new(mk.as_slice(), true);
-        let _ = sess.get_key_temporary();
-        let _ = sess.decrypt_in_place(&[0u8; 16]);
-
-        if let Ok(db) = AegisDatabase::open_encrypted(":memory:", &mk) {
-            let _ = db.secure_purge_table("logs");
+    // Vraie dérivation matérielle HardwareKeystore (remplace l'ancien stub SQLite/Vault)
+    let _ = HardwareKeystore::set_root_key(&[0x55u8; 32]);
+    if HardwareKeystore::derive_master_key("BlindspotPIN-v36").is_ok() {
+        if let Ok(mk) = HardwareKeystore::get_master_key() {
+            let mut sess = OpaqueSessionVault::new(mk.as_slice(), true);
+            let _ = sess.get_key_temporary();
+            let _ = sess.decrypt_in_place(&[0u8; 16]);
         }
     }
-    let _ = HardwareKeystore::get_or_create_root_key();
+    let tmp_vault_file = std::env::temp_dir().join("aegis_bs_wipe.tmp");
+    let _ = AegisVault::purge(&tmp_vault_file);
+
+    // Couverture des modules v3.6 (C90 Chaffing, C91 Mutual Attest, C92 Optical, C93 Dead-Drop/LoRa)
+    let mut chaff = ChaffScheduler::new(250);
+    chaff.configure(true, 250);
+    let _ = chaff.enqueue(WireCellKind::LiveMessage, b"BS_PING");
+    if let Ok(Some(cell)) = chaff.poll_tick(true) {
+        let _ = cell.unpack();
+    }
+    let _ = WireCell512::new_chaff();
+    chaff.wipe();
+
+    let _att_chal = compute_peer_attestation_challenge(&[0x11u8; 32], &[0x22u8; 32]);
+
+    let tag = derive_hourly_blind_tag(&[0x33u8; 32], 12345);
+    let mut dd = RamDeadDropVault::new(16, 600);
+    let _ = dd.deposit(tag, vec![0xAA; 64]);
+    let _ = dd.collect_and_burn(&tag);
+    let _ = fragment_for_lora_relay([1; 8], 4, true, &[0xBB; 300]);
+
+    if let Ok(frames) = encode_optical_fountain_stream([9, 8, 7, 6], &[0xCC; 200]) {
+        let mut dec = OpticalFountainDecoder::default();
+        for f in &frames {
+            if dec.ingest_wire_droplet(f).unwrap_or(false) {
+                let _ = dec.finalize_and_wipe();
+                break;
+            }
+        }
+    }
 
     DeadMansSwitch::set_max_inactivity(3600);
     DeadMansSwitch::heartbeat();
@@ -77,12 +106,8 @@ fn test_blindspots_full_26_modules_sweep() {
     let _canary = MemoryNoiseCanary::inject(1, 32);
 
     let (sk, pk) = HybridKeyExchange::generate_keypair();
-    
-    // Instanciation du secret éphémère (Correction de l'export et du RNG)
     let recv_eph_sk = x25519_dalek::EphemeralSecret::random_from_rng(rand::thread_rng());
     let recv_eph_pk = x25519_dalek::PublicKey::from(&recv_eph_sk);
-
-    // Exécution de l'échange de clés
     let (_shared_sec, eph_pk, ct) = HybridKeyExchange::encapsulate_and_derive(&recv_eph_pk, &sk.kyber_pk);
     let _ = HybridKeyExchange::decapsulate_and_derive(recv_eph_sk, &pk.kyber_sk, &eph_pk, &ct);
 
@@ -107,8 +132,6 @@ fn test_blindspots_full_26_modules_sweep() {
     let _ = SneakernetMesh::ingest_packet([0u8; 512], 1);
     let _ = SneakernetMesh::export_gossip_bundle();
 
-    // D47 (02/10/26) : modules dht et local supprimés.
-    // Les tests _dht_size et _local_size ont été retirés avec eux.
     let _ts = TransportSelector::new(30);
 
     let tmp_dir = std::env::temp_dir().join("aegis_tor_test_bs");

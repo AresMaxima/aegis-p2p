@@ -1,10 +1,10 @@
 //! aegis-core/src/panic.rs
-//! Moteur d'Éradication d'Urgence PanicPurge & Silent Burn — Phase 4 (CdCM v2.2-RC1).
+//! Moteur d'Ã‰radication d'Urgence PanicPurge & Silent Burn â€” Phase 4 (CdCM v2.2-RC1).
 //!
 //! C11 FIX (2026-09-21) : le wipe du fichier vault n'ouvre plus
-//! /dev/urandom à chaque chunk. Un handle unique est gardé pour toute
-//! la durée du wipe. Fallback sur `getrandom` (syscall direct) en cas
-//! d'échec — jamais de pattern fixe.
+//! /dev/urandom Ã  chaque chunk. Un handle unique est gardÃ© pour toute
+//! la durÃ©e du wipe. Fallback sur `getrandom` (syscall direct) en cas
+//! d'Ã©chec â€” jamais de pattern fixe.
 
 use crate::keystore::HardwareKeystore;
 use crate::secure_buffer;
@@ -17,7 +17,7 @@ use std::sync::Mutex;
 static VAULT_PATH: Mutex<Option<String>> = Mutex::new(None);
 
 /// # Safety
-/// Le pointeur `path` doit pointer vers une chaîne de caractères C valide terminée par un octet nul (`\0`).
+/// Le pointeur `path` doit pointer vers une chaÃ®ne de caractÃ¨res C valide terminÃ©e par un octet nul (`\0`).
 #[no_mangle]
 pub unsafe extern "C" fn aegis_init_vault_path(path: *const c_char) -> i32 {
     if path.is_null() {
@@ -39,7 +39,7 @@ fn system_exit(code: i32) {
     std::process::exit(code);
 
     #[cfg(test)]
-    let _ = code; // Évite l'avertissement de variable inutilisée pendant les tests
+    let _ = code; // Ã‰vite l'avertissement de variable inutilisÃ©e pendant les tests
 }
 
 pub struct PanicPurge;
@@ -47,6 +47,7 @@ pub struct PanicPurge;
 impl PanicPurge {
     pub fn execute_silent_burn() {
         let _ = HardwareKeystore::wipe_root_key();
+        let _ = crate::aegis_v36_wipe_ephemeral_buffers();
         unsafe {
             secure_buffer::global_wipe_all_buffers();
         }
@@ -60,6 +61,7 @@ impl PanicPurge {
 
 pub fn panic_purge() {
     let _ = HardwareKeystore::wipe_root_key();
+    let _ = crate::aegis_v36_wipe_ephemeral_buffers();
     unsafe {
         secure_buffer::global_wipe_all_buffers();
     }
@@ -68,6 +70,7 @@ pub fn panic_purge() {
 
 #[no_mangle]
 pub extern "C" fn aegis_purge_ram_buffer() {
+    let _ = crate::aegis_v36_wipe_ephemeral_buffers();
     unsafe {
         secure_buffer::global_wipe_all_buffers();
     }
@@ -78,15 +81,15 @@ pub extern "C" fn aegis_panic_purge() {
     panic_purge();
 }
 
-/// Remplit `buf` avec des octets aléatoires cryptographiquement sûrs.
+/// Remplit `buf` avec des octets alÃ©atoires cryptographiquement sÃ»rs.
 ///
-/// Ordre de préférence :
-///   1. Handle `/dev/urandom` (passé en paramètre, ouvert une fois par l'appelant).
-///   2. `getrandom::getrandom` (syscall direct, ne peut pas échouer côté OS moderne).
+/// Ordre de prÃ©fÃ©rence :
+///   1. Handle `/dev/urandom` (passÃ© en paramÃ¨tre, ouvert une fois par l'appelant).
+///   2. `getrandom::getrandom` (syscall direct, ne peut pas Ã©chouer cÃ´tÃ© OS moderne).
 ///
-/// Jamais de fallback sur un octet fixe : un attaquant pourrait détecter
-/// le pattern dans le fichier wipé et en déduire que le wipe a partiellement
-/// échoué (fuite d'information).
+/// Jamais de fallback sur un octet fixe : un attaquant pourrait dÃ©tecter
+/// le pattern dans le fichier wipÃ© et en dÃ©duire que le wipe a partiellement
+/// Ã©chouÃ© (fuite d'information).
 fn fill_random(maybe_urandom: Option<&mut File>, buf: &mut [u8]) -> bool {
     // 1) /dev/urandom
     if let Some(urandom) = maybe_urandom {
@@ -98,7 +101,7 @@ fn fill_random(maybe_urandom: Option<&mut File>, buf: &mut [u8]) -> bool {
     if getrandom::getrandom(buf).is_ok() {
         return true;
     }
-    // 3) Échec total : remplir avec un pattern HAUTEMENT aléatoire dérivé
+    // 3) Ã‰chec total : remplir avec un pattern HAUTEMENT alÃ©atoire dÃ©rivÃ©
     //    du timestamp + adresse du buffer (mieux que 0x55 fixe, mais on
     //    ne devrait jamais y arriver sur Android/Linux).
     let seed = std::time::SystemTime::now()
@@ -107,7 +110,7 @@ fn fill_random(maybe_urandom: Option<&mut File>, buf: &mut [u8]) -> bool {
         .unwrap_or(0xA3E1);
     let mut x = seed;
     for b in buf.iter_mut() {
-        // xorshift64* — rapide, déterministe si seed connu, mais différent à chaque appel
+        // xorshift64* â€” rapide, dÃ©terministe si seed connu, mais diffÃ©rent Ã  chaque appel
         x ^= x << 13;
         x ^= x >> 7;
         x ^= x << 17;
@@ -119,6 +122,7 @@ fn fill_random(maybe_urandom: Option<&mut File>, buf: &mut [u8]) -> bool {
 fn internal_silent_burn() {
     // 1. Wipe RAM avant tout
     let _ = HardwareKeystore::wipe_root_key();
+    let _ = crate::aegis_v36_wipe_ephemeral_buffers();
     unsafe {
         secure_buffer::global_wipe_all_buffers();
     }
@@ -159,7 +163,7 @@ pub extern "C" fn aegis_panic_silent_burn() {
 }
 
 /// # Safety
-/// Le pointeur `path` doit être soit nul, soit pointer vers une chaîne C valide.
+/// Le pointeur `path` doit Ãªtre soit nul, soit pointer vers une chaÃ®ne C valide.
 #[no_mangle]
 pub unsafe extern "C" fn aegis_ingest(path: *const c_char) -> i32 {
     if path.is_null() {
@@ -198,7 +202,7 @@ mod tests {
 
     #[test]
     fn test_panic_module_execution() {
-        // Ces fonctions traverseront 100% de la logique sans détruire le processus
+        // Ces fonctions traverseront 100% de la logique sans dÃ©truire le processus
         PanicPurge::execute_silent_burn();
         PanicPurge::trigger();
         aegis_panic_purge();
@@ -215,10 +219,10 @@ mod tests {
             let valid_path = CString::new("test_vault_dummy.tmp").unwrap();
             assert_eq!(aegis_init_vault_path(valid_path.as_ptr()), 0);
 
-            // Création d'un fichier factice pour valider la boucle d'écrasement
+            // CrÃ©ation d'un fichier factice pour valider la boucle d'Ã©crasement
             let _ = std::fs::write("test_vault_dummy.tmp", b"DONNEES_SENSIBLES");
 
-            // Déclenche l'écrasement (qui ira jusqu'au bout sans crasher)
+            // DÃ©clenche l'Ã©crasement (qui ira jusqu'au bout sans crasher)
             aegis_panic_silent_burn();
 
             // Nettoyage post-test
@@ -228,26 +232,26 @@ mod tests {
 
     #[test]
     fn test_fill_random_produces_varied_output() {
-        // Sans urandom, le fallback doit produire des sorties différentes à
-        // chaque appel (grâce au timestamp).
+        // Sans urandom, le fallback doit produire des sorties diffÃ©rentes Ã 
+        // chaque appel (grÃ¢ce au timestamp).
         let mut buf1 = [0u8; 32];
         let mut buf2 = [0u8; 32];
         fill_random(None, &mut buf1);
         std::thread::sleep(std::time::Duration::from_millis(2));
         fill_random(None, &mut buf2);
-        // Les 2 buffers ne doivent pas être identiques (probabilité ~2^-256)
-        assert_ne!(buf1, buf2, "fallback non-aléatoire détecté");
+        // Les 2 buffers ne doivent pas Ãªtre identiques (probabilitÃ© ~2^-256)
+        assert_ne!(buf1, buf2, "fallback non-alÃ©atoire dÃ©tectÃ©");
     }
 
     #[test]
     fn test_fill_random_no_fixed_pattern() {
-        // Vérifier qu'aucun octet fixe (0x55 ou 0x00) n'apparaît
-        // systématiquement — indicatif d'un fallback faible.
+        // VÃ©rifier qu'aucun octet fixe (0x55 ou 0x00) n'apparaÃ®t
+        // systÃ©matiquement â€” indicatif d'un fallback faible.
         let mut buf = [0u8; 1024];
         fill_random(None, &mut buf);
         let all_55 = buf.iter().all(|&b| b == 0x55);
         let all_zero = buf.iter().all(|&b| b == 0x00);
-        assert!(!all_55, "pattern 0x55 détecté — fallback faible");
-        assert!(!all_zero, "pattern 0x00 détecté — fallback faible");
+        assert!(!all_55, "pattern 0x55 dÃ©tectÃ© â€” fallback faible");
+        assert!(!all_zero, "pattern 0x00 dÃ©tectÃ© â€” fallback faible");
     }
 }

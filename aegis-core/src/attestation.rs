@@ -1,12 +1,12 @@
 //! aegis-core/src/attestation.rs
-//! Android Key Attestation — Niveau 3 (CdCM v2.2-RC3).
+//! Android Key Attestation â€” Niveau 3 (CdCM v2.2-RC3).
 //!
-//! C78 FIX (2026-11-01) : verify_cert_signature gère maintenant
+//! C78 FIX (2026-11-01) : verify_cert_signature gÃ¨re maintenant
 //! ECDSA-P256/P384 x SHA256/SHA384 + RSA-PKCS1 x SHA256/384/512
-//! + RSA-PSS x SHA256. Logs natifs ajoutés à chaque étape.
+//! + RSA-PSS x SHA256. Logs natifs ajoutÃ©s Ã  chaque Ã©tape.
 //!
 //! C78 FIX v2 (2026-11-02) : correctif `subject_public_key.data.as_ref()`
-//! — `Cow<[u8]>` doit être emprunté, pas déplacé.
+//! â€” `Cow<[u8]>` doit Ãªtre empruntÃ©, pas dÃ©placÃ©.
 
 use ring::signature::{
     UnparsedPublicKey,
@@ -154,7 +154,7 @@ fn parse_concatenated_certs(
 }
 
 // =========================================================================
-// Vérification des signatures de chaîne
+// VÃ©rification des signatures de chaÃ®ne
 // =========================================================================
 
 fn verify_cert_signature(child: &X509Certificate, parent: &X509Certificate) -> bool {
@@ -162,7 +162,7 @@ fn verify_cert_signature(child: &X509Certificate, parent: &X509Certificate) -> b
     let sig: &[u8] = &child.signature_value.data;
     let alg_oid = child.signature_algorithm.algorithm.to_id_string();
 
-    // C78 FIX v2 : Cow<[u8]> doit être emprunté via as_ref()
+    // C78 FIX v2 : Cow<[u8]> doit Ãªtre empruntÃ© via as_ref()
     let parent_spki = parent.public_key();
     let parent_pk: &[u8] = parent_spki.subject_public_key.data.as_ref();
     let pk_len = parent_pk.len();
@@ -176,7 +176,7 @@ fn verify_cert_signature(child: &X509Certificate, parent: &X509Certificate) -> b
     );
 
     let ok = match alg_oid.as_str() {
-        // ECDSA P-256 / P-384 — distingue via longueur clé (65=P256 uncompressed, 97=P384 uncompressed)
+        // ECDSA P-256 / P-384 â€” distingue via longueur clÃ© (65=P256 uncompressed, 97=P384 uncompressed)
         "1.2.840.10045.4.3.2" => {
             // ecdsa-with-SHA256
             if pk_len <= 65 {
@@ -256,7 +256,7 @@ fn get_attestation_extension<'a>(cert: &'a X509Certificate) -> Option<&'a [u8]> 
 }
 
 // =========================================================================
-// Mini-parser DER ciblé
+// Mini-parser DER ciblÃ©
 // =========================================================================
 
 fn der_read_tag<'a>(data: &'a [u8], expected: u8) -> Result<(&'a [u8], &'a [u8]), AttestationStatus> {
@@ -490,7 +490,7 @@ fn parse_root_of_trust(data: &[u8]) -> Result<RootOfTrust<'_>, AttestationStatus
 }
 
 // =========================================================================
-// Vérification complète
+// VÃ©rification complÃ¨te
 // =========================================================================
 
 pub fn verify_attestation_chain(chain: &[u8], expected_challenge: &[u8]) -> AttestationStatus {
@@ -519,7 +519,7 @@ pub fn verify_attestation_chain(chain: &[u8], expected_challenge: &[u8]) -> Atte
         if !verify_cert_signature(&certs[i], &certs[i + 1]) {
             log_android(
                 "AEGIS-ATTEST",
-                &format!("cert[{}] signature INVALID → ChainSignatureInvalid (-4)", i),
+                &format!("cert[{}] signature INVALID â†’ ChainSignatureInvalid (-4)", i),
             );
             return AttestationStatus::ChainSignatureInvalid;
         }
@@ -563,7 +563,7 @@ pub fn verify_attestation_chain(chain: &[u8], expected_challenge: &[u8]) -> Atte
     if kd.attestation_version < 3 {
         log_android(
             "AEGIS-ATTEST",
-            &format!("attestation_version < 3 ({}) → -6", kd.attestation_version),
+            &format!("attestation_version < 3 ({}) â†’ -6", kd.attestation_version),
         );
         return AttestationStatus::AttestationExtensionParseError;
     }
@@ -571,7 +571,7 @@ pub fn verify_attestation_chain(chain: &[u8], expected_challenge: &[u8]) -> Atte
     if kd.attestation_security_level < 1 {
         log_android(
             "AEGIS-ATTEST",
-            &format!("security_level < 1 ({}) → -11", kd.attestation_security_level),
+            &format!("security_level < 1 ({}) â†’ -11", kd.attestation_security_level),
         );
         return AttestationStatus::SecurityLevelSoftware;
     }
@@ -580,7 +580,7 @@ pub fn verify_attestation_chain(chain: &[u8], expected_challenge: &[u8]) -> Atte
         log_android(
             "AEGIS-ATTEST",
             &format!(
-                "challenge MISMATCH: expected={} actual={} → -7",
+                "challenge MISMATCH: expected={} actual={} â†’ -7",
                 hex_preview(expected_challenge, 8),
                 hex_preview(kd.attestation_challenge, 8)
             ),
@@ -594,7 +594,7 @@ pub fn verify_attestation_chain(chain: &[u8], expected_challenge: &[u8]) -> Atte
         None => {
             log_android(
                 "AEGIS-ATTEST",
-                "rootOfTrust tag 704 NOT FOUND in teeEnforced → -5",
+                "rootOfTrust tag 704 NOT FOUND in teeEnforced â†’ -5",
             );
             return AttestationStatus::AttestationExtensionMissing;
         }
@@ -625,18 +625,18 @@ pub fn verify_attestation_chain(chain: &[u8], expected_challenge: &[u8]) -> Atte
     );
 
     if !rot.device_locked {
-        log_android("AEGIS-ATTEST", "device_locked=false → -8");
+        log_android("AEGIS-ATTEST", "device_locked=false â†’ -8");
         return AttestationStatus::BootloaderUnlocked;
     }
     if rot.verified_boot_state != 0 {
         log_android(
             "AEGIS-ATTEST",
-            &format!("verified_boot_state={} != 0 → -9", rot.verified_boot_state),
+            &format!("verified_boot_state={} != 0 â†’ -9", rot.verified_boot_state),
         );
         return AttestationStatus::BootStateNotVerified;
     }
     if rot.verified_boot_hash.is_empty() {
-        log_android("AEGIS-ATTEST", "boot_hash empty → -10");
+        log_android("AEGIS-ATTEST", "boot_hash empty â†’ -10");
         return AttestationStatus::BootHashMissing;
     }
 
@@ -645,7 +645,7 @@ pub fn verify_attestation_chain(chain: &[u8], expected_challenge: &[u8]) -> Atte
 }
 
 // =========================================================================
-// TESTS (inchangés)
+// TESTS (inchangÃ©s)
 // =========================================================================
 
 #[cfg(test)]
@@ -743,4 +743,49 @@ mod tests {
         assert_eq!(rot.verified_boot_state, 0);
         assert_eq!(rot.verified_boot_hash.len(), 32);
     }
+}
+
+// =========================================================================
+// CHANTIER C91 (v3.6) : Attestation Matérielle Mutuelle entre Pairs P2P
+// =========================================================================
+
+pub fn compute_peer_attestation_challenge(
+    peer_ed25519_pubkey: &[u8; 32],
+    session_nonce: &[u8; 32],
+) -> [u8; 32] {
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    hasher.update(b"AEGIS-P2P-ATTEST-v1:");
+    hasher.update(peer_ed25519_pubkey);
+    hasher.update(session_nonce);
+    let digest = hasher.finalize();
+    let mut out = [0u8; 32];
+    out.copy_from_slice(&digest);
+    out
+}
+
+pub fn verify_peer_mutual_attestation(
+    peer_cert_chain_der: &[u8],
+    peer_ed25519_pubkey: &[u8; 32],
+    session_nonce: &[u8; 32],
+    require_strongbox_chip: bool,
+) -> AttestationStatus {
+    let bound_challenge = compute_peer_attestation_challenge(peer_ed25519_pubkey, session_nonce);
+    let base_status = verify_attestation_chain(peer_cert_chain_der, &bound_challenge);
+    if base_status != AttestationStatus::Ok {
+        return base_status;
+    }
+
+    if require_strongbox_chip {
+        if let Ok(certs) = parse_concatenated_certs(peer_cert_chain_der) {
+            if let Some(ext) = get_attestation_extension(&certs[0]) {
+                if let Ok(kd) = parse_key_description(ext) {
+                    if kd.attestation_security_level < 2 {
+                        return AttestationStatus::SecurityLevelSoftware;
+                    }
+                }
+            }
+        }
+    }
+    AttestationStatus::Ok
 }

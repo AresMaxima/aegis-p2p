@@ -1,9 +1,14 @@
+//! aegis-core/src/storage/vault.rs
+//! Effacement forensique par réécriture aléatoire CSPRNG (DoD / Gutmann léger) avant suppression.
+//! Note : La dérivation réelle de `master_key` réside exclusivement dans `crate::keystore::HardwareKeystore`.
+
+use std::ffi::CStr;
 use std::fs::OpenOptions;
 use std::io::Write;
-use std::path::Path;
-use std::ffi::CStr;
 use std::os::raw::c_char;
+use std::path::Path;
 use getrandom::getrandom;
+use zeroize::Zeroize;
 
 const CHUNK_SIZE: usize = 64 * 1024;
 
@@ -12,8 +17,6 @@ pub struct AegisVault {
 }
 
 impl AegisVault {
-    pub fn derive_master_key(_pass: &[u8], _salt: &[u8]) -> Result<Vec<u8>, ()> { Ok(vec![0; 32]) }
-
     pub fn new(path: &str) -> Self {
         Self {
             path: path.to_string(),
@@ -50,21 +53,18 @@ pub fn wipe_and_delete_vault<P: AsRef<Path>>(path: P) -> std::io::Result<()> {
                 written += to_write as u64;
             }
             let _ = file.sync_all();
+            buf.zeroize();
         }
     }
     std::fs::remove_file(path)
 }
 
-/// # Safety
-///
-/// Le pointeur `path_ptr` doit pointer vers une chaÃ®ne de caractÃ¨res C valide et terminÃ©e par un octet nul.
-/// Cette zone mÃ©moire ne doit pas Ãªtre modifiÃ©e concurremment pendant l'exÃ©cution.
 #[cfg_attr(not(test), no_mangle)]
 pub unsafe extern "C" fn aegis_vault_destroy(path_ptr: *const c_char) -> i32 {
     if path_ptr.is_null() {
         return -1;
     }
-    
+
     let c_str = CStr::from_ptr(path_ptr);
     if let Ok(path_str) = c_str.to_str() {
         if wipe_and_delete_vault(path_str).is_ok() {
@@ -73,5 +73,17 @@ pub unsafe extern "C" fn aegis_vault_destroy(path_ptr: *const c_char) -> i32 {
     }
     -1
 }
+
 #[cfg(test)]
-mod cov_vlt { use super::*; #[test] fn t() { let p = std::env::temp_dir().join("v.db"); let s = p.to_str().unwrap(); let _ = AegisVault::derive_master_key(b"p", b"s"); let _ = AegisVault::new(s); let _ = AegisVault::purge(&p); let _ = AegisVault::panic_purge(&p); let _ = wipe_and_delete_vault(&p); } }
+mod cov_vlt {
+    use super::*;
+    #[test]
+    fn t() {
+        let p = std::env::temp_dir().join("v_wipe_test.bin");
+        let s = p.to_str().unwrap();
+        let _ = AegisVault::new(s);
+        let _ = AegisVault::purge(&p);
+        let _ = AegisVault::panic_purge(&p);
+        let _ = wipe_and_delete_vault(&p);
+    }
+}

@@ -1,15 +1,25 @@
-name: Reproducible Build & Verification
-on: [push, pull_request]
+name: Reproducible Build, Formal Proofs & SLSA Unforgeable Audit
+on:
+  push:
+    branches: [ "main", "master" ]
+    tags: [ "v*" ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
 
 jobs:
   # ============================================================
-  # JOB 1 — Kani (pin rust:1.93 pour compatibilité Kani 0.67.0)
+  # JOB 1 â€” Kani (pin rust:1.93 pour compatibilitÃ© Kani 0.67.0)
   # ============================================================
   kani-proofs:
     name: Formal Proofs (AWS Kani)
     runs-on: ubuntu-latest
     container:
-      image: rust:1.93-bookworm     # PIN compatible Kani 0.67.0
+      image: rust:1.93-bookworm
     steps:
       - uses: actions/checkout@v4
       - name: Install System Dependencies & Kani
@@ -21,24 +31,29 @@ jobs:
         run: |
           cd aegis-core
           cargo kani --harness crypto_pq::verify_process_512b_frame_bounds > kani-report.txt
+      - name: Upload Kani Proof Log
+        uses: actions/upload-artifact@v4
+        with:
+          name: kani-formal-report
+          path: aegis-core/kani-report.txt
+          retention-days: 30
 
   # ============================================================
-  # JOB 2 — Miri (idem, pin rust:1.93 pour stabilité)
+  # JOB 2 â€” Miri (5 serveurs parallÃ¨les couvrant 100% des modules dont v3.6)
   # ============================================================
   miri-audit:
     name: Memory Audit (Miri)
     runs-on: ubuntu-latest
     container:
-      image: rust:1.93-bookworm     # PIN compatible Miri stable
+      image: rust:1.93-bookworm
     strategy:
       fail-fast: false
       matrix:
-        # Lancement de 5 serveurs parallèles pour couvrir 100% du code sans timeout
         modules:
           - "crypto crypto_pq"
           - "network mesh transport"
           - "secure_buffer storage session"
-          - "keystore stegano ffi_security"
+          - "keystore stegano ffi_security attestation"
           - "panic hardware_triggers ingestion qr_pairing seccomp signals viewer deadman"
     steps:
       - uses: actions/checkout@v4
@@ -49,20 +64,18 @@ jobs:
           MIRIFLAGS: "-Zmiri-disable-isolation"
         run: |
           cd aegis-core
-          # Exécute Miri sur les modules assignés à ce serveur spécifique
           for mod in ${{ matrix.modules }}; do
             cargo +nightly-2026-09-01 miri test $mod --release
           done
 
   # ============================================================
-  # JOB 3 — Build Android (NE PAS TOUCHER = rust:latest = 1.98.1)
-  # Même version que le cargo local de l'opérateur = reproducible build
+  # JOB 3 â€” Build Android DÃ©terministe (INTACT : rust:latest = 1.98.1)
   # ============================================================
   build-android:
-    name: Android NDK Build
+    name: Android NDK Build (ARM64)
     runs-on: ubuntu-latest
     container:
-      image: rust:latest            # INTACT : 1.98.1 = même que cargo local
+      image: rust:latest
     steps:
       - uses: actions/checkout@v4
       - name: Install System Dependencies
@@ -72,6 +85,11 @@ jobs:
           wget -q https://dl.google.com/android/repository/android-ndk-r27-linux.zip
           unzip -q android-ndk-r27-linux.zip
           rustup target add aarch64-linux-android
+          rustup component add clippy
+      - name: Zero-Warning Clippy Gate
+        run: |
+          cd aegis-core
+          cargo clippy --lib -- -D warnings
       - name: Build Deterministic ARM64 Binary
         env:
           ANDROID_NDK_HOME: ${{ github.workspace }}/android-ndk-r27
@@ -83,67 +101,37 @@ jobs:
           cargo build --target aarch64-linux-android --release
       - name: Verify Cryptographic Hash
         run: |
-          sha256sum aegis-core/target/aarch64-linux-android/release/libaegis_core.so
-      # ──────────────────────────────────────────────────────────
-      # C65 FIX (2026-10-13) — Upload du .so pour le job suivant
-      # (jni-symbols-verification).
-      # ──────────────────────────────────────────────────────────
+          sha256sum aegis-core/target/aarch64-linux-android/release/libaegis_core.so | tee aegis-core/libaegis_core.so.sha256
       - name: Upload arm64 .so artifact
         uses: actions/upload-artifact@v4
         with:
           name: libaegis_core-arm64-v8a
-          path: aegis-core/target/aarch64-linux-android/release/libaegis_core.so
+          path: |
+            aegis-core/target/aarch64-linux-android/release/libaegis_core.so
+            aegis-core/libaegis_core.so.sha256
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 30
 
   # ============================================================
-  # JOB 3bis — Vérification des symboles JNI (C64/C65) et FFI C ABI (C79)
-  # ============================================================
-  # Contexte :
-  #   Le 13/10/2026, un audit a révélé que 6 FFI appelées depuis
-  #   Kotlin (external fun) étaient déclarées sans préfixe JNI
-  #   (`Java_com_example_...`). Elles compilaient mais craschaient
-  #   au runtime avec UnsatisfiedLinkError.
-  #
-  #   Ce job vérifie, APRÈS le build, que TOUS les symboles JNI
-  #   attendus par le code Kotlin sont présents dans le .so.
-  #   Il échoue si un seul manque.
-  #
-  # P0-A.3e.2b.1b (2026-10-16) : ajout des 4 symboles
-  #   aegis_ble_handshake_* (start_initiator, start_responder,
-  #   is_complete, reset). Total : 18 symboles JNI.
-  #
-  # C79 (2026-10-21) : ajout de la vérification des FFI C ABI
-  #   (Dart DynamicLibrary.lookupFunction) pour éviter les régressions
-  #   silencieuses sur les exports appelés depuis Dart.
+  # JOB 3bis â€” VÃ©rification exhaustive des symboles JNI + FFI C ABI (v3.5 + v3.6)
   # ============================================================
   jni-symbols-verification:
-    name: JNI Symbol Verification
+    name: JNI & FFI v3.6 Symbol Verification
     runs-on: ubuntu-latest
     needs: build-android
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-
       - name: Download arm64 .so artifact
         uses: actions/download-artifact@v4
         with:
           name: libaegis_core-arm64-v8a
           path: /tmp/aegis-so/
-
-      - name: List .so files
-        run: ls -la /tmp/aegis-so/
-
-      - name: Verify JNI symbols present
+      - name: Verify JNI symbols present (18 symbols)
         run: |
           SO=$(find /tmp/aegis-so -name "libaegis_core.so" | head -n1)
-          if [ -z "$SO" ]; then
-            echo "ERROR: libaegis_core.so introuvable dans /tmp/aegis-so/"
-            exit 1
-          fi
-          echo "Checking $SO"
+          [ -n "$SO" ] || { echo "ERROR: libaegis_core.so introuvable"; exit 1; }
           SYMBOLS=$(nm -D --defined-only "$SO")
-
           MISSING=0
           for SYM in \
             "Java_com_aresmaxima_aegis_MainActivity_aegisRegisterMainActivity" \
@@ -166,30 +154,18 @@ jobs:
             "Java_com_aresmaxima_aegis_MainActivity_aegis_1ble_1handshake_1reset" \
           ; do
             if echo "$SYMBOLS" | grep -q " $SYM$"; then
-              echo "✓ $SYM"
+              echo "OK JNI: $SYM"
             else
-              echo "✗ MISSING: $SYM"
+              echo "MISSING JNI: $SYM"
               MISSING=$((MISSING + 1))
             fi
           done
+          [ "$MISSING" -eq 0 ] || exit 1
 
-          if [ "$MISSING" -gt 0 ]; then
-            echo "ERROR: $MISSING JNI symbol(s) missing"
-            exit 1
-          fi
-          echo "All JNI symbols present."
-
-      # C79 : Vérification des FFI C ABI (Dart DynamicLibrary.lookupFunction)
-      - name: Verify FFI C ABI symbols
+      - name: Verify FFI C ABI symbols (v3.5 HSM + v3.6 C90-C94)
         run: |
           SO=$(find /tmp/aegis-so -name "libaegis_core.so" | head -n1)
-          if [ -z "$SO" ]; then
-            echo "ERROR: libaegis_core.so introuvable dans /tmp/aegis-so/"
-            exit 1
-          fi
-          echo "Checking FFI C ABI symbols in $SO"
           SYMBOLS=$(nm -D --defined-only "$SO")
-          
           MISSING=0
           for SYM in \
             "aegis_verify_update_signature" \
@@ -205,57 +181,44 @@ jobs:
             "aegis_tor_set_strongbox_available" \
             "aegis_wifi_direct_set_fd" \
             "aegis_verify_license_key" \
+            "aegis_verify_license_key_bound" \
+            "aegis_set_external_nfc_token_secret" \
+            "aegis_chaff_configure" \
+            "aegis_chaff_poll_cell" \
+            "aegis_verify_peer_attestation" \
+            "aegis_deaddrop_deposit" \
+            "aegis_deaddrop_collect_and_burn" \
+            "aegis_optical_encode_json" \
+            "aegis_optical_ingest_droplet" \
+            "aegis_v36_wipe_ephemeral_buffers" \
           ; do
             if echo "$SYMBOLS" | grep -qE " T $SYM$"; then
-              echo "✓ $SYM"
+              echo "OK FFI: $SYM"
             else
-              echo "✗ MISSING: $SYM"
+              echo "MISSING FFI: $SYM"
               MISSING=$((MISSING + 1))
             fi
           done
-
-          if [ "$MISSING" -gt 0 ]; then
-            echo "ERROR: $MISSING FFI C ABI symbol(s) missing"
-            exit 1
-          fi
-          echo "All FFI C ABI symbols present."
+          [ "$MISSING" -eq 0 ] || exit 1
 
   # ============================================================
-  # JOB 4 — Preuve mmap/mprotect (Valgrind sur Linux natif)
-  # Couvre ce que Miri ne peut PAS vérifier : mmap(PROT_NONE) +
-  # mprotect(PROT_READ|PROT_WRITE). Valgrind exécute le binaire
-  # natif instrumenté et détecte tout accès hors bornes.
+  # JOB 4 â€” Preuve mmap/mprotect (Valgrind sur Linux natif)
   # ============================================================
   linux-mmap-proof:
     name: Linux mmap/mprotect proof (Valgrind)
     runs-on: ubuntu-latest
     container:
-      image: rust:1.93-bookworm     # même image que Kani/Miri (cohérence)
+      image: rust:1.93-bookworm
     steps:
       - uses: actions/checkout@v4
-
       - name: Install Valgrind
-        run: |
-          apt-get update
-          apt-get install -y valgrind
-
-      - name: Build tests (no-run, debug profile)
+        run: apt-get update && apt-get install -y valgrind
+      - name: Build & Execute Valgrind on polymorphic_ram
         run: |
           cd aegis-core
           cargo test --lib polymorphic --no-run
-
-      - name: Execute Valgrind on polymorphic_ram
-        run: |
-          cd aegis-core
-          # Localiser le binaire de test le plus récent
           BIN=$(find target/debug/deps -maxdepth 1 -type f -executable -name 'aegis_core-*' | head -n 1)
-          if [ -z "$BIN" ]; then
-            echo "ERREUR: binaire de test introuvable"
-            exit 1
-          fi
-          echo "Test binary: $BIN"
-
-          # Lancer Valgrind : échec CI si accès hors bornes détecté
+          [ -n "$BIN" ] || exit 1
           valgrind \
             --error-exitcode=1 \
             --leak-check=full \
@@ -265,31 +228,65 @@ jobs:
             "$BIN" polymorphic --test-threads=1
 
   # ============================================================
-  # JOB 5 — Preuve TPM : compilation de tpm.rs avec la feature `tpm`
-  # Ce job est la PREUVE que le module TPM est compilable et testable
-  # (mock uniquement — les tests hardware sont `#[ignore]`).
-  # Sans ce job, tpm.rs n'est jamais validé par la CI (absent de Miri
-  # car #![cfg(not(miri))], absent d'Android car target_os != linux).
+  # JOB 5 â€” Preuve TPM + Firmware BoÃ®tier MESH #![no_std] + RustSec 0-CVE
   # ============================================================
-  tpm-feature-proof:
-    name: TPM feature compilation proof
+  tpm-and-mesh-proof:
+    name: TPM2, Bare-Metal Mesh Firmware & RustSec Audit
     runs-on: ubuntu-latest
     container:
-      image: rust:1.93-bookworm
+      image: rust:latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install libtss2 (TPM2-TSS)
+      - name: Install libtss2 & clippy
         run: |
-          apt-get update
-          apt-get install -y libtss2-dev pkg-config
-
-      - name: Compile aegis-core with tpm feature
+          apt-get update && apt-get install -y libtss2-dev pkg-config
+          rustup component add clippy
+      - name: Compile & Test TPM feature
         run: |
           cd aegis-core
           cargo check --features tpm --tests
-
-      - name: Run TPM mock tests (hardware tests ignored)
-        run: |
-          cd aegis-core
           cargo test --features tpm --lib tpm:: -- --test-threads=1
+      - name: Verify Bare-Metal Mesh Relay Firmware (#![no_std])
+        if: hashFiles('aegis-mesh-fw/Cargo.toml') != ''
+        run: |
+          cd aegis-mesh-fw
+          cargo test
+          cargo clippy --all-targets -- -D warnings
+      - name: Supply-Chain RustSec Audit (0-CVE Gate)
+        run: |
+          cargo install cargo-audit --locked
+          cd aegis-core
+          cargo audit
+
+  # ============================================================
+  # JOB 6 â€” SCEAU D'AUTO-AUDIT INTRAFFICABLE (SLSA v1.0 / Sigstore Rekor)
+  # Ne s'exÃ©cute QUE si Kani, les 5 Miri, Android NDK, JNI/FFI, Valgrind & RustSec sont 100% VERTS.
+  # ============================================================
+  slsa-unforgeable-attestation:
+    name: SLSA Build Provenance Seal (Zero Editor Trust)
+    runs-on: ubuntu-latest
+    needs:
+      - kani-proofs
+      - miri-audit
+      - build-android
+      - jni-symbols-verification
+      - linux-mmap-proof
+      - tpm-and-mesh-proof
+    steps:
+      - name: Download Verified ARM64 .so Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: libaegis_core-arm64-v8a
+          path: verified_release/
+
+      - name: Find Binary & Display Immutable SHA-256
+        id: locate
+        run: |
+          SO_PATH=$(find verified_release -name "libaegis_core.so" | head -n 1)
+          echo "so_path=$SO_PATH" >> "$GITHUB_OUTPUT"
+          sha256sum "$SO_PATH"
+
+      - name: Sign Unforgeable SLSA Provenance in Public Sigstore Rekor Log
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: ${{ steps.locate.outputs.so_path }}
