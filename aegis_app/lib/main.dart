@@ -1,3 +1,6 @@
+import 'package:qr_flutter/qr_flutter.dart';
+import 'v36_hardening_bridge.dart';
+import 'views/v36_tactical_sheet.dart';
 import 'dart:async';
 import 'dart:ffi' hide Size;
 import 'dart:io';
@@ -45,7 +48,7 @@ void verifyApkSignatureOrBurn(String currentApkSha256) {
       malloc.free(ptr);
     }
   } catch (e) {
-    debugPrint("Échec du contrôle de signature APK : $e");
+    debugPrint("Ã‰chec du contrÃ´le de signature APK : $e");
   }
 }
 
@@ -71,13 +74,13 @@ bool verifyLicenseKeyFfi(String licenseKey) {
       malloc.free(ptr);
     }
   } catch (_) {
-    // P4 FIX : fail-closed. Aucun fallback sur préfixe "AEGIS-".
+    // P4 FIX : fail-closed. Aucun fallback sur prÃ©fixe "AEGIS-".
     return false;
   }
 }
 
 // =========================================================================
-// C89 : Vérifie une licence liée au StrongBox du téléphone.
+// C89 : VÃ©rifie une licence liÃ©e au StrongBox du tÃ©lÃ©phone.
 // =========================================================================
 Future<bool> verifyLicenseKeyFfiBound(String licenseKey) async {
   try {
@@ -139,7 +142,7 @@ Future<bool> ingestFileZeroDisk(String filePath) async {
 
 // =========================================================================
 // P6 FIX : malloc.free dans finally
-// P7 FIX : plus de fallback base64 trivial (aucune sécurité)
+// P7 FIX : plus de fallback base64 trivial (aucune sÃ©curitÃ©)
 // =========================================================================
 String drownKeyFfi(String keyToDrown, String poem) {
   try {
@@ -160,7 +163,7 @@ String drownKeyFfi(String keyToDrown, String poem) {
     try {
       final resultPtr = drownFunc(keyPtr, poemPtr);
       if (resultPtr == nullptr) {
-        return "Erreur lors du noyage stéganographique.";
+        return "Erreur lors du noyage stÃ©ganographique.";
       }
       try {
         return resultPtr.toDartString();
@@ -172,8 +175,8 @@ String drownKeyFfi(String keyToDrown, String poem) {
       malloc.free(poemPtr);
     }
   } catch (e) {
-    // P7 FIX : plus de fallback base64 trivial (aucune sécurité).
-    return "Erreur stégano : $e";
+    // P7 FIX : plus de fallback base64 trivial (aucune sÃ©curitÃ©).
+    return "Erreur stÃ©gano : $e";
   }
 }
 
@@ -199,7 +202,7 @@ String extractKeyFfi(String stegoText) {
     try {
       final resultPtr = extractFunc(ptr);
       if (resultPtr == nullptr) {
-        return "Erreur : Aucun payload stéganographique AEGIS détecté.";
+        return "Erreur : Aucun payload stÃ©ganographique AEGIS dÃ©tectÃ©.";
       }
       try {
         return resultPtr.toDartString();
@@ -211,7 +214,7 @@ String extractKeyFfi(String stegoText) {
     }
   } catch (e) {
     // P7 FIX : plus de fallback base64 trivial.
-    return "Erreur : Aucun payload stéganographique AEGIS détecté ($e).";
+    return "Erreur : Aucun payload stÃ©ganographique AEGIS dÃ©tectÃ© ($e).";
   }
 }
 
@@ -230,7 +233,7 @@ Future<void> deploySnowflake() async {
       await Process.run('chmod', ['+x', snowflakePath]);
     }
   } catch (e) {
-    debugPrint("Déploiement Snowflake : $e");
+    debugPrint("DÃ©ploiement Snowflake : $e");
   }
 }
 
@@ -248,15 +251,15 @@ void main() async {
   };
 
   if (Platform.isAndroid) {
-    // P8 FIX (2026-11-06) : le hash SHA-256 était hardcodé et obsolète
-    // après chaque rebuild APK. Le FFI Rust `aegis_verify_apk_signature_or_burn`
+    // P8 FIX (2026-11-06) : le hash SHA-256 Ã©tait hardcodÃ© et obsolÃ¨te
+    // aprÃ¨s chaque rebuild APK. Le FFI Rust `aegis_verify_apk_signature_or_burn`
     // ne valide QUE le format UTF-8 (jamais la valeur), donc le hash
-    // était purement décoratif. On passe un fingerprint runtime
-    // déterministe (version OS + plateforme), toujours valide UTF-8 et
-    // jamais obsolète. La vraie validation APK est faite par :
+    // Ã©tait purement dÃ©coratif. On passe un fingerprint runtime
+    // dÃ©terministe (version OS + plateforme), toujours valide UTF-8 et
+    // jamais obsolÃ¨te. La vraie validation APK est faite par :
     //   1) Android PackageManager (refus d'installation si signature change)
-    //   2) L'attestation StrongBox au démarrage
-    //      (aegis_verify_attestation_chain, déjà en place)
+    //   2) L'attestation StrongBox au dÃ©marrage
+    //      (aegis_verify_attestation_chain, dÃ©jÃ  en place)
     final apkMarker = "aegis:${Platform.operatingSystemVersion}";
     verifyApkSignatureOrBurn(apkMarker);
   }
@@ -276,7 +279,7 @@ void main() async {
     final dirOk = KeystoreBridge.vaultSetDir(docsDir.path);
     debugPrint("AEGIS-VAULT: setVaultDir(${docsDir.path}) = $dirOk");
   } catch (e) {
-    debugPrint("AEGIS-VAULT: vaultSetDir a échoué: $e");
+    debugPrint("AEGIS-VAULT: vaultSetDir a Ã©chouÃ©: $e");
   }
 
   try {
@@ -304,23 +307,23 @@ void main() async {
       );
       debugPrint("AEGIS: initializeHardwareSecurity = $ok");
     } catch (e) {
-      debugPrint("AEGIS: initializeHardwareSecurity a échoué: $e");
+      debugPrint("AEGIS: initializeHardwareSecurity a Ã©chouÃ©: $e");
     }
 
     try {
       final torOk = await KeystoreBridge.setTorStrongboxAvailable();
       debugPrint("AEGIS: setTorStrongboxAvailable = $torOk");
     } catch (e) {
-      debugPrint("AEGIS: setTorStrongboxAvailable a échoué: $e");
+      debugPrint("AEGIS: setTorStrongboxAvailable a Ã©chouÃ©: $e");
     }
   });
 }
 
 // =========================================================================
-// P10 FIX (côté Dart) : les symboles aegis_panic_purge,
-// aegis_purge_ram_buffer et aegis_panic_silent_burn sont exportés
+// P10 FIX (cÃ´tÃ© Dart) : les symboles aegis_panic_purge,
+// aegis_purge_ram_buffer et aegis_panic_silent_burn sont exportÃ©s
 // depuis lib.rs (patch Rust joint en partie 2). Cascade de fallback :
-// essaie le plus spécifique d'abord, sinon retombe sur panic_purge.
+// essaie le plus spÃ©cifique d'abord, sinon retombe sur panic_purge.
 // =========================================================================
 void _executeEmergencyFfiPurge() {
   try {
@@ -429,9 +432,9 @@ class _UserInactivityWrapperState extends State<UserInactivityWrapper> with Widg
   Timer? _inactivityTimer;
 
   // =====================================================================
-  // P11 FIX (2026-11-06) : `runApp(const AegisApp())` retiré — sans objet
+  // P11 FIX (2026-11-06) : `runApp(const AegisApp())` retirÃ© â€” sans objet
   // puisque SystemNavigator.pop + exit(0) terminent le process
-  // immédiatement. Le re-runApp() était un no-op gaspillé.
+  // immÃ©diatement. Le re-runApp() Ã©tait un no-op gaspillÃ©.
   // =====================================================================
   void _lockAndPurge() {
     if (isExternalFlowActive()) return;
@@ -516,10 +519,10 @@ class AegisLogoWidget extends StatelessWidget {
 }
 
 // =========================================================================
-// P12 (2026-11-06) : documenté. Si l'utilisateur reçoit un appel pendant
-// l'unlock (Argon2id ~2-4s), mounted=false à la fin → session perdue.
-// Comportement de sécurité voulu (purge silencieuse plutôt que session
-// zombie). Voir _unlock() où ce cas est déjà géré par `if (!mounted) return;`.
+// P12 (2026-11-06) : documentÃ©. Si l'utilisateur reÃ§oit un appel pendant
+// l'unlock (Argon2id ~2-4s), mounted=false Ã  la fin â†’ session perdue.
+// Comportement de sÃ©curitÃ© voulu (purge silencieuse plutÃ´t que session
+// zombie). Voir _unlock() oÃ¹ ce cas est dÃ©jÃ  gÃ©rÃ© par `if (!mounted) return;`.
 // =========================================================================
 class LockScreen extends StatefulWidget {
   const LockScreen({super.key});
@@ -690,7 +693,7 @@ class _LockScreenState extends State<LockScreen> {
       return;
     }
 
-    // P12 : voir doc ci-dessus — perte session = sécurité voulue.
+    // P12 : voir doc ci-dessus â€” perte session = sÃ©curitÃ© voulue.
     final session = await _vault.unlockSession(pin);
     if (!mounted) return;
 
@@ -776,12 +779,12 @@ class _LockScreenState extends State<LockScreen> {
                       dropdownColor: const Color(0xFF141416),
                       underline: Container(),
                       items: const [
-                        DropdownMenuItem(value: Locale('fr', 'FR'), child: Text('Français')),
+                        DropdownMenuItem(value: Locale('fr', 'FR'), child: Text('FranÃ§ais')),
                         DropdownMenuItem(value: Locale('en', 'US'), child: Text('English')),
-                        DropdownMenuItem(value: Locale('es', 'ES'), child: Text('Español')),
-                        DropdownMenuItem(value: Locale('ar', 'SA'), child: Text('العربية')),
+                        DropdownMenuItem(value: Locale('es', 'ES'), child: Text('EspaÃ±ol')),
+                        DropdownMenuItem(value: Locale('ar', 'SA'), child: Text('Ø§Ù„Ø¹Ø±Ø¨ÙŠØ©')),
                         DropdownMenuItem(value: Locale('it', 'IT'), child: Text('Italiano')),
-                        DropdownMenuItem(value: Locale('uk', 'UA'), child: Text('Українська')),
+                        DropdownMenuItem(value: Locale('uk', 'UA'), child: Text('Ð£ÐºÑ€Ð°Ñ—Ð½ÑÑŒÐºÐ°')),
                         DropdownMenuItem(value: Locale('pl', 'PL'), child: Text('Polski')),
                       ],
                       onChanged: (Locale? locale) {
@@ -809,7 +812,7 @@ class _LockScreenState extends State<LockScreen> {
                             SizedBox(width: 6),
                             Expanded(
                               child: Text(
-                                "SCEAU MATÉRIEL HSM (STRONGBOX)",
+                                "SCEAU MATÃ‰RIEL HSM (STRONGBOX)",
                                 style: TextStyle(
                                   color: brandYellow,
                                   fontSize: 11,
@@ -842,14 +845,14 @@ class _LockScreenState extends State<LockScreen> {
                                     Clipboard.setData(ClipboardData(text: _hsmFingerprint!));
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
-                                        content: Text("Sceau matériel HSM copié dans le presse-papiers"),
+                                        content: Text("Sceau matÃ©riel HSM copiÃ© dans le presse-papiers"),
                                         duration: Duration(seconds: 2),
                                       ),
                                     );
                                   },
                             icon: const Icon(Icons.copy, size: 14, color: brandYellow),
                             label: const Text(
-                              "COPIER LE SCEAU D'ENRÔLEMENT HSM",
+                              "COPIER LE SCEAU D'ENRÃ”LEMENT HSM",
                               style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
                             ),
                             style: OutlinedButton.styleFrom(
@@ -885,7 +888,7 @@ class _LockScreenState extends State<LockScreen> {
                   child: Text(
                     _pinController.text.isEmpty
                         ? displayHint
-                        : '•' * _pinController.text.length,
+                        : 'â€¢' * _pinController.text.length,
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: _pinController.text.isEmpty ? Colors.white54 : Colors.white,
@@ -962,7 +965,7 @@ class _LockScreenState extends State<LockScreen> {
 
 
 // =========================================================================
-// FakeDashboard (P2 : inchangé, pas de panne identifiée)
+// FakeDashboard (P2 : inchangÃ©, pas de panne identifiÃ©e)
 // =========================================================================
 class FakeDashboard extends StatelessWidget {
   const FakeDashboard({super.key});
@@ -980,7 +983,7 @@ class FakeDashboard extends StatelessWidget {
           bottom: const TabBar(
             tabs: [
               Tab(icon: Icon(Icons.note), text: "Notes"),
-              Tab(icon: Icon(Icons.checklist), text: "Tâches"),
+              Tab(icon: Icon(Icons.checklist), text: "TÃ¢ches"),
             ],
           ),
         ),
@@ -1017,12 +1020,12 @@ class FakeDashboard extends StatelessWidget {
 // =========================================================================
 // MainDashboard
 // =========================================================================
-// P13 FIX (2026-11-06) : `_updaterService.check()` reste appelé sur le
+// P13 FIX (2026-11-06) : `_updaterService.check()` reste appelÃ© sur le
 // main thread via addPostFrameCallback, MAIS ne bloque plus : le FFI
-// `aegis_tor_fetch_http` est exécuté dans un isolate Dart via
-// UpdaterBridge._fetchManifestViaTor() → Isolate.run() (voir patch
-// updater_bridge.dart). Le main thread reste réactif pendant les 30-60 s
-// du bootstrap Tor. La bannière UpdaterBanner passe à jour au fil des
+// `aegis_tor_fetch_http` est exÃ©cutÃ© dans un isolate Dart via
+// UpdaterBridge._fetchManifestViaTor() â†’ Isolate.run() (voir patch
+// updater_bridge.dart). Le main thread reste rÃ©actif pendant les 30-60 s
+// du bootstrap Tor. La banniÃ¨re UpdaterBanner passe Ã  jour au fil des
 // notifyListeners() du service.
 // =========================================================================
 class MainDashboard extends StatefulWidget {
@@ -1046,9 +1049,9 @@ class _MainDashboardState extends State<MainDashboard> {
   @override
   void initState() {
     super.initState();
-    _updaterService = UpdaterService(currentVersion: '3.5.0');
+    _updaterService = UpdaterService(currentVersion: '3.6.0');
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Non-bloquant : délègue à Isolate.run() dans updater_bridge.dart.
+      // Non-bloquant : dÃ©lÃ¨gue Ã  Isolate.run() dans updater_bridge.dart.
       _updaterService.check();
     });
   }
@@ -1062,6 +1065,7 @@ class _MainDashboardState extends State<MainDashboard> {
   }
 
   void _instantRamPurge() {
+    V36HardeningBridge.wipeAllEphemeralV36();
     _executeEmergencyFfiPurge();
     activeRamPin = "";
     SystemChannels.platform.invokeMethod('SystemNavigator.pop');
@@ -1222,7 +1226,7 @@ class _MainDashboardState extends State<MainDashboard> {
             Container(
               padding: const EdgeInsets.all(16),
               color: Colors.white,
-              child: const Icon(Icons.qr_code_2, size: 140, color: Colors.black),
+              child: QrImageView(data: _myEphemeralKey, version: QrVersions.auto, size: 180),
             ),
             const SizedBox(height: 12),
             SelectableText(
@@ -1421,6 +1425,18 @@ class _MainDashboardState extends State<MainDashboard> {
         backgroundColor: Colors.black,
         elevation: 0,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.security_update_good, color: Color(0xFFFCBE0B), size: 26),
+            tooltip: 'Boucliers Anti-SIGINT & Air-Gap v3.6',
+            onPressed: () => showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: const Color(0xFF121215),
+              builder: (_) => V36TacticalSheet(
+                onMessageReceived: (msg) => setState(() => _chatMessages.add(msg)),
+              ),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 28),
             tooltip: "PURGE D'URGENCE",

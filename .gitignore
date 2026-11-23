@@ -50,7 +50,7 @@ aegis-core/coverage-report/
 aegis-core/llvm-cov.toml
 
 # ============================================================
-# 8. FIX 26/09/2026 â€” nettoyage pre-commit v3.0
+# 8. FIX 26/09/2026 Ã¢â‚¬â€ nettoyage pre-commit v3.0
 # ============================================================
 
 # Outils offensifs (F4)
@@ -74,7 +74,7 @@ aegis_heap.hprof
 translations_before_mojibake_fix.dart
 
 # ============================================================
-# 9. FIX 26/09/2026 â€” exclusions avant commit v3.0
+# 9. FIX 26/09/2026 Ã¢â‚¬â€ exclusions avant commit v3.0
 # ============================================================
 
 # Ancien .git (backup local)
@@ -88,13 +88,14 @@ oss-fuzz/
 # 10. EXCEPTIONS (FINDING C103)
 # ============================================================
 
-# Autoriser explicitement les outils Python de signature (malgrÃ© *.txt)
+# Autoriser explicitement les outils Python de signature (malgrÃƒÂ© *.txt)
 !tools/requirements.txt
 
-# --- AEGIS v3.6 : Autorisation explicite du protocole d'audit boîte noire public ---
-!audit/
+# --- AEGIS v3.6 : Autorisation explicite du protocole d'audit boÃ®te noire public ---
+audit/*
 !audit/aegis_blackbox_forensic_verify.sh
+*.apk
 
-# --- Protection des logs locaux temporaires et dossiers administratifs privés ---
+# --- Protection des logs locaux temporaires et dossiers administratifs privÃ©s ---
 *.log
 GUIDE UTILISATEUR/Declaration ANSII/

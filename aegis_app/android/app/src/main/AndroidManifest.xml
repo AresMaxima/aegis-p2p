@@ -9,15 +9,17 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.NFC" />
+    <uses-feature android:name="android.hardware.nfc" android:required="false" />
 
     <!--
       ================================================================
-      P0-A.2 (2026-10-07) — Wi-Fi Direct (manual pairing, QR code)
+      P0-A.2 (2026-10-07) â€” Wi-Fi Direct (manual pairing, QR code)
       ================================================================
       Access Wi-Fi state (obligatoire pour WifiP2pManager).
       ACCESS_FINE_LOCATION est requis sur API < 33 pour la discovery.
       NEARBY_WIFI_DEVICES (API 33+) remplace ACCESS_FINE_LOCATION
-      pour les opérations Wi-Fi Direct, avec neverForLocation.
+      pour les opÃ©rations Wi-Fi Direct, avec neverForLocation.
     -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
@@ -30,9 +32,9 @@
 
     <!--
       ================================================================
-      P0-A.3 (2026-10-11) — BLE Mesh
+      P0-A.3 (2026-10-11) â€” BLE Mesh
       ================================================================
-      Permissions BLE pour Android 12+ (API 31+) et versions antérieures.
+      Permissions BLE pour Android 12+ (API 31+) et versions antÃ©rieures.
     -->
     <!-- API 31+ -->
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
@@ -42,23 +44,23 @@
     <!-- API < 31 (legacy) -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
-    <!-- Note: ACCESS_FINE_LOCATION est déjà déclaré pour Wi-Fi Direct (maxSdkVersion="32").
-         Il couvre également le besoin BLE pour API < 31. Ne pas dupliquer. -->
+    <!-- Note: ACCESS_FINE_LOCATION est dÃ©jÃ  dÃ©clarÃ© pour Wi-Fi Direct (maxSdkVersion="32").
+         Il couvre Ã©galement le besoin BLE pour API < 31. Ne pas dupliquer. -->
 
     <!--
       ================================================================
-      P0-A.8b (2026-10-19) — Updater in-app (P-6)
+      P0-A.8b (2026-10-19) â€” Updater in-app (P-6)
       ================================================================
-      Permission indispensable pour déclencher l'installation d'un
+      Permission indispensable pour dÃ©clencher l'installation d'un
       APK hors Play Store via Intent ACTION_VIEW (API 26+).
 
-      C69 : la permission doit être vérifiée AU RUNTIME via
-      `packageManager.canRequestPackageInstalls()`. La déclaration
+      C69 : la permission doit Ãªtre vÃ©rifiÃ©e AU RUNTIME via
+      `packageManager.canRequestPackageInstalls()`. La dÃ©claration
       manifest seule ne suffit pas : Android exige que l'utilisateur
-      autorise AEGIS dans Paramètres > Applications spéciales >
+      autorise AEGIS dans ParamÃ¨tres > Applications spÃ©ciales >
       Installer des applis inconnues. Sans autorisation utilisateur,
-      l'Intent est refusé silencieusement (aucune exception levée,
-      aucun log système évident).
+      l'Intent est refusÃ© silencieusement (aucune exception levÃ©e,
+      aucun log systÃ¨me Ã©vident).
     -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
@@ -68,7 +70,7 @@
 
     <!--
       Wi-Fi Direct est optionnel : certains devices bas de gamme ne
-      l'ont pas. L'app doit démarrer en mode dégradé (BLE + Tor).
+      l'ont pas. L'app doit dÃ©marrer en mode dÃ©gradÃ© (BLE + Tor).
     -->
     <uses-feature
         android:name="android.hardware.wifi.direct"
@@ -80,7 +82,7 @@
         android:required="true" />
 
     <!--
-      C17 FIX (2026-09-23) — Auto Backup Android DESACTIVE.
+      C17 FIX (2026-09-23) â€” Auto Backup Android DESACTIVE.
       allowBackup="false" + fullBackupContent + dataExtractionRules
     -->
     <application
@@ -110,24 +112,24 @@
 
         <!--
           ================================================================
-          P0-A.8b (2026-10-19) — FileProvider pour l'updater (Q25)
+          P0-A.8b (2026-10-19) â€” FileProvider pour l'updater (Q25)
           ================================================================
-          Expose de façon minimale le sous-répertoire cacheDir/updates/
+          Expose de faÃ§on minimale le sous-rÃ©pertoire cacheDir/updates/
           via un content:// URI. Obligatoire depuis API 24 (Android 7.0)
-          pour transmettre un fichier à l'installateur système sans
+          pour transmettre un fichier Ã  l'installateur systÃ¨me sans
           FileUriExposedException.
 
           - exported="false" : aucune autre app ne peut invoquer le
-            provider directement (défense "Dirty Stream").
+            provider directement (dÃ©fense "Dirty Stream").
           - grantUriPermissions="true" : permet d'accorder au runtime
-            FLAG_GRANT_READ_URI_PERMISSION pour la durée de l'Intent.
+            FLAG_GRANT_READ_URI_PERMISSION pour la durÃ©e de l'Intent.
           - authority ${applicationId}.updater.fileprovider : doit
-            matcher EXACTEMENT la valeur passée côté Kotlin via
+            matcher EXACTEMENT la valeur passÃ©e cÃ´tÃ© Kotlin via
             "${activity.packageName}.updater.fileprovider"
             (AegisUpdater.kt::launchInstaller).
 
           Le scope (res/xml/file_paths.xml) n'expose QUE
-          cacheDir/updates/, jamais l'intégralité du cacheDir.
+          cacheDir/updates/, jamais l'intÃ©gralitÃ© du cacheDir.
         -->
         <provider
             android:name="androidx.core.content.FileProvider"
