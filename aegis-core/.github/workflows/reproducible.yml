@@ -201,8 +201,11 @@ jobs:
       - name: Build & Execute Valgrind on polymorphic_ram
         run: |
           cd aegis-core
-          cargo test --lib polymorphic --no-run
-          BIN=$(find target/debug/deps -maxdepth 1 -type f -executable -name "aegis_core-*" | head -n 1)
+          BIN=$(cargo test --lib polymorphic --no-run --message-format=json | sed -n 's/.*"executable":"\([^"]*\)".*/\1/p' | head -n 1)
+          if [ -z "$BIN" ]; then
+            BIN=$(find target/debug -type f -executable -name "aegis_core-*" ! -name "*.so" | head -n 1)
+          fi
+          echo "Valgrind target binary: $BIN"
           [ -n "$BIN" ] || exit 1
           valgrind --error-exitcode=1 --leak-check=full --show-leak-kinds=definite --track-origins=yes --errors-for-leak-kinds=definite "$BIN" polymorphic --test-threads=1
 
