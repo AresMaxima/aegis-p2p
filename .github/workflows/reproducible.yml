@@ -236,6 +236,61 @@ jobs:
           cd aegis-core
           cargo audit
 
+  build-apk:
+    name: Build Hardened Flutter APK (ARM64 v3.6)
+    runs-on: ubuntu-latest
+    needs: jni-symbols-verification
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Verified ARM64 .so Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: libaegis_core-arm64-v8a
+          path: /tmp/verified-so/
+      - name: Inject Verified libaegis_core.so into jniLibs
+        run: |
+          SO=$(find /tmp/verified-so -name "libaegis_core.so" | head -n 1)
+          mkdir -p aegis_app/android/app/src/main/jniLibs/arm64-v8a
+          cp "$SO" aegis_app/android/app/src/main/jniLibs/arm64-v8a/libaegis_core.so
+          sha256sum aegis_app/android/app/src/main/jniLibs/arm64-v8a/libaegis_core.so
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.29.0"
+          channel: stable
+      - name: Configure Release Keystore in RAM (/dev/shm)
+        env:
+          KS_B64: ${{ secrets.AEGIS_KEYSTORE_BASE64 }}
+          KS_ALIAS: ${{ secrets.AEGIS_KEY_ALIAS }}
+          KS_KEY_PASS: ${{ secrets.AEGIS_KEY_PASSWORD }}
+          KS_STORE_PASS: ${{ secrets.AEGIS_STORE_PASSWORD }}
+        run: |
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > /dev/shm/aegis-release.jks
+            printf "storePassword=%s\nkeyPassword=%s\nkeyAlias=%s\nstoreFile=/dev/shm/aegis-release.jks\n" "$KS_STORE_PASS" "$KS_KEY_PASS" "$KS_ALIAS" > aegis_app/android/key.properties
+          fi
+      - name: Build & Verify aegis-v3.6.apk
+        run: |
+          cd aegis_app
+          flutter pub get
+          flutter analyze --no-pub
+          flutter build apk --release --target-platform android-arm64
+          cp build/app/outputs/flutter-apk/app-release.apk ../aegis-v3.6.apk
+          rm -f /dev/shm/aegis-release.jks android/key.properties
+          sha256sum ../aegis-v3.6.apk | tee ../aegis-v3.6.apk.sha256
+      - name: Upload Signed APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aegis-v3.6-apk-arm64
+          path: |
+            aegis-v3.6.apk
+            aegis-v3.6.apk.sha256
+          if-no-files-found: error
+          retention-days: 90
+
   slsa-unforgeable-attestation:
     name: SLSA Build Provenance Seal (Zero Editor Trust)
     runs-on: ubuntu-latest
@@ -244,21 +299,25 @@ jobs:
       - miri-audit
       - build-android
       - jni-symbols-verification
+      - build-apk
       - linux-mmap-proof
       - tpm-and-mesh-proof
     steps:
-      - name: Download Verified ARM64 .so Artifact
+      - name: Download Verified .so & APK Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: libaegis_core-arm64-v8a
           path: verified_release/
-      - name: Find Binary & Display Immutable SHA-256
-        id: locate
+          pattern: "{libaegis_core-arm64-v8a,aegis-v3.6-apk-arm64}"
+          merge-multiple: true
+      - name: Locate Artifacts & Display Immutable SHA-256
         run: |
-          SO_PATH=$(find verified_release -name "libaegis_core.so" | head -n 1)
-          echo "so_path=$SO_PATH" >> "$GITHUB_OUTPUT"
-          sha256sum "$SO_PATH"
-      - name: Sign Unforgeable SLSA Provenance in Public Sigstore Rekor Log
+          mkdir -p slsa_subjects
+          cp "$(find verified_release -name "libaegis_core.so" | head -n 1)" slsa_subjects/libaegis_core.so
+          cp "$(find verified_release -name "aegis-v3.6.apk" | head -n 1)" slsa_subjects/aegis-v3.6.apk
+          sha256sum slsa_subjects/*
+      - name: Sign Unforgeable SLSA Provenance (APK + .so) in Sigstore Rekor
         uses: actions/attest-build-provenance@v1
         with:
-          subject-path: ${{ steps.locate.outputs.so_path }}
+          subject-path: |
+            slsa_subjects/aegis-v3.6.apk
+            slsa_subjects/libaegis_core.so
