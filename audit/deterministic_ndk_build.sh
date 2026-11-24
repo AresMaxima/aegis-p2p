@@ -3,7 +3,7 @@ set -euo pipefail
 TC="${1:-1.100.0}"; ROOT="$(pwd)"; RUP="$(command -v rustup)"
 rm -rf /tmp/aegis-repro /tmp/aegis-rustup /tmp/aegis-chome /tmp/aegis-tmp /tmp/aegis-tools
 mkdir -p /tmp/aegis-repro /tmp/aegis-rustup /tmp/aegis-chome /tmp/aegis-tmp /tmp/aegis-tools/bin
-git archive HEAD | tar -x -C /tmp/aegis-repro
+git -c safe.directory="$ROOT" archive HEAD | tar -x -C /tmp/aegis-repro
 RUSTUP_HOME=/tmp/aegis-rustup CARGO_HOME=/tmp/aegis-chome "$RUP" toolchain install "$TC" --target aarch64-linux-android --profile minimal
 SYS="/tmp/aegis-rustup/toolchains/${TC}-x86_64-unknown-linux-gnu"
 curl -L -sSf https://github.com/cargo-bins/cargo-binstall/releases/latest/download/cargo-binstall-x86_64-unknown-linux-musl.tgz | tar -xz -C /tmp/aegis-tools/bin
