@@ -173,7 +173,7 @@ class _V36TacticalSheetState extends State<V36TacticalSheet> {
                   trailing: OutlinedButton(
                     onPressed: () {
                       final ep = V36HardeningBridge.runSpqrPcsEpochSelfCheck();
-                      setState(() => _statusBanner = ep > 0 ? 'C95 PCS VALIDE : Epoque ML-KEM # scellee !' : 'C95 Erreur : ');
+                      setState(() => _statusBanner = ep > 0 ? 'C95 PCS VALIDE : Epoque ML-KEM #$ep scellee !' : 'C95 Erreur : $ep');
                     },
                     child: const Text('Rotater', style: TextStyle(color: Colors.purpleAccent, fontSize: 12)),
                   ),
@@ -189,7 +189,7 @@ class _V36TacticalSheetState extends State<V36TacticalSheet> {
                   trailing: OutlinedButton(
                     onPressed: () {
                       final n = V36HardeningBridge.testStealthMasqueRoundtrip();
-                      setState(() => _statusBanner = n > 512 ? 'C96 ACTIF : Capsule H3 (fuzz_stealth_dpi B + GREASE) verifiee !' : 'C96 Erreur : fuzz_stealth_dpi');
+                      setState(() => _statusBanner = n > 512 ? 'C96 ACTIF : Capsule H3 ($n B + GREASE) verifiee !' : 'C96 Erreur : $n');
                     },
                     child: const Text('Sonder', style: TextStyle(color: Colors.orangeAccent, fontSize: 12)),
                   ),

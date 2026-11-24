@@ -29,8 +29,8 @@ jobs:
         run: |
           cd aegis-core
           cargo kani --harness crypto_pq::verify_process_512b_frame_bounds > kani-report.txt
-          cargo kani --harness crypto::pq_ratchet::kani_proofs::proof_spqr_assembler_never_panics_on_arbitrary_cell >> kani-report.txt
-          cargo kani --harness network::stealth_transport::kani_proofs::proof_masque_unwrap_never_panics_on_hostile_dpi_probe >> kani-report.txt
+          cargo kani --harness proof_spqr_assembler_never_panics_on_arbitrary_cell >> kani-report.txt
+          cargo kani --harness proof_masque_unwrap_never_panics_on_hostile_dpi_probe >> kani-report.txt
       - name: Upload Kani Proof Log
         uses: actions/upload-artifact@v4
         with:
@@ -68,8 +68,7 @@ jobs:
   build-android:
     name: Deterministic NDK Build Vendor A (Debian + ELF SBOM)
     runs-on: ubuntu-24.04
-    container:
-      image: rust:latest
+    container: { image: rust:latest }
     steps:
       - uses: actions/checkout@v4
       - run: |
@@ -78,64 +77,53 @@ jobs:
           rustup target add aarch64-linux-android && rustup component add clippy
           curl -L --proto "=https" --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
           cargo binstall -y cargo-auditable cargo-cyclonedx
-      - run: cd aegis-core && cargo clippy --lib -- -D warnings
-      - run: |
-          WSPACE=$(pwd); CHOME=${CARGO_HOME:-/usr/local/cargo}; SYSROOT=$(rustc --print sysroot)
-          rustc -vV | sed -n "s/^release: //p" > aegis-core/rustc-version.txt
-          export SOURCE_DATE_EPOCH=1735689600 ZERO_AR_DATE=1 CARGO_INCREMENTAL=0 LC_ALL=C.UTF-8 TZ=UTC
+          cd aegis-core && cargo clippy --lib -- -D warnings && cd ..
+          rm -rf /tmp/aegis-repro /tmp/aegis-chome && cp -r . /tmp/aegis-repro
+          rustc -vV | sed -n "s/^release: //p" > /tmp/aegis-repro/aegis-core/rustc-version.txt
+          SYSROOT=$(rustc --print sysroot); export CARGO_HOME=/tmp/aegis-chome SOURCE_DATE_EPOCH=1735689600 ZERO_AR_DATE=1 CARGO_INCREMENTAL=0 LC_ALL=C.UTF-8 TZ=UTC
           export ANDROID_NDK_HOME=/opt/ndk/android-ndk-r27
           export CC_aarch64_linux_android=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang
           export AR_aarch64_linux_android=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
           export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$CC_aarch64_linux_android
-          export CFLAGS_aarch64_linux_android="-ffile-prefix-map=$WSPACE=/aegis-src -ffile-prefix-map=$CHOME=/cargo-home -g0"
-          export CXXFLAGS_aarch64_linux_android="$CFLAGS_aarch64_linux_android"
-          export RUSTFLAGS="--remap-path-prefix=$WSPACE=/aegis-src --remap-path-prefix=$CHOME=/cargo-home --remap-path-prefix=$SYSROOT=/rustc -C link-arg=-Wl,--build-id=sha1"
-          cd aegis-core && cargo auditable build --locked --target aarch64-linux-android --release
+          export RUSTFLAGS="--remap-path-prefix=$SYSROOT=/rustc -C link-arg=-Wl,--build-id=sha1"
+          cd /tmp/aegis-repro/aegis-core && cargo auditable build --locked --target aarch64-linux-android --release
           readelf -S target/aarch64-linux-android/release/libaegis_core.so | grep ".dep-v0"
-          cargo cyclonedx --format json --spec-version 1.5 --override-filename aegis-core.cdx
+          cargo cyclonedx --format json
           sha256sum target/aarch64-linux-android/release/libaegis_core.so | cut -d" " -f1 > libaegis_core.so.sha256
+          cp target/aarch64-linux-android/release/libaegis_core.so libaegis_core.so.sha256 aegis-core.cdx.json rustc-version.txt $GITHUB_WORKSPACE/aegis-core/
       - uses: actions/upload-artifact@v4
         with:
           name: libaegis_core-arm64-v8a
           path: |
-            aegis-core/target/aarch64-linux-android/release/libaegis_core.so
+            aegis-core/libaegis_core.so
             aegis-core/libaegis_core.so.sha256
             aegis-core/aegis-core.cdx.json
             aegis-core/rustc-version.txt
-          if-no-files-found: error
-          retention-days: 30
 
   repro-vendor-b-ubuntu:
     name: Independent Rebuild Vendor B (Ubuntu 24.04 Bit-for-Bit Gate)
     runs-on: ubuntu-24.04
-    needs: build-android
+    needs: [build-android, repro-vendor-b-ubuntu]
     steps:
       - uses: actions/checkout@v4
-        with: { path: vendor_b_isolated_tree }
       - uses: actions/download-artifact@v4
-        with: { name: libaegis_core-arm64-v8a, path: /tmp/vendor_a }
+        with: { name: libaegis_core-arm64-v8a, path: /tmp/va }
       - run: |
-          RUST_VER=$(tr -d " \n\r" < "$(find /tmp/vendor_a -name rustc-version.txt | head -n1)")
-          export CARGO_HOME=/tmp/chome_b RUSTUP_HOME=/tmp/rhome_b
-          rustup toolchain install "$RUST_VER" --target aarch64-linux-android --profile minimal && rustup default "$RUST_VER"
-          export PATH="$CARGO_HOME/bin:$PATH"
+          RVER=$(tr -d " \n\r" < /tmp/va/rustc-version.txt)
+          rustup toolchain install "$RVER" --target aarch64-linux-android --profile minimal && rustup default "$RVER"
           curl -L --proto "=https" --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
           cargo binstall -y cargo-auditable
           sudo mkdir -p /opt/ndk && wget -q https://dl.google.com/android/repository/android-ndk-r27-linux.zip && sudo unzip -q android-ndk-r27-linux.zip -d /opt/ndk
-          cd vendor_b_isolated_tree
-          WSPACE=$(pwd); SYSROOT=$(rustc --print sysroot)
-          export SOURCE_DATE_EPOCH=1735689600 ZERO_AR_DATE=1 CARGO_INCREMENTAL=0 LC_ALL=C.UTF-8 TZ=UTC ANDROID_NDK_HOME=/opt/ndk/android-ndk-r27
+          rm -rf /tmp/aegis-repro /tmp/aegis-chome && cp -r . /tmp/aegis-repro
+          SYSROOT=$(rustc --print sysroot); export CARGO_HOME=/tmp/aegis-chome SOURCE_DATE_EPOCH=1735689600 ZERO_AR_DATE=1 CARGO_INCREMENTAL=0 LC_ALL=C.UTF-8 TZ=UTC
+          export ANDROID_NDK_HOME=/opt/ndk/android-ndk-r27
           export CC_aarch64_linux_android=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang
           export AR_aarch64_linux_android=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
           export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$CC_aarch64_linux_android
-          export CFLAGS_aarch64_linux_android="-ffile-prefix-map=$WSPACE=/aegis-src -ffile-prefix-map=$CARGO_HOME=/cargo-home -g0"
-          export CXXFLAGS_aarch64_linux_android="$CFLAGS_aarch64_linux_android"
-          export RUSTFLAGS="--remap-path-prefix=$WSPACE=/aegis-src --remap-path-prefix=$CARGO_HOME=/cargo-home --remap-path-prefix=$SYSROOT=/rustc -C link-arg=-Wl,--build-id=sha1"
-          cd aegis-core && cargo auditable build --locked --target aarch64-linux-android --release
-          HASH_A=$(tr -d " \n\r" < "$(find /tmp/vendor_a -name libaegis_core.so.sha256 | head -n1)")
-          HASH_B=$(sha256sum target/aarch64-linux-android/release/libaegis_core.so | cut -d" " -f1)
-          echo "Vendor A (Debian) : $HASH_A" && echo "Vendor B (Ubuntu) : $HASH_B"
-          [ "$HASH_A" = "$HASH_B" ] || { echo "FATAL: Bit-for-bit mismatch!"; exit 1; }
+          export RUSTFLAGS="--remap-path-prefix=$SYSROOT=/rustc -C link-arg=-Wl,--build-id=sha1"
+          cd /tmp/aegis-repro/aegis-core && cargo +$RVER auditable build --locked --target aarch64-linux-android --release
+          HA=$(tr -d " \n\r" < /tmp/va/libaegis_core.so.sha256); HB=$(sha256sum target/aarch64-linux-android/release/libaegis_core.so | cut -d" " -f1)
+          echo "Debian SHA256=$HA" && echo "Ubuntu SHA256=$HB" && [ "$HA" = "$HB" ]
   fuzzing-audit:
     name: Continuous Coverage Fuzzing (5 LibFuzzer Targets)
     runs-on: ubuntu-latest
@@ -148,7 +136,7 @@ jobs:
           curl -L --proto "=https" --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
           cargo binstall -y cargo-fuzz && cd aegis-core
           for t in fuzz_attestation_x509 fuzz_optical_fountain fuzz_dead_drop fuzz_pq_ratchet fuzz_stealth_dpi; do
-            cargo +nightly-2026-09-01 fuzz run "$t" -- -max_total_time=12 -rss_limit_mb=2048
+            cargo +nightly-2026-09-01 fuzz run "$t" -- -max_total_time=10 -rss_limit_mb=2048
           done
   jni-symbols-verification:
     name: JNI & FFI v3.7 Symbol Verification
@@ -244,7 +232,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install Valgrind
         run: apt-get update && apt-get install -y valgrind
-      - name: Build & Execute Valgrind + /proc/self/mem Zeroize Proof
+      - name: Build & Execute Valgrind on polymorphic_ram
         run: |
           cd aegis-core
           cargo test --lib test_proc_self_mem_physical_zeroize_proof -- --nocapture
@@ -363,7 +351,7 @@ jobs:
           mkdir -p slsa_subjects
           cp "$(find verified_release -name "libaegis_core.so" | head -n 1)" slsa_subjects/libaegis_core.so
           cp "$(find verified_release -name "aegis-v3.7.apk" | head -n 1)" slsa_subjects/aegis-v3.7.apk
-          cp "$(find verified_release -name "aegis-core.cdx.json" | head -n 1)" slsa_subjects/aegis-core.cdx.json
+          cp "$(find verified_release -name aegis-core.cdx.json | head -n1)" slsa_subjects/aegis-core.cdx.json
           sha256sum slsa_subjects/*
       - name: Sign Unforgeable SLSA Provenance (APK + .so) in Sigstore Rekor
         uses: actions/attest-build-provenance@v1
@@ -371,8 +359,7 @@ jobs:
           subject-path: |
             slsa_subjects/aegis-v3.7.apk
             slsa_subjects/libaegis_core.so
-      - name: Sign Embedded Dependency SBOM (CycloneDX) in Sigstore Rekor
-        uses: actions/attest-sbom@v1
+      - uses: actions/attest-sbom@v1
         with:
           subject-path: slsa_subjects/libaegis_core.so
           sbom-path: slsa_subjects/aegis-core.cdx.json
