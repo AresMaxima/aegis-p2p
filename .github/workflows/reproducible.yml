@@ -82,7 +82,7 @@ jobs:
           curl -L --proto "=https" --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
           cargo binstall -y cargo-auditable cargo-cyclonedx
           cd aegis-core && cargo clippy --lib -- -D warnings && cd ..
-          rm -rf /tmp/aegis-repro /tmp/aegis-chome /tmp/aegis-home /tmp/aegis-tmp && mkdir -p /tmp/aegis-home /tmp/aegis-tmp && cp -r . /tmp/aegis-repro && export HOME=/tmp/aegis-home TMPDIR=/tmp/aegis-tmp NUM_JOBS=1
+          rm -rf /tmp/aegis-repro /tmp/aegis-chome /tmp/aegis-tmp && mkdir -p /tmp/aegis-tmp && cp -r . /tmp/aegis-repro && export TMPDIR=/tmp/aegis-tmp NUM_JOBS=1
           rustc -vV | sed -n "s/^release: //p" > /tmp/aegis-repro/aegis-core/rustc-version.txt
           SYSROOT=$(rustc --print sysroot); export CARGO_HOME=/tmp/aegis-chome SOURCE_DATE_EPOCH=1735689600 ZERO_AR_DATE=1 CARGO_INCREMENTAL=0 LC_ALL=C.UTF-8 TZ=UTC
           export ANDROID_NDK_HOME=/opt/ndk/android-ndk-r27
@@ -117,12 +117,12 @@ jobs:
       - uses: actions/download-artifact@v4
         with: { name: libaegis_core-arm64-v8a, path: /tmp/va }
       - run: |
-          RVER=$(tr -d " \n\r" < /tmp/va/rustc-version.txt)
+          RVER=$(tr -d " \n\r" < /tmp/va/rustc-version.txt); export RUSTUP_TOOLCHAIN="$RVER"
           rustup toolchain install "$RVER" --target aarch64-linux-android --profile minimal && rustup default "$RVER"
           curl -L --proto "=https" --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
           cargo binstall -y cargo-auditable
           sudo mkdir -p /opt/ndk && wget -q https://dl.google.com/android/repository/android-ndk-r27-linux.zip && sudo unzip -q android-ndk-r27-linux.zip -d /opt/ndk
-          rm -rf /tmp/aegis-repro /tmp/aegis-chome /tmp/aegis-home /tmp/aegis-tmp && mkdir -p /tmp/aegis-home /tmp/aegis-tmp && cp -r . /tmp/aegis-repro && export HOME=/tmp/aegis-home TMPDIR=/tmp/aegis-tmp NUM_JOBS=1
+          rm -rf /tmp/aegis-repro /tmp/aegis-chome /tmp/aegis-tmp && mkdir -p /tmp/aegis-tmp && cp -r . /tmp/aegis-repro && export TMPDIR=/tmp/aegis-tmp NUM_JOBS=1
           SYSROOT=$(rustc --print sysroot); export CARGO_HOME=/tmp/aegis-chome SOURCE_DATE_EPOCH=1735689600 ZERO_AR_DATE=1 CARGO_INCREMENTAL=0 LC_ALL=C.UTF-8 TZ=UTC
           export ANDROID_NDK_HOME=/opt/ndk/android-ndk-r27
           export CC_aarch64_linux_android=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang
