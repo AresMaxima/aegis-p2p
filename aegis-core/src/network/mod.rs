@@ -1,3 +1,4 @@
+pub mod stealth_transport;
 pub mod encrypted_transport;
 pub mod ble_mesh;
 pub mod ble_mesh_frame;

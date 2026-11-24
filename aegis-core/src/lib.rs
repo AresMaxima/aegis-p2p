@@ -1,74 +1,74 @@
 //! aegis-core/src/lib.rs
-//! Point d'EntrÃƒÆ’Ã‚Â©e FFI/JNI et Enregistrement des Modules Natifs (CdCM v2.2-RC3).
+//! Point d'EntrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e FFI/JNI et Enregistrement des Modules Natifs (CdCM v2.2-RC3).
 //!
 //! =========================================================================
-//! CONTRAT DE SÃƒÆ’Ã¢â‚¬Â°CURITÃƒÆ’Ã¢â‚¬Â° FFI ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â AEGIS CORE (Mil-Spec)
+//! CONTRAT DE SÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°CURITÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â° FFI ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â AEGIS CORE (Mil-Spec)
 //! =========================================================================
 //!
-//! Ce document dÃƒÆ’Ã‚Â©finit le contrat de sÃƒÆ’Ã‚Â©curitÃƒÆ’Ã‚Â© commun ÃƒÆ’Ã‚Â  **toutes les fonctions
-//! `pub unsafe extern "C"` et `pub unsafe extern "system"`** exposÃƒÆ’Ã‚Â©es par ce
+//! Ce document dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©finit le contrat de sÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©curitÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â© commun ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  **toutes les fonctions
+//! `pub unsafe extern "C"` et `pub unsafe extern "system"`** exposÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es par ce
 //! crate et ses sous-modules (`network/ble_handshake.rs`, `network/ble_mesh.rs`,
 //! `network/ble_mesh_reader.rs`, `viewer/stream_pipe.rs`). Chaque wrapper
-//! adhÃƒÆ’Ã‚Â¨re dÃƒÆ’Ã‚Â©fensivement ÃƒÆ’Ã‚Â  ce contrat ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â voir le code de chaque fonction pour
-//! les vÃƒÆ’Ã‚Â©rifications effectives.
+//! adhÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨re dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©fensivement ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  ce contrat ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â voir le code de chaque fonction pour
+//! les vÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rifications effectives.
 //!
-//! ## 1. Pointeurs (rÃƒÆ’Ã‚Â¨gle universelle)
+//! ## 1. Pointeurs (rÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨gle universelle)
 //! - `*const T` / `*mut T` : jamais `null` sauf mention contraire explicite.
-//!   Chaque wrapper vÃƒÆ’Ã‚Â©rifie `ptr.is_null()` avant tout dÃƒÆ’Ã‚Â©rÃƒÆ’Ã‚Â©fÃƒÆ’Ã‚Â©rencement et
-//!   retourne un code d'erreur documentÃƒÆ’Ã‚Â© si le contrat est violÃƒÆ’Ã‚Â©.
+//!   Chaque wrapper vÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rifie `ptr.is_null()` avant tout dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©fÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rencement et
+//!   retourne un code d'erreur documentÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â© si le contrat est violÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©.
 //! - Alignement : `align_of::<T>()`. Les `*const u8` / `*mut u8` n'ont pas
 //!   de contrainte d'alignement (1 octet).
-//! - DurÃƒÆ’Ã‚Â©e de vie : tout pointeur d'entrÃƒÆ’Ã‚Â©e doit rester valide pendant l'appel.
-//!   AEGIS ne conserve AUCUN pointeur aprÃƒÆ’Ã‚Â¨s retour (pas de dangling possible).
+//! - DurÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e de vie : tout pointeur d'entrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e doit rester valide pendant l'appel.
+//!   AEGIS ne conserve AUCUN pointeur aprÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨s retour (pas de dangling possible).
 //!
-//! ## 2. ChaÃƒÆ’Ã‚Â®nes C (`*const c_char`)
+//! ## 2. ChaÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â®nes C (`*const c_char`)
 //! - Encodage **UTF-8 strict** (jamais Latin-1 ni Windows-1252).
 //! - Null-terminated obligatoire. AEGIS retourne `-2` si l'UTF-8 est invalide.
 //!
 //! ## 3. Buffers de sortie
-//! - Toute fonction qui ÃƒÆ’Ã‚Â©crit dans un buffer **documente sa taille minimale**
-//!   dans sa doc spÃƒÆ’Ã‚Â©cifique (`MAX_MANIFEST_BYTES`, `MAX_SIG_BYTES`, tailles
+//! - Toute fonction qui ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©crit dans un buffer **documente sa taille minimale**
+//!   dans sa doc spÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©cifique (`MAX_MANIFEST_BYTES`, `MAX_SIG_BYTES`, tailles
 //!   fixes 32/64 octets, etc.).
-//! - Buffer trop petit = comportement indÃƒÆ’Ã‚Â©fini (ÃƒÆ’Ã‚Â©crasement mÃƒÆ’Ã‚Â©moire). AEGIS ne
-//!   peut pas dÃƒÆ’Ã‚Â©tecter cette erreur a posteriori : la responsabilitÃƒÆ’Ã‚Â© est sur
-//!   l'appelant. Les tailles EFFECTIVES ÃƒÆ’Ã‚Â©crites sont retournÃƒÆ’Ã‚Â©es via `*mut usize`.
+//! - Buffer trop petit = comportement indÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©fini (ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©crasement mÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©moire). AEGIS ne
+//!   peut pas dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©tecter cette erreur a posteriori : la responsabilitÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â© est sur
+//!   l'appelant. Les tailles EFFECTIVES ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©crites sont retournÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es via `*mut usize`.
 //!
-//! ## 4. Ownership et libÃƒÆ’Ã‚Â©ration
-//! - EntrÃƒÆ’Ã‚Â©es : AEGIS n'assume jamais l'ownership, l'appelant libÃƒÆ’Ã‚Â¨re.
+//! ## 4. Ownership et libÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©ration
+//! - EntrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es : AEGIS n'assume jamais l'ownership, l'appelant libÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨re.
 //! - Sorties `*mut c_char` (ex: `aegis_stegano_drown_payload`) : ownership
-//!   transfÃƒÆ’Ã‚Â©rÃƒÆ’Ã‚Â©. L'appelant **doit** appeler `aegis_free_string()` pour libÃƒÆ’Ã‚Â©rer
+//!   transfÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©. L'appelant **doit** appeler `aegis_free_string()` pour libÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rer
 //!   (via `CString::from_raw`, jamais `free()` C).
 //!
 //! ## 5. Thread safety
 //! - Toutes les fonctions sont **thread-safe sauf mention contraire**.
-//! - ÃƒÆ’Ã¢â‚¬Â°tats globaux (`JAVA_VM`, `MAIN_ACTIVITY`, `WIFI_DIRECT_FD`,
-//!   `TOR_STRONGBOX_AVAILABLE`) protÃƒÆ’Ã‚Â©gÃƒÆ’Ã‚Â©s par `Atomic*` ou `OnceLock`.
-//! - **Aucune fonction FFI n'est rÃƒÆ’Ã‚Â©entrante en cas de panic interne** : le
-//!   crate est compilÃƒÆ’Ã‚Â© avec `panic = "abort"` (profil release), donc tout
-//!   panic tue le process sans unwind ÃƒÆ’Ã‚Â  travers la frontiÃƒÆ’Ã‚Â¨re FFI.
+//! - ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°tats globaux (`JAVA_VM`, `MAIN_ACTIVITY`, `WIFI_DIRECT_FD`,
+//!   `TOR_STRONGBOX_AVAILABLE`) protÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©gÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©s par `Atomic*` ou `OnceLock`.
+//! - **Aucune fonction FFI n'est rÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©entrante en cas de panic interne** : le
+//!   crate est compilÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â© avec `panic = "abort"` (profil release), donc tout
+//!   panic tue le process sans unwind ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  travers la frontiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨re FFI.
 //!
 //! ## 6. Codes de retour
-//! - `0` = succÃƒÆ’Ã‚Â¨s.
-//! - `< 0` = erreur (valeur documentÃƒÆ’Ã‚Â©e par fonction).
-//! - `1` / `2` = succÃƒÆ’Ã‚Â¨s avec variante (ex: `aegis_vault_unlock` ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ 0 Real, 1 Decoy, 2 NeedsInit).
-//! - `-1` gÃƒÆ’Ã‚Â©nÃƒÆ’Ã‚Â©rique = pointeur NULL ou argument invalide.
+//! - `0` = succÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨s.
+//! - `< 0` = erreur (valeur documentÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e par fonction).
+//! - `1` / `2` = succÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨s avec variante (ex: `aegis_vault_unlock` ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ 0 Real, 1 Decoy, 2 NeedsInit).
+//! - `-1` gÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©nÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rique = pointeur NULL ou argument invalide.
 //!
 //! ## 7. Comportement en cas de violation critique
 //! Certaines fonctions (`aegis_verify_apk_signature_or_burn`,
 //! `aegisPanicSilentBurn`, `Java_..._verify_1attestation_1chain` en statut
-//! critique) dÃƒÆ’Ã‚Â©clenchent `panic_purge()` ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ `exit(137)`. C'est **intentionnel** :
-//! la RAM est dÃƒÆ’Ã‚Â©truite et le processus meurt immÃƒÆ’Ã‚Â©diatement. Aucun retour.
+//! critique) dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©clenchent `panic_purge()` ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ `exit(137)`. C'est **intentionnel** :
+//! la RAM est dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©truite et le processus meurt immÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©diatement. Aucun retour.
 //!
 //! ## 8. Wrappers JNI (`Java_com_aresmaxima_aegis_*`)
-//! - Signature imposÃƒÆ’Ã‚Â©e par JNI : `(JNIEnv, JObject, ...args) -> jint`.
+//! - Signature imposÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e par JNI : `(JNIEnv, JObject, ...args) -> jint`.
 //! - `env` / `_this` garantis valides par le runtime Android.
-//! - Arguments JNI (`JString`, `JByteArray`, `JByteBuffer`) validÃƒÆ’Ã‚Â©s par le
-//!   crate `jni` ; `exception_clear()` appelÃƒÆ’Ã‚Â© en cas d'erreur pour ne pas
+//! - Arguments JNI (`JString`, `JByteArray`, `JByteBuffer`) validÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©s par le
+//!   crate `jni` ; `exception_clear()` appelÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â© en cas d'erreur pour ne pas
 //!   propager d'exception Java.
 //!
-//! ## RÃƒÆ’Ã‚Â©fÃƒÆ’Ã‚Â©rences
+//! ## RÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©fÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rences
 //! - Rust FFI Omnibus : <https://jakegoulding.com/rust-ffi-omnibus/>
-//! - Rustonomicon Ãƒâ€šÃ‚Â§FFI : <https://doc.rust-lang.org/nomicon/ffi.html>
+//! - Rustonomicon ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§FFI : <https://doc.rust-lang.org/nomicon/ffi.html>
 //! - Android JNI Tips : <https://developer.android.com/training/articles/perf-jni>
 //!
 //! =========================================================================
@@ -76,13 +76,13 @@
 #![allow(unused_imports, dead_code, unused_variables)]
 
 // =========================================================================
-// Configuration Clippy ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â AEGIS (Mil-Spec)
+// Configuration Clippy ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â AEGIS (Mil-Spec)
 //
 // Politique :
-//   ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ SECURITY & SAFETY : -D warnings (les lints de sÃƒÆ’Ã‚Â©curitÃƒÆ’Ã‚Â© bloquent).
-//   ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ ÃƒÂ¢Ã…Â¡Ã‚Âª STYLE : allow-list documentÃƒÆ’Ã‚Â©e ci-dessous (aucun impact sÃƒÆ’Ã‚Â©curitÃƒÆ’Ã‚Â©).
+//   ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ SECURITY & SAFETY : -D warnings (les lints de sÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©curitÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â© bloquent).
+//   ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Âª STYLE : allow-list documentÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e ci-dessous (aucun impact sÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©curitÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©).
 //
-// Toute exception est auditÃƒÆ’Ã‚Â©e trimestriellement.
+// Toute exception est auditÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e trimestriellement.
 // =========================================================================
 #![allow(clippy::needless_lifetimes)]
 #![allow(clippy::needless_range_loop)]
@@ -106,11 +106,11 @@
 #![allow(clippy::useless_vec)]
 #![allow(clippy::missing_const_for_thread_local)]
 #![allow(clippy::manual_unwrap_or)]
-// Documentation FFI : le contrat de sÃƒÆ’Ã‚Â©curitÃƒÆ’Ã‚Â© global est dÃƒÆ’Ã‚Â©fini en tÃƒÆ’Ã‚Âªte de
-// crate (voir "Contrat de SÃƒÆ’Ã‚Â©curitÃƒÆ’Ã‚Â© FFI ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â AEGIS Core"). Les 43 wrappers FFI
-// y adhÃƒÆ’Ã‚Â¨rent dÃƒÆ’Ã‚Â©fensivement (validation `is_null`, bornes, encodage UTF-8).
-// Le lint per-fonction est dÃƒÆ’Ã‚Â©sactivÃƒÆ’Ã‚Â© car la doc est centralisÃƒÆ’Ã‚Â©e et maintenue
-// comme une seule source de vÃƒÆ’Ã‚Â©ritÃƒÆ’Ã‚Â© ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â dÃƒÆ’Ã‚Â©cision architecturale documentÃƒÆ’Ã‚Â©e.
+// Documentation FFI : le contrat de sÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©curitÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â© global est dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©fini en tÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âªte de
+// crate (voir "Contrat de SÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©curitÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â© FFI ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â AEGIS Core"). Les 43 wrappers FFI
+// y adhÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨rent dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©fensivement (validation `is_null`, bornes, encodage UTF-8).
+// Le lint per-fonction est dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©sactivÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â© car la doc est centralisÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e et maintenue
+// comme une seule source de vÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©ritÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â© ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©cision architecturale documentÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e.
 #![allow(clippy::missing_safety_doc)]
 
 use std::ffi::{CStr, CString};
@@ -172,7 +172,7 @@ pub const ADMIN_PUBLIC_KEY_BYTES: [u8; 32] = [
 ];
 
 // =========================================================================
-// ÃƒÆ’Ã¢â‚¬Â°TAT GLOBAL JNI
+// ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°TAT GLOBAL JNI
 // =========================================================================
 
 static JAVA_VM: OnceLock<JavaVM> = OnceLock::new();
@@ -184,9 +184,9 @@ static MAIN_ACTIVITY: OnceLock<GlobalRef> = OnceLock::new();
 
 /// # Safety
 ///
-/// AppelÃƒÆ’Ã‚Â©e uniquement par le runtime Android (JNI).
-/// `vm` doit ÃƒÆ’Ã‚Âªtre un pointeur valide vers un `JavaVM`.
-/// `_reserved` doit ÃƒÆ’Ã‚Âªtre NULL.
+/// AppelÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e uniquement par le runtime Android (JNI).
+/// `vm` doit ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âªtre un pointeur valide vers un `JavaVM`.
+/// `_reserved` doit ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âªtre NULL.
 #[no_mangle]
 pub unsafe extern "system" fn JNI_OnLoad(
     vm: *mut jni::sys::JavaVM,
@@ -195,8 +195,8 @@ pub unsafe extern "system" fn JNI_OnLoad(
     ffi_security::init_native_security();
     secure_buffer::init_secure_buffer_system();
 
-    // Ancres runtime (empÃƒÆ’Ã‚Âªchent --gc-sections d'ÃƒÆ’Ã‚Â©liminer les symboles
-    // FFI non rÃƒÆ’Ã‚Â©fÃƒÆ’Ã‚Â©rencÃƒÆ’Ã‚Â©s dans le crate).
+    // Ancres runtime (empÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âªchent --gc-sections d'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©liminer les symboles
+    // FFI non rÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©fÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rencÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©s dans le crate).
     _anchor_vault_ffi();
     _anchor_wifi_direct_ffi();
     _anchor_updater_ffi();
@@ -232,20 +232,20 @@ pub unsafe extern "system" fn Java_com_aresmaxima_aegis_MainActivity_aegisRegist
     match env.new_global_ref(activity) {
         Ok(global) => {
             if MAIN_ACTIVITY.set(global).is_err() {
-                eprintln!("AEGIS: MainActivity dÃƒÆ’Ã‚Â©jÃƒÆ’Ã‚Â  enregistrÃƒÆ’Ã‚Â©e, on garde l'ancienne");
+                eprintln!("AEGIS: MainActivity dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©jÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  enregistrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e, on garde l'ancienne");
             } else {
-                eprintln!("AEGIS: MainActivity enregistrÃƒÆ’Ã‚Â©e avec succÃƒÆ’Ã‚Â¨s");
+                eprintln!("AEGIS: MainActivity enregistrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e avec succÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨s");
             }
         }
         Err(e) => {
             let _ = env.exception_clear();
-            eprintln!("AEGIS: new_global_ref a ÃƒÆ’Ã‚Â©chouÃƒÆ’Ã‚Â©: {}", e);
+            eprintln!("AEGIS: new_global_ref a ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©chouÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©: {}", e);
         }
     }
 }
 
 // =========================================================================
-// CAPTURE CAMÃƒÆ’Ã¢â‚¬Â°RA ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â DÃƒÆ’Ã¢â‚¬Â°LÃƒÆ’Ã¢â‚¬Â°GUÃƒÆ’Ã¢â‚¬Â°E ÃƒÆ’Ã¢â€šÂ¬ KOTLIN VIA JNI
+// CAPTURE CAMÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°RA ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â DÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°LÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°GUÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°E ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ KOTLIN VIA JNI
 // =========================================================================
 
 #[no_mangle]
@@ -253,7 +253,7 @@ pub unsafe extern "C" fn aegis_capture_ndk_camera() -> i32 {
     let jvm = match JAVA_VM.get() {
         Some(jvm) => jvm,
         None => {
-            eprintln!("AEGIS: JNI_OnLoad n'a pas initialisÃƒÆ’Ã‚Â© JAVA_VM");
+            eprintln!("AEGIS: JNI_OnLoad n'a pas initialisÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â© JAVA_VM");
             return -1;
         }
     };
@@ -261,7 +261,7 @@ pub unsafe extern "C" fn aegis_capture_ndk_camera() -> i32 {
     let activity = match MAIN_ACTIVITY.get() {
         Some(a) => a,
         None => {
-            eprintln!("AEGIS: MainActivity non enregistrÃƒÆ’Ã‚Â©e.");
+            eprintln!("AEGIS: MainActivity non enregistrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e.");
             return -2;
         }
     };
@@ -269,7 +269,7 @@ pub unsafe extern "C" fn aegis_capture_ndk_camera() -> i32 {
     let mut env = match jvm.attach_current_thread_as_daemon() {
         Ok(env) => env,
         Err(e) => {
-            eprintln!("AEGIS: attach_current_thread_as_daemon a ÃƒÆ’Ã‚Â©chouÃƒÆ’Ã‚Â©: {}", e);
+            eprintln!("AEGIS: attach_current_thread_as_daemon a ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©chouÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©: {}", e);
             return -3;
         }
     };
@@ -287,7 +287,7 @@ pub unsafe extern "C" fn aegis_capture_ndk_camera() -> i32 {
         }
         Err(e) => {
             let _ = env.exception_clear();
-            eprintln!("AEGIS: appel aegisStartHardwareCapture a ÃƒÆ’Ã‚Â©chouÃƒÆ’Ã‚Â©: {}", e);
+            eprintln!("AEGIS: appel aegisStartHardwareCapture a ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©chouÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©: {}", e);
             -5
         }
     }
@@ -312,7 +312,7 @@ pub extern "C" fn aegis_tor_strongbox_available() -> i32 {
 }
 
 // =========================================================================
-// P0-A.2b.1 : IdentitÃƒÆ’Ã‚Â© ed25519 P2P
+// P0-A.2b.1 : IdentitÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â© ed25519 P2P
 // =========================================================================
 
 static EXTERNAL_NFC_TOKEN_SECRET: std::sync::Mutex<Option<[u8; 32]>> = std::sync::Mutex::new(None);
@@ -552,7 +552,7 @@ pub extern "C" fn aegis_wifi_direct_close_fd() -> i32 {
 }
 
 // =========================================================================
-// C64 FIX ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Wrappers JNI pour WifiDirectBridge.kt
+// C64 FIX ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Wrappers JNI pour WifiDirectBridge.kt
 // =========================================================================
 
 #[no_mangle]
@@ -590,8 +590,8 @@ pub unsafe extern "C" fn aegis_set_hardware_secret(secret_ptr: *const u8, secret
 
 /// # Safety
 ///
-/// `apk_sha256_ptr` doit pointer vers une chaÃƒÆ’Ã‚Â®ne C valide (UTF-8, null-terminated).
-/// Si le pointeur est NULL ou la chaÃƒÆ’Ã‚Â®ne invalide, l'appel dÃƒÆ’Ã‚Â©clenche un `panic_purge` (kill process).
+/// `apk_sha256_ptr` doit pointer vers une chaÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â®ne C valide (UTF-8, null-terminated).
+/// Si le pointeur est NULL ou la chaÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â®ne invalide, l'appel dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©clenche un `panic_purge` (kill process).
 #[no_mangle]
 pub unsafe extern "C" fn aegis_verify_apk_signature_or_burn(apk_sha256_ptr: *const c_char) {
     if apk_sha256_ptr.is_null() {
@@ -605,7 +605,7 @@ pub unsafe extern "C" fn aegis_verify_apk_signature_or_burn(apk_sha256_ptr: *con
 
 /// # Safety
 ///
-/// `license_ptr` doit pointer vers une chaÃƒÆ’Ã‚Â®ne C valide (hex-encoded, null-terminated).
+/// `license_ptr` doit pointer vers une chaÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â®ne C valide (hex-encoded, null-terminated).
 /// Retourne 0 si la licence est valide, <0 sinon.
 #[no_mangle]
 pub unsafe extern "C" fn aegis_verify_license_key(license_ptr: *const c_char) -> i32 {
@@ -657,11 +657,11 @@ pub unsafe extern "C" fn aegis_verify_license_key(license_ptr: *const c_char) ->
 
 /// # Safety
 ///
-/// VÃƒÆ’Ã‚Â©rifie une licence liÃƒÆ’Ã‚Â©e ÃƒÆ’Ã‚Â  un appareil spÃƒÆ’Ã‚Â©cifique.
+/// VÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rifie une licence liÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  un appareil spÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©cifique.
 ///
-/// Format licence : `CMD-XXX:FINGERPRINT_HEX:SIGNATURE_HEX` (encodÃƒÆ’Ã‚Â© en hex global).
-/// Signature ed25519 vÃƒÆ’Ã‚Â©rifiÃƒÆ’Ã‚Â©e sur `LICENSE:v1:CMD-XXX:FINGERPRINT_HEX`.
-/// `device_fingerprint_ptr` doit pointer vers une chaÃƒÆ’Ã‚Â®ne C valide (64 chars hex).
+/// Format licence : `CMD-XXX:FINGERPRINT_HEX:SIGNATURE_HEX` (encodÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â© en hex global).
+/// Signature ed25519 vÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rifiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e sur `LICENSE:v1:CMD-XXX:FINGERPRINT_HEX`.
+/// `device_fingerprint_ptr` doit pointer vers une chaÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â®ne C valide (64 chars hex).
 /// Retourne 0 si signature valide ET fingerprint match, <0 sinon.
 #[no_mangle]
 pub unsafe extern "C" fn aegis_verify_license_key_bound(
@@ -715,7 +715,7 @@ pub unsafe extern "C" fn aegis_verify_license_key_bound(
         return -11;
     }
 
-    // 5. VÃƒÆ’Ã‚Â©rifier signature ed25519 sur LICENSE:v1:CMD:FINGERPRINT
+    // 5. VÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rifier signature ed25519 sur LICENSE:v1:CMD:FINGERPRINT
     let verifying_key = match VerifyingKey::from_bytes(&ADMIN_PUBLIC_KEY_BYTES) {
         Ok(vk) => vk,
         Err(_) => return -8,
@@ -856,7 +856,7 @@ pub unsafe extern "C" fn aegis_send_p2p_tor(
                 if let Err(e) =
                     crate::network::tor::AegisTorClient::bootstrap(&target, &path).await
                 {
-                    eprintln!("AEGIS_FATAL: ÃƒÆ’Ã¢â‚¬Â°chec tunnel Tor vers {} ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â {}", target, e);
+                    eprintln!("AEGIS_FATAL: ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°chec tunnel Tor vers {} ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â {}", target, e);
                 }
             });
         }
@@ -865,7 +865,7 @@ pub unsafe extern "C" fn aegis_send_p2p_tor(
 }
 
 // =========================================================================
-// WRAPPERS JNI ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â MainActivity
+// WRAPPERS JNI ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â MainActivity
 // =========================================================================
 
 #[no_mangle]
@@ -954,7 +954,7 @@ pub unsafe extern "system" fn Java_com_aresmaxima_aegis_MainActivity_aegis_1cont
 }
 
 // =========================================================================
-// WRAPPERS JNI ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â ProtectedConfirmation
+// WRAPPERS JNI ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ProtectedConfirmation
 // =========================================================================
 
 #[no_mangle]
@@ -966,7 +966,7 @@ pub unsafe extern "system" fn Java_com_aresmaxima_aegis_ProtectedConfirmation_ae
 }
 
 // =========================================================================
-// WRAPPER JNI ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Master Key derivation
+// WRAPPER JNI ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Master Key derivation
 // =========================================================================
 
 #[no_mangle]
@@ -979,21 +979,21 @@ pub unsafe extern "system" fn Java_com_aresmaxima_aegis_MainActivity_aegis_1deri
         Ok(s) => s.into(),
         Err(e) => {
             let _ = env.exception_clear();
-            eprintln!("AEGIS-MASTER: get_string(pin) a ÃƒÆ’Ã‚Â©chouÃƒÆ’Ã‚Â©: {}", e);
+            eprintln!("AEGIS-MASTER: get_string(pin) a ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©chouÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©: {}", e);
             return -1;
         }
     };
 
     match crate::keystore::HardwareKeystore::derive_master_key(&pin_str) {
         Ok(_) => {
-            eprintln!("AEGIS-MASTER: master_key dÃƒÆ’Ã‚Â©rivÃƒÆ’Ã‚Â©e (HKDF-SHA256)");
+            eprintln!("AEGIS-MASTER: master_key dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rivÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e (HKDF-SHA256)");
             0
         }
         Err(msg) => {
-            eprintln!("AEGIS-MASTER: derive_master_key refusÃƒÆ’Ã‚Â©: {}", msg);
+            eprintln!("AEGIS-MASTER: derive_master_key refusÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©: {}", msg);
             if msg.contains("vide") {
                 -2
-            } else if msg.contains("non initialisÃƒÆ’Ã‚Â©e") {
+            } else if msg.contains("non initialisÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e") {
                 -3
             } else {
                 -4
@@ -1003,7 +1003,7 @@ pub unsafe extern "system" fn Java_com_aresmaxima_aegis_MainActivity_aegis_1deri
 }
 
 // =========================================================================
-// WRAPPER JNI ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Android Key Attestation
+// WRAPPER JNI ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Android Key Attestation
 // =========================================================================
 
 #[no_mangle]
@@ -1017,7 +1017,7 @@ pub unsafe extern "system" fn Java_com_aresmaxima_aegis_MainActivity_aegis_1veri
         Ok(v) => v,
         Err(e) => {
             let _ = env.exception_clear();
-            eprintln!("AEGIS-ATTEST: convert_byte_array(chain) a ÃƒÆ’Ã‚Â©chouÃƒÆ’Ã‚Â©: {}", e);
+            eprintln!("AEGIS-ATTEST: convert_byte_array(chain) a ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©chouÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©: {}", e);
             return -100;
         }
     };
@@ -1026,7 +1026,7 @@ pub unsafe extern "system" fn Java_com_aresmaxima_aegis_MainActivity_aegis_1veri
         Ok(v) => v,
         Err(e) => {
             let _ = env.exception_clear();
-            eprintln!("AEGIS-ATTEST: convert_byte_array(challenge) a ÃƒÆ’Ã‚Â©chouÃƒÆ’Ã‚Â©: {}", e);
+            eprintln!("AEGIS-ATTEST: convert_byte_array(challenge) a ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©chouÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©: {}", e);
             return -101;
         }
     };
@@ -1048,7 +1048,7 @@ pub unsafe extern "system" fn Java_com_aresmaxima_aegis_MainActivity_aegis_1veri
     );
 
         if status.is_critical() {
-        eprintln!("AEGIS-ATTEST: COMPROMISSION CRITIQUE ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â PanicPurge dÃƒÆ’Ã‚Â©clenchÃƒÆ’Ã‚Â©");
+        eprintln!("AEGIS-ATTEST: COMPROMISSION CRITIQUE ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â PanicPurge dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©clenchÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©");
         crate::panic::panic_purge();
     }
 
@@ -1056,7 +1056,7 @@ pub unsafe extern "system" fn Java_com_aresmaxima_aegis_MainActivity_aegis_1veri
 }
 
 // =========================================================================
-// WRAPPERS FFI ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Vault Persistence
+// WRAPPERS FFI ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Vault Persistence
 // =========================================================================
 
 #[no_mangle]
@@ -1072,7 +1072,7 @@ pub unsafe extern "C" fn aegis_vault_set_dir(path_ptr: *const c_char) -> i32 {
     match crate::vault_persistence::set_vault_dir(std::path::PathBuf::from(path_str)) {
         Ok(_) => 0,
         Err(e) => {
-            eprintln!("AEGIS-VAULT: set_vault_dir a ÃƒÆ’Ã‚Â©chouÃƒÆ’Ã‚Â©: {}", e);
+            eprintln!("AEGIS-VAULT: set_vault_dir a ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©chouÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©: {}", e);
             -3
         }
     }
@@ -1100,7 +1100,7 @@ pub unsafe extern "C" fn aegis_vault_init(pin_ptr: *const c_char) -> i32 {
     match crate::vault_persistence::vault_init(pin) {
         Ok(_) => 0,
         Err(e) => {
-            eprintln!("AEGIS-VAULT: vault_init a ÃƒÆ’Ã‚Â©chouÃƒÆ’Ã‚Â©: {}", e);
+            eprintln!("AEGIS-VAULT: vault_init a ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©chouÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©: {}", e);
             -3
         }
     }
@@ -1121,7 +1121,7 @@ pub unsafe extern "C" fn aegis_vault_unlock(pin_ptr: *const c_char) -> i32 {
         Ok(crate::vault_persistence::VaultSession::Decoy) => 1,
         Ok(crate::vault_persistence::VaultSession::NeedsInitialization) => 2,
         Err(e) => {
-            eprintln!("AEGIS-VAULT: vault_unlock a ÃƒÆ’Ã‚Â©chouÃƒÆ’Ã‚Â©: {}", e);
+            eprintln!("AEGIS-VAULT: vault_unlock a ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©chouÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©: {}", e);
             -1
         }
     }
@@ -1132,7 +1132,7 @@ pub unsafe extern "C" fn aegis_vault_wipe() -> i32 {
     match crate::vault_persistence::vault_wipe() {
         Ok(_) => 0,
         Err(e) => {
-            eprintln!("AEGIS-VAULT: vault_wipe a ÃƒÆ’Ã‚Â©chouÃƒÆ’Ã‚Â©: {}", e);
+            eprintln!("AEGIS-VAULT: vault_wipe a ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©chouÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©: {}", e);
             -1
         }
     }
@@ -1181,12 +1181,12 @@ fn _anchor_tor_fetch_ffi() {
 // =========================================================================
 // P10 FIX (2026-11-06) : ancre runtime pour deadman_heartbeat
 //
-// `aegis_deadman_heartbeat` est dÃƒÆ’Ã‚Â©fini dans `deadman.rs` avec
+// `aegis_deadman_heartbeat` est dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©fini dans `deadman.rs` avec
 // `#[no_mangle] pub extern "C"`, mais le linker (--gc-sections) peut
-// l'ÃƒÆ’Ã‚Â©liminer s'il n'est rÃƒÆ’Ã‚Â©fÃƒÆ’Ã‚Â©rencÃƒÆ’Ã‚Â© que par DeadMansSwitch::heartbeat()
-// (lui-mÃƒÆ’Ã‚Âªme jamais instanciÃƒÆ’Ã‚Â©). Cette ancre garantit la prÃƒÆ’Ã‚Â©sence du
+// l'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©liminer s'il n'est rÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©fÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rencÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â© que par DeadMansSwitch::heartbeat()
+// (lui-mÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âªme jamais instanciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©). Cette ancre garantit la prÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©sence du
 // symbole dans le .so final, sinon l'appel Dart dans main.dart:622
-// ÃƒÆ’Ã‚Â©choue silencieusement (catch).
+// ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©choue silencieusement (catch).
 // =========================================================================
 
 #[inline(never)]
@@ -1198,7 +1198,7 @@ fn _anchor_deadman_ffi() {
 
 
 // =========================================================================
-// P0-A.8a ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â FFI de vÃƒÆ’Ã‚Â©rification cryptographique des mises ÃƒÆ’Ã‚Â  jour
+// P0-A.8a ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â FFI de vÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rification cryptographique des mises ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  jour
 // =========================================================================
 
 #[no_mangle]
@@ -1231,7 +1231,7 @@ pub unsafe extern "C" fn aegis_verify_update_signature(
 }
 
 // =========================================================================
-// C82 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â FFI fetch manifest via Tor (HTTP-over-Tor, Approche A)
+// C82 ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â FFI fetch manifest via Tor (HTTP-over-Tor, Approche A)
 // =========================================================================
 
 pub const MANIFEST_ONION_HOST: &str = "PLACEHOLDER_REPLACE_ME.onion";
@@ -1241,7 +1241,7 @@ const MAX_SIG_BYTES: usize = 64;
 
 /// # Safety
 ///
-/// `out_manifest_ptr` et `out_sig_ptr` doivent pointer vers des buffers allouÃƒÆ’Ã‚Â©s par l'appelant
+/// `out_manifest_ptr` et `out_sig_ptr` doivent pointer vers des buffers allouÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©s par l'appelant
 /// d'au moins `MAX_MANIFEST_BYTES` (64 KiB) et `MAX_SIG_BYTES` (64 B) respectivement.
 /// `out_manifest_len` et `out_sig_len` doivent pointer vers des `usize` inscriptibles.
 #[no_mangle]
@@ -1322,14 +1322,14 @@ pub unsafe extern "C" fn aegis_tor_fetch_http(
 // P10 FIX (2026-11-06) : ancre runtime pour les 3 symboles purge
 //
 // Les 3 fonctions `aegis_panic_purge`, `aegis_purge_ram_buffer` et
-// `aegis_panic_silent_burn` sont dÃƒÆ’Ã‚Â©finies dans `panic.rs` (avec
+// `aegis_panic_silent_burn` sont dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©finies dans `panic.rs` (avec
 // `#[no_mangle] pub extern "C"`). Le linker --gc-sections peut les
-// ÃƒÆ’Ã‚Â©liminer du .so si elles ne sont rÃƒÆ’Ã‚Â©fÃƒÆ’Ã‚Â©rencÃƒÆ’Ã‚Â©es que depuis Dart via
-// lookup dynamique (pas de rÃƒÆ’Ã‚Â©fÃƒÆ’Ã‚Â©rence statique dans le crate).
+// ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©liminer du .so si elles ne sont rÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©fÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rencÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es que depuis Dart via
+// lookup dynamique (pas de rÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©fÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rence statique dans le crate).
 //
-// Cette ancre garantit leur prÃƒÆ’Ã‚Â©sence dans le .so final ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â sans elle,
-// le bouton "PURGE D'URGENCE" de main.dart ÃƒÆ’Ã‚Â©choue silencieusement
-// (3 lookup en cascade ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ catch ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ rien ne se passe).
+// Cette ancre garantit leur prÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©sence dans le .so final ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â sans elle,
+// le bouton "PURGE D'URGENCE" de main.dart ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©choue silencieusement
+// (3 lookup en cascade ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ catch ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ rien ne se passe).
 // =========================================================================
 
 #[inline(never)]
@@ -1342,7 +1342,7 @@ fn _anchor_panic_purge_ffi() {
 }
 
 // =========================================================================
-// P0-A.2b.1 : Tests de l'identitÃƒÆ’Ã‚Â© ed25519
+// P0-A.2b.1 : Tests de l'identitÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â© ed25519
 // =========================================================================
 
 #[cfg(test)]
@@ -1361,7 +1361,7 @@ mod ed25519_identity_tests {
         let _ = HardwareKeystore::wipe_all();
     }
 
-    /// DÃƒÆ’Ã‚Â©terminisme : mÃƒÆ’Ã‚Âªme master_key ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ mÃƒÆ’Ã‚Âªme clÃƒÆ’Ã‚Â© ed25519.
+    /// DÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©terminisme : mÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âªme master_key ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ mÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âªme clÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â© ed25519.
     #[test]
     fn test_ed25519_identity_derivation_is_deterministic() {
         let _g = TEST_LOCK.lock().unwrap();
@@ -1373,13 +1373,13 @@ mod ed25519_identity_tests {
         assert_eq!(
             k1.verifying_key().as_bytes(),
             k2.verifying_key().as_bytes(),
-            "mÃƒÆ’Ã‚Âªme master_key ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ mÃƒÆ’Ã‚Âªme clÃƒÆ’Ã‚Â© ed25519"
+            "mÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âªme master_key ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ mÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âªme clÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â© ed25519"
         );
 
         teardown();
     }
 
-    /// Isolation par PIN : PIN-A ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ clÃƒÆ’Ã‚Â© A, PIN-B ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ clÃƒÆ’Ã‚Â© B.
+    /// Isolation par PIN : PIN-A ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ clÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â© A, PIN-B ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ clÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â© B.
     #[test]
     fn test_ed25519_identity_differs_per_master_key() {
         let _g = TEST_LOCK.lock().unwrap();
@@ -1396,7 +1396,7 @@ mod ed25519_identity_tests {
         assert_ne!(
             k_a.verifying_key().as_bytes(),
             k_b.verifying_key().as_bytes(),
-            "PIN diffÃƒÆ’Ã‚Â©rents ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ clÃƒÆ’Ã‚Â©s ed25519 diffÃƒÆ’Ã‚Â©rentes"
+            "PIN diffÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rents ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ clÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©s ed25519 diffÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rentes"
         );
 
         teardown();
@@ -1418,7 +1418,7 @@ mod ed25519_identity_tests {
         teardown();
     }
 
-    /// Une signature valide ÃƒÆ’Ã‚Â©choue contre une mauvaise pubkey.
+    /// Une signature valide ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©choue contre une mauvaise pubkey.
     #[test]
     fn test_ed25519_verify_rejects_wrong_pubkey() {
         let _g = TEST_LOCK.lock().unwrap();
@@ -1433,13 +1433,13 @@ mod ed25519_identity_tests {
 
         assert!(
             other_pub.verify(challenge, &signature).is_err(),
-            "signature valide contre mauvaise pubkey doit ÃƒÆ’Ã‚Â©chouer"
+            "signature valide contre mauvaise pubkey doit ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©chouer"
         );
 
         teardown();
     }
 
-    /// Sans master_key ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ erreur (fail-closed).
+    /// Sans master_key ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ erreur (fail-closed).
     #[test]
     fn test_ed25519_identity_requires_master_key() {
         let _g = TEST_LOCK.lock().unwrap();
@@ -1457,7 +1457,7 @@ mod ed25519_identity_tests {
 }
 
 // =========================================================================
-// C93 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Tests de la FFI de licence (sÃƒÆ’Ã‚Â©paration de domaine)
+// C93 ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Tests de la FFI de licence (sÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©paration de domaine)
 // =========================================================================
 
 #[cfg(test)]
@@ -1482,7 +1482,7 @@ mod license_ffi_tests {
         hex::encode(inner.as_bytes())
     }
 
-    /// VÃƒÆ’Ã‚Â©rifie que la logique de domaine cÃƒÆ’Ã‚Â´tÃƒÆ’Ã‚Â© Rust est correcte.
+    /// VÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rifie que la logique de domaine cÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´tÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â© Rust est correcte.
     #[test]
     fn test_license_domain_separation() {
         let (sk, pk) = generate_test_keypair();
@@ -1505,7 +1505,7 @@ mod license_ffi_tests {
     }
 
     /// Une signature faite avec le domaine MANIFEST:v1: ne doit PAS valider
-    /// une licence (sÃƒÆ’Ã‚Â©paration de domaine).
+    /// une licence (sÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©paration de domaine).
     #[test]
     fn test_license_rejects_manifest_domain() {
         let (sk, pk) = generate_test_keypair();
@@ -1543,7 +1543,7 @@ mod license_ffi_tests {
 }
 
 // =========================================================================
-// AEGIS v3.6 Ã¢â‚¬â€ WRAPPERS FFI C90, C91, C92, C93, C94
+// AEGIS v3.6 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â WRAPPERS FFI C90, C91, C92, C93, C94
 // =========================================================================
 
 #[no_mangle]
@@ -1671,10 +1671,10 @@ pub extern "C" fn aegis_v36_wipe_ephemeral_buffers() -> i32 {
     0
 }
 
-/// C93 : Collecte destructive (Read-Once) des enveloppes Dead-Drop pour une clé publique Ed25519
-/// et une heure epoch donnée (`unix_ts / 3600`).
-/// Format binaire retourné dans `out_buf_ptr` : répétition de `[u32_be_len | ciphertext_bytes]`.
-/// Retourne le nombre d'enveloppes collectées (`>= 0`), `-4` si `out_buf_cap` est trop petit, ou `< 0` sur erreur.
+/// C93 : Collecte destructive (Read-Once) des enveloppes Dead-Drop pour une clÃ© publique Ed25519
+/// et une heure epoch donnÃ©e (`unix_ts / 3600`).
+/// Format binaire retournÃ© dans `out_buf_ptr` : rÃ©pÃ©tition de `[u32_be_len | ciphertext_bytes]`.
+/// Retourne le nombre d'enveloppes collectÃ©es (`>= 0`), `-4` si `out_buf_cap` est trop petit, ou `< 0` sur erreur.
 #[no_mangle]
 pub unsafe extern "C" fn aegis_deaddrop_collect_and_burn(
     recipient_ed25519_pk_ptr: *const u8,
@@ -1705,7 +1705,7 @@ pub unsafe extern "C" fn aegis_deaddrop_collect_and_burn(
         required = required.saturating_add(4).saturating_add(env.len());
     }
     if required > out_buf_cap {
-        // Ré-insère les enveloppes pour ne pas les perdre si le buffer appelant était trop petit
+        // RÃ©-insÃ¨re les enveloppes pour ne pas les perdre si le buffer appelant Ã©tait trop petit
         for env in envelopes {
             let _ = store.deposit(tag, env);
         }
@@ -1730,8 +1730,8 @@ pub unsafe extern "C" fn aegis_deaddrop_collect_and_burn(
     count
 }
 
-/// C92 : Encode un payload chiffré en flux de gouttes optiques Fountain QR (JSON Array de chaînes Base64).
-/// L'appelant DOIT libérer le pointeur retourné avec `aegis_free_string()`.
+/// C92 : Encode un payload chiffrÃ© en flux de gouttes optiques Fountain QR (JSON Array de chaÃ®nes Base64).
+/// L'appelant DOIT libÃ©rer le pointeur retournÃ© avec `aegis_free_string()`.
 #[no_mangle]
 pub unsafe extern "C" fn aegis_optical_encode_json(
     transfer_id_4_ptr: *const u8,
@@ -1762,12 +1762,12 @@ pub unsafe extern "C" fn aegis_optical_encode_json(
     }
 }
 
-/// C92 : Ingère un QR Code Base64 scanné par la caméra (Mode Avion 0-RF).
+/// C92 : IngÃ¨re un QR Code Base64 scannÃ© par la camÃ©ra (Mode Avion 0-RF).
 /// Retourne :
-///   `0` = goutte valide ingérée, transfert encore en cours.
-///   `1` = transfert 100 % reconstruit, copié dans `out_buf_ptr` (`*out_len_ptr` mis à jour) et purgé de la RAM.
+///   `0` = goutte valide ingÃ©rÃ©e, transfert encore en cours.
+///   `1` = transfert 100 % reconstruit, copiÃ© dans `out_buf_ptr` (`*out_len_ptr` mis Ã  jour) et purgÃ© de la RAM.
 ///   `-4` = reconstruit mais `out_buf_cap` insuffisant (`*out_len_ptr` indique la taille requise).
-///   `< 0` = erreur de décodage ou CRC invalide.
+///   `< 0` = erreur de dÃ©codage ou CRC invalide.
 #[no_mangle]
 pub unsafe extern "C" fn aegis_optical_ingest_droplet(
     b64_droplet_ptr: *const c_char,
@@ -1913,3 +1913,5 @@ mod v36_ffi_tests {
         assert_eq!(&out[4..4 + item_len], env);
     }
 }
+pub mod ffi_v37;
+pub use ffi_v37::*;

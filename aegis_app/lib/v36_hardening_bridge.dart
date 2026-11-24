@@ -90,7 +90,16 @@ typedef _WipeV36D = int Function();
 typedef _EdPubkeyC = Int32 Function(Pointer<Uint8> outPk32Ptr);
 typedef _EdPubkeyD = int Function(Pointer<Uint8> outPk32Ptr);
 
+typedef _SpqrCheckC = Int32 Function();
+typedef _SpqrCheckD = int Function();
+typedef _StealthWrapC = Int32 Function(Pointer<Uint8> k, Pointer<Uint8> c, Pointer<Uint8> o, IntPtr cap, Pointer<IntPtr> w);
+typedef _StealthWrapD = int Function(Pointer<Uint8> k, Pointer<Uint8> c, Pointer<Uint8> o, int cap, Pointer<IntPtr> w);
+typedef _StealthUnwrapC = Int32 Function(Pointer<Uint8> k, Pointer<Uint8> w, IntPtr wlen, Pointer<Uint8> out512);
+typedef _StealthUnwrapD = int Function(Pointer<Uint8> k, Pointer<Uint8> w, int wlen, Pointer<Uint8> out512);
+
 class V36HardeningBridge {
+  static final ValueNotifier<bool> stealthMasqueActive = ValueNotifier<bool>(false);
+  static final ValueNotifier<int> spqrEpochCount = ValueNotifier<int>(0);
   V36HardeningBridge._();
 
   static const MethodChannel _keystoreChannel = MethodChannel('com.aegis/keystore');
@@ -349,5 +358,33 @@ class V36HardeningBridge {
       final fn = _lib.lookupFunction<_WipeV36C, _WipeV36D>('aegis_v36_wipe_ephemeral_buffers');
       fn();
     } catch (_) {}
+  }
+  /// C95 : Execute un re-encapsulage ML-KEM-1024 continu (4x512B) et verifie l'aveuglement PCS.
+  static int runSpqrPcsEpochSelfCheck() {
+    try {
+      final fn = _lib.lookupFunction<_SpqrCheckC, _SpqrCheckD>('aegis_spqr_run_pcs_epoch_selfcheck');
+      final rc = fn();
+      if (rc > 0) spqrEpochCount.value = spqrEpochCount.value + 1;
+      return rc;
+    } catch (_) { return -99; }
+  }
+
+  /// C96 : Encapsule/desencapsule une cellule 512B en capsule HTTP/3 MASQUE + GREASE anti-DPI.
+  static int testStealthMasqueRoundtrip() {
+    final k = calloc<Uint8>(32); final c = calloc<Uint8>(512);
+    final o = calloc<Uint8>(768); final r = calloc<Uint8>(512); final w = calloc<IntPtr>(1);
+    try {
+      final rng = Random.secure();
+      for (int i = 0; i < 32; i++) { k[i] = rng.nextInt(256); }
+      for (int i = 0; i < 512; i++) { c[i] = rng.nextInt(256); }
+      final wrap = _lib.lookupFunction<_StealthWrapC, _StealthWrapD>('aegis_stealth_wrap_h3_cell');
+      final unwrap = _lib.lookupFunction<_StealthUnwrapC, _StealthUnwrapD>('aegis_stealth_unwrap_h3_cell');
+      if (wrap(k, c, o, 768, w) != 0) return -1;
+      if (unwrap(k, o, w.value, r) != 0) return -2;
+      for (int i = 0; i < 512; i++) { if (c[i] != r[i]) return -3; }
+      return w.value;
+    } catch (_) { return -99; } finally {
+      calloc.free(k); calloc.free(c); calloc.free(o); calloc.free(r); calloc.free(w);
+    }
   }
 }

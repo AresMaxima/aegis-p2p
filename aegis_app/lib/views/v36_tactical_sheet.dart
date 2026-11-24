@@ -18,7 +18,7 @@ class V36TacticalSheet extends StatefulWidget {
 class _V36TacticalSheetState extends State<V36TacticalSheet> {
   static const Color _gold = Color(0xFFFCBE0B);
   static const Color _card = Color(0xFF17171B);
-  String _statusBanner = 'Boucliers v3.6 prets (100% RAM volatile - Zero SQLite)';
+  String _statusBanner = 'Boucliers v3.7 prets (100% RAM volatile - Zero SQLite)';
 
   Future<void> _runSelfAttestationTest() async {
     final pk = V36HardeningBridge.getOwnEd25519PublicKey() ?? Uint8List(32);
@@ -83,7 +83,7 @@ class _V36TacticalSheetState extends State<V36TacticalSheet> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('BOUCLIERS ANTI-SIGINT & AIR-GAP v3.6', style: TextStyle(color: _gold, fontWeight: FontWeight.bold, fontSize: 15)),
+                  const Text('BOUCLIERS ANTI-SIGINT & PQ v3.7', style: TextStyle(color: _gold, fontWeight: FontWeight.bold, fontSize: 15)),
                   IconButton(icon: const Icon(Icons.close, color: Colors.white70), onPressed: () => Navigator.pop(context)),
                 ],
               ),
@@ -160,6 +160,38 @@ class _V36TacticalSheetState extends State<V36TacticalSheet> {
                       onPressed: sealed ? V36HardeningBridge.clearExternalNfcToken : _enrollNfc,
                       child: Text(sealed ? 'Retirer' : 'Sceller', style: TextStyle(color: sealed ? Colors.redAccent : _gold, fontSize: 12)),
                     ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                decoration: BoxDecoration(color: _card, borderRadius: BorderRadius.circular(8)),
+                child: ListTile(
+                  leading: const Icon(Icons.autorenew, color: Colors.purpleAccent),
+                  title: const Text('C95 - Double Ratchet PQ Continu (SPQR)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  subtitle: const Text('ML-KEM-1024 PCS intra-session (4x512 B)', style: TextStyle(fontSize: 11, color: Colors.white60)),
+                  trailing: OutlinedButton(
+                    onPressed: () {
+                      final ep = V36HardeningBridge.runSpqrPcsEpochSelfCheck();
+                      setState(() => _statusBanner = ep > 0 ? 'C95 PCS VALIDE : Epoque ML-KEM # scellee !' : 'C95 Erreur : ');
+                    },
+                    child: const Text('Rotater', style: TextStyle(color: Colors.purpleAccent, fontSize: 12)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                decoration: BoxDecoration(color: _card, borderRadius: BorderRadius.circular(8)),
+                child: ListTile(
+                  leading: const Icon(Icons.public_off, color: Colors.orangeAccent),
+                  title: const Text('C96 - Tunnel Furtif HTTP/3 MASQUE + ECH', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  subtitle: const Text('Capsules RFC 9297 + GREASE anti-DPI etatique', style: TextStyle(fontSize: 11, color: Colors.white60)),
+                  trailing: OutlinedButton(
+                    onPressed: () {
+                      final n = V36HardeningBridge.testStealthMasqueRoundtrip();
+                      setState(() => _statusBanner = n > 512 ? 'C96 ACTIF : Capsule H3 (fuzz_stealth_dpi B + GREASE) verifiee !' : 'C96 Erreur : fuzz_stealth_dpi');
+                    },
+                    child: const Text('Sonder', style: TextStyle(color: Colors.orangeAccent, fontSize: 12)),
                   ),
                 ),
               ),

@@ -1,18 +1,42 @@
-﻿[package]
+[package]
 name = "aegis-core-fuzz"
 version = "0.0.0"
 publish = false
 edition = "2021"
-
 [package.metadata]
 cargo-fuzz = true
-
 [dependencies]
 libfuzzer-sys = "0.4"
 aegis-core = { path = ".." }
-
+[workspace]
+members = ["."]
 [[bin]]
-name = "fuzz_ingest_frame"
-path = "fuzz_targets/fuzz_ingest_frame.rs"
+name = "fuzz_attestation_x509"
+path = "fuzz_targets/fuzz_attestation_x509.rs"
 test = false
 doc = false
+bench = false
+[[bin]]
+name = "fuzz_optical_fountain"
+path = "fuzz_targets/fuzz_optical_fountain.rs"
+test = false
+doc = false
+bench = false
+[[bin]]
+name = "fuzz_dead_drop"
+path = "fuzz_targets/fuzz_dead_drop.rs"
+test = false
+doc = false
+bench = false
+[[bin]]
+name = "fuzz_pq_ratchet"
+path = "fuzz_targets/fuzz_pq_ratchet.rs"
+test = false
+doc = false
+bench = false
+[[bin]]
+name = "fuzz_stealth_dpi"
+path = "fuzz_targets/fuzz_stealth_dpi.rs"
+test = false
+doc = false
+bench = false
