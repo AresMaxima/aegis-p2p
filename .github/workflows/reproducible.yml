@@ -76,29 +76,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: |
-          apt-get update && apt-get install -y wget unzip binutils curl
+          apt-get update && apt-get install -y wget unzip curl git
           mkdir -p /opt/ndk && wget -q https://dl.google.com/android/repository/android-ndk-r27-linux.zip && unzip -q android-ndk-r27-linux.zip -d /opt/ndk
-          rustup target add aarch64-linux-android && rustup component add clippy
-          curl -L --proto "=https" --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
-          cargo binstall -y cargo-auditable cargo-cyclonedx
-          cd aegis-core && cargo clippy --lib -- -D warnings && cd ..
-          rm -rf /tmp/aegis-repro /tmp/aegis-chome /tmp/aegis-tmp && mkdir -p /tmp/aegis-tmp && cp -r . /tmp/aegis-repro && export TMPDIR=/tmp/aegis-tmp NUM_JOBS=1
-          rustc -vV | sed -n "s/^release: //p" > /tmp/aegis-repro/aegis-core/rustc-version.txt
-          SYSROOT=$(rustc --print sysroot); export CARGO_HOME=/tmp/aegis-chome SOURCE_DATE_EPOCH=1735689600 ZERO_AR_DATE=1 CARGO_INCREMENTAL=0 LC_ALL=C.UTF-8 TZ=UTC
-          export ANDROID_NDK_HOME=/opt/ndk/android-ndk-r27
-          export CC_aarch64_linux_android=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang
-          export AR_aarch64_linux_android=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
-          export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$CC_aarch64_linux_android
-          export NDK_BIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin
-          export CFLAGS_aarch64_linux_android="-ffile-prefix-map=/tmp/aegis-repro=/src -ffile-prefix-map=/tmp/aegis-chome=/chome -ffile-prefix-map=$ANDROID_NDK_HOME=/ndk -g0 -O2"
-          export CXXFLAGS_aarch64_linux_android="$CFLAGS_aarch64_linux_android"
-          export RUSTFLAGS="--remap-path-prefix=/tmp/aegis-repro=/src --remap-path-prefix=/tmp/aegis-chome=/chome --remap-path-prefix=$SYSROOT=/rustc -C strip=none -C link-arg=-Wl,--build-id=none -C link-arg=-Wl,--hash-style=gnu -C link-arg=-Wl,--threads=1"
-          cd /tmp/aegis-repro/aegis-core && cargo auditable build --locked -j 1 --target aarch64-linux-android --release
-          $NDK_BIN/llvm-strip --strip-all --keep-section=.dep-v0 target/aarch64-linux-android/release/libaegis_core.so
-          readelf -S target/aarch64-linux-android/release/libaegis_core.so | grep ".dep-v0"
-          cargo cyclonedx --format json
-          sha256sum target/aarch64-linux-android/release/libaegis_core.so | cut -d" " -f1 > libaegis_core.so.sha256
-          cp target/aarch64-linux-android/release/libaegis_core.so libaegis_core.so.sha256 aegis-core.cdx.json rustc-version.txt $GITHUB_WORKSPACE/aegis-core/
+          rustup component add clippy
+          curl -L -sSf https://github.com/cargo-bins/cargo-binstall/releases/latest/download/cargo-binstall-x86_64-unknown-linux-musl.tgz | tar -xz -C /usr/local/cargo/bin
+          cargo binstall -y cargo-cyclonedx
+          cd aegis-core && cargo clippy --lib -- -D warnings && cargo cyclonedx --format json && cd ..
+          bash audit/deterministic_ndk_build.sh 1.100.0
       - uses: actions/upload-artifact@v4
         with:
           name: libaegis_core-arm64-v8a
@@ -106,8 +90,6 @@ jobs:
             aegis-core/libaegis_core.so
             aegis-core/libaegis_core.so.sha256
             aegis-core/aegis-core.cdx.json
-            aegis-core/rustc-version.txt
-
   repro-vendor-b-ubuntu:
     name: Independent Rebuild Vendor B (Ubuntu 24.04 Bit-for-Bit Gate)
     runs-on: ubuntu-24.04
@@ -117,25 +99,11 @@ jobs:
       - uses: actions/download-artifact@v4
         with: { name: libaegis_core-arm64-v8a, path: /tmp/va }
       - run: |
-          RVER=$(tr -d " \n\r" < /tmp/va/rustc-version.txt); export RUSTUP_TOOLCHAIN="$RVER"
-          rustup toolchain install "$RVER" --target aarch64-linux-android --profile minimal && rustup default "$RVER"
-          curl -L --proto "=https" --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
-          cargo binstall -y cargo-auditable
           sudo mkdir -p /opt/ndk && wget -q https://dl.google.com/android/repository/android-ndk-r27-linux.zip && sudo unzip -q android-ndk-r27-linux.zip -d /opt/ndk
-          rm -rf /tmp/aegis-repro /tmp/aegis-chome /tmp/aegis-tmp && mkdir -p /tmp/aegis-tmp && cp -r . /tmp/aegis-repro && export TMPDIR=/tmp/aegis-tmp NUM_JOBS=1
-          SYSROOT=$(rustc --print sysroot); export CARGO_HOME=/tmp/aegis-chome SOURCE_DATE_EPOCH=1735689600 ZERO_AR_DATE=1 CARGO_INCREMENTAL=0 LC_ALL=C.UTF-8 TZ=UTC
-          export ANDROID_NDK_HOME=/opt/ndk/android-ndk-r27
-          export CC_aarch64_linux_android=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang
-          export AR_aarch64_linux_android=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
-          export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$CC_aarch64_linux_android
-          export NDK_BIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin
-          export CFLAGS_aarch64_linux_android="-ffile-prefix-map=/tmp/aegis-repro=/src -ffile-prefix-map=/tmp/aegis-chome=/chome -ffile-prefix-map=$ANDROID_NDK_HOME=/ndk -g0 -O2"
-          export CXXFLAGS_aarch64_linux_android="$CFLAGS_aarch64_linux_android"
-          export RUSTFLAGS="--remap-path-prefix=/tmp/aegis-repro=/src --remap-path-prefix=/tmp/aegis-chome=/chome --remap-path-prefix=$SYSROOT=/rustc -C strip=none -C link-arg=-Wl,--build-id=none -C link-arg=-Wl,--hash-style=gnu -C link-arg=-Wl,--threads=1"
-          cd /tmp/aegis-repro/aegis-core && cargo +$RVER auditable build --locked -j 1 --target aarch64-linux-android --release
-          $NDK_BIN/llvm-strip --strip-all --keep-section=.dep-v0 target/aarch64-linux-android/release/libaegis_core.so
-          HA=$(tr -d " \n\r" < /tmp/va/libaegis_core.so.sha256); HB=$(sha256sum target/aarch64-linux-android/release/libaegis_core.so | cut -d" " -f1)
-          echo "Debian SHA256=$HA" && echo "Ubuntu SHA256=$HB" && if [ "$HA" != "$HB" ]; then $NDK_BIN/llvm-readelf -S /tmp/va/libaegis_core.so > /tmp/sa; $NDK_BIN/llvm-readelf -S target/aarch64-linux-android/release/libaegis_core.so > /tmp/sb; diff -u /tmp/sa /tmp/sb || true; cmp -l /tmp/va/libaegis_core.so target/aarch64-linux-android/release/libaegis_core.so | head -n 30 || true; exit 1; fi
+          bash audit/deterministic_ndk_build.sh 1.100.0
+          HA=$(tr -d " \n\r" < /tmp/va/libaegis_core.so.sha256); HB=$(tr -d " \n\r" < aegis-core/libaegis_core.so.sha256)
+          echo "Debian SHA256=$HA" && echo "Ubuntu SHA256=$HB" && [ "$HA" = "$HB" ]
+
   fuzzing-audit:
     name: Continuous Coverage Fuzzing (5 LibFuzzer Targets)
     runs-on: ubuntu-latest
