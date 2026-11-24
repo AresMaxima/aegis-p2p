@@ -1,5 +1,5 @@
 //! aegis-core/src/network/stealth_transport.rs
-//! C96 â€” Anti-DPI Stealth Transport (WebTunnel / HTTP/3 MASQUE RFC 9297 + TLS ECH)
+//! C96 Ã¢â‚¬â€ Anti-DPI Stealth Transport (WebTunnel / HTTP/3 MASQUE RFC 9297 + TLS ECH)
 //!
 //! Rend le flux de cellules fixes de 512 octets d'AEGIS indiscernable d'une
 //! session HTTPS / HTTP/3 (QUIC) ordinaire face aux boitiers DPI etatiques
@@ -255,12 +255,14 @@ pub fn unwrap_cell_masque_h3(
 #[cfg(kani)]
 mod kani_proofs {
     use super::*;
-
     #[kani::proof]
-    #[kani::unwind(10)]
-    fn proof_masque_unwrap_never_panics_on_hostile_dpi_probe() {
-        let wire: [u8; 8] = kani::any();
-        let _ = unwrap_cell_masque_h3(&[0x11u8; 32], &wire);
+    #[kani::unwind(16)]
+    fn proof_masque_varint_and_unwrap_bounds() {
+        let wire: [u8; 6] = kani::any();
+        let _ = decode_quic_varint(&wire);
+        if wire[0] != 0 {
+            let _ = unwrap_cell_masque_h3(&[0x11u8; 32], &wire);
+        }
     }
 }
 

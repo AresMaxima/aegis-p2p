@@ -29,8 +29,8 @@ jobs:
         run: |
           cd aegis-core
           cargo kani --harness crypto_pq::verify_process_512b_frame_bounds > kani-report.txt
-          cargo kani --harness proof_spqr_assembler_never_panics_on_arbitrary_cell >> kani-report.txt
-          cargo kani --harness proof_masque_unwrap_never_panics_on_hostile_dpi_probe >> kani-report.txt
+          cargo kani --harness pq_ratchet::kani_proofs::proof_spqr_assembler_never_panics_on_arbitrary_cell | tee -a kani-report.txt
+          cargo kani --harness stealth_transport::kani_proofs::proof_masque_varint_and_unwrap_bounds | tee -a kani-report.txt
       - name: Upload Kani Proof Log
         uses: actions/upload-artifact@v4
         with:
@@ -85,8 +85,12 @@ jobs:
           export CC_aarch64_linux_android=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang
           export AR_aarch64_linux_android=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
           export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$CC_aarch64_linux_android
-          export RUSTFLAGS="--remap-path-prefix=$SYSROOT=/rustc -C link-arg=-Wl,--build-id=sha1"
-          cd /tmp/aegis-repro/aegis-core && cargo auditable build --locked --target aarch64-linux-android --release
+          export NDK_BIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin
+          export CFLAGS_aarch64_linux_android="-ffile-prefix-map=/tmp/aegis-repro=/src -ffile-prefix-map=/tmp/aegis-chome=/chome -ffile-prefix-map=$ANDROID_NDK_HOME=/ndk -g0 -O2"
+          export CXXFLAGS_aarch64_linux_android="$CFLAGS_aarch64_linux_android"
+          export RUSTFLAGS="--remap-path-prefix=/tmp/aegis-repro=/src --remap-path-prefix=/tmp/aegis-chome=/chome --remap-path-prefix=$SYSROOT=/rustc -C strip=none -C link-arg=-Wl,--build-id=none -C link-arg=-Wl,--hash-style=gnu"
+          cd /tmp/aegis-repro/aegis-core && cargo auditable build --locked -j 2 --target aarch64-linux-android --release
+          $NDK_BIN/llvm-strip --strip-debug --remove-section=.comment target/aarch64-linux-android/release/libaegis_core.so
           readelf -S target/aarch64-linux-android/release/libaegis_core.so | grep ".dep-v0"
           cargo cyclonedx --format json
           sha256sum target/aarch64-linux-android/release/libaegis_core.so | cut -d" " -f1 > libaegis_core.so.sha256
@@ -120,10 +124,14 @@ jobs:
           export CC_aarch64_linux_android=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang
           export AR_aarch64_linux_android=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
           export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$CC_aarch64_linux_android
-          export RUSTFLAGS="--remap-path-prefix=$SYSROOT=/rustc -C link-arg=-Wl,--build-id=sha1"
-          cd /tmp/aegis-repro/aegis-core && cargo +$RVER auditable build --locked --target aarch64-linux-android --release
+          export NDK_BIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin
+          export CFLAGS_aarch64_linux_android="-ffile-prefix-map=/tmp/aegis-repro=/src -ffile-prefix-map=/tmp/aegis-chome=/chome -ffile-prefix-map=$ANDROID_NDK_HOME=/ndk -g0 -O2"
+          export CXXFLAGS_aarch64_linux_android="$CFLAGS_aarch64_linux_android"
+          export RUSTFLAGS="--remap-path-prefix=/tmp/aegis-repro=/src --remap-path-prefix=/tmp/aegis-chome=/chome --remap-path-prefix=$SYSROOT=/rustc -C strip=none -C link-arg=-Wl,--build-id=none -C link-arg=-Wl,--hash-style=gnu"
+          cd /tmp/aegis-repro/aegis-core && cargo +$RVER auditable build --locked -j 2 --target aarch64-linux-android --release
+          $NDK_BIN/llvm-strip --strip-debug --remove-section=.comment target/aarch64-linux-android/release/libaegis_core.so
           HA=$(tr -d " \n\r" < /tmp/va/libaegis_core.so.sha256); HB=$(sha256sum target/aarch64-linux-android/release/libaegis_core.so | cut -d" " -f1)
-          echo "Debian SHA256=$HA" && echo "Ubuntu SHA256=$HB" && [ "$HA" = "$HB" ]
+          echo "Debian SHA256=$HA" && echo "Ubuntu SHA256=$HB" && if [ "$HA" != "$HB" ]; then $NDK_BIN/llvm-readelf -S /tmp/va/libaegis_core.so > /tmp/sa; $NDK_BIN/llvm-readelf -S target/aarch64-linux-android/release/libaegis_core.so > /tmp/sb; diff -u /tmp/sa /tmp/sb || true; cmp -l /tmp/va/libaegis_core.so target/aarch64-linux-android/release/libaegis_core.so | head -n 30 || true; exit 1; fi
   fuzzing-audit:
     name: Continuous Coverage Fuzzing (5 LibFuzzer Targets)
     runs-on: ubuntu-latest
@@ -136,7 +144,7 @@ jobs:
           curl -L --proto "=https" --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
           cargo binstall -y cargo-fuzz && cd aegis-core
           for t in fuzz_attestation_x509 fuzz_optical_fountain fuzz_dead_drop fuzz_pq_ratchet fuzz_stealth_dpi; do
-            cargo +nightly-2026-09-01 fuzz run "$t" -- -max_total_time=10 -rss_limit_mb=2048
+            cargo +nightly-2026-09-01 fuzz run --target x86_64-unknown-linux-gnu "$t" -- -max_total_time=10 -rss_limit_mb=2048
           done
   jni-symbols-verification:
     name: JNI & FFI v3.7 Symbol Verification

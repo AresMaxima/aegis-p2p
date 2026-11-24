@@ -1,5 +1,5 @@
 //! aegis-core/src/crypto/pq_ratchet.rs
-//! C95 â€” Continuous Post-Quantum Double Ratchet (SPQR / ML-KEM-1024 Braid)
+//! C95 Ã¢â‚¬â€ Continuous Post-Quantum Double Ratchet (SPQR / ML-KEM-1024 Braid)
 //!
 //! Fournit la Post-Compromise Security (PCS) quantique continue a l'interieur
 //! d'une session active en melangeant periodiquement un secret partage frais
@@ -379,7 +379,7 @@ mod kani_proofs {
     use super::*;
 
     #[kani::proof]
-    #[kani::unwind(6)]
+    #[kani::unwind(16)]
     fn proof_spqr_assembler_never_panics_on_arbitrary_cell() {
         let mut cell = [0u8; CELL_BYTES];
         cell[0] = kani::any();
