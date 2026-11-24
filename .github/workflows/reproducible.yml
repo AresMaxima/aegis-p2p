@@ -103,7 +103,7 @@ jobs:
   repro-vendor-b-ubuntu:
     name: Independent Rebuild Vendor B (Ubuntu 24.04 Bit-for-Bit Gate)
     runs-on: ubuntu-24.04
-    needs: [build-android, repro-vendor-b-ubuntu]
+    needs: build-android
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
