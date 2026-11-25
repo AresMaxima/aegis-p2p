@@ -22,7 +22,7 @@ class ProtectedConfirmation(private val context: Context) {
         private const val KEY_NAME = "aegis_master_root"
     }
 
-    // Symboles Rust correspondants (à déclarer dans lib.rs) :
+    // Symboles Rust correspondants (? d?clarer dans lib.rs) :
     //   Java_com_example_aegis_1app_ProtectedConfirmation_aegisPanicSilentBurn
     external fun aegisPanicSilentBurn()
 
@@ -77,7 +77,7 @@ class ProtectedConfirmation(private val context: Context) {
         try {
             kg.init(builder.build())
             kg.generateKey()
-            Log.i(TAG, "Clé scellée dans le StrongBox.")
+            Log.i(TAG, "Cl? scell?e dans le StrongBox.")
         } catch (e: StrongBoxUnavailableException) {
             Log.w(TAG, "StrongBox indisponible, fallback TEE classique.", e)
             val fallback = KeyGenParameterSpec.Builder(
@@ -99,7 +99,7 @@ class ProtectedConfirmation(private val context: Context) {
         return if (km.isDeviceSecure) {
             km.createConfirmDeviceCredentialIntent(
                 "AEGIS Zero-Trust",
-                "Saisissez votre code PIN d'accès matériel."
+                "Saisissez votre code PIN d'acc?s mat?riel."
             )
         } else null
     }

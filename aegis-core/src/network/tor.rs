@@ -71,6 +71,7 @@ impl AegisTorClient {
             .cache_dir(CfgPath::new(cache_dir.display().to_string()));
 
         let config = config_builder.build()?;
+        let _ = rustls::crypto::ring::default_provider().install_default();
         let runtime = TokioRustlsRuntime::current()?;
 
         let client = TorClient::with_runtime(runtime)
@@ -161,6 +162,7 @@ impl TorTransport {
             .cache_dir(CfgPath::new(cache_dir.display().to_string()));
 
         let config = config_builder.build()?;
+        let _ = rustls::crypto::ring::default_provider().install_default();
         let runtime = TokioRustlsRuntime::current()?;
 
         let base_client = TorClient::with_runtime(runtime)

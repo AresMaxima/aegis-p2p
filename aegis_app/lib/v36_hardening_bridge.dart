@@ -364,7 +364,7 @@ class V36HardeningBridge {
     try {
       final fn = _lib.lookupFunction<_SpqrCheckC, _SpqrCheckD>('aegis_spqr_run_pcs_epoch_selfcheck');
       final rc = fn();
-      if (rc > 0) spqrEpochCount.value = spqrEpochCount.value + 1;
+      if (rc > 0) spqrEpochCount.value = rc;
       return rc;
     } catch (_) { return -99; }
   }

@@ -43,8 +43,8 @@ class MainActivity : FlutterActivity() {
         }
 
         // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-        // RÃ©fÃ©rence vers le PreviewView CameraX (aperÃ§u live).
-        // RenseignÃ©e par CameraPreviewView.init(), utilisÃ©e par
+        // Référence vers le PreviewView CameraX (aperçu live).
+        // Renseignée par CameraPreviewView.init(), utilisée par
         // startCameraInternal() pour lier le use case Preview.
         // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         @Volatile
@@ -66,7 +66,7 @@ class MainActivity : FlutterActivity() {
     }
 
     // =====================================================================
-    // DÃ©clarations JNI â€” Rust (lib.rs)
+    // Déclarations JNI — Rust (lib.rs)
     // =====================================================================
 
     external fun aegisRegisterMainActivity(activity: MainActivity)
@@ -81,16 +81,16 @@ class MainActivity : FlutterActivity() {
     external fun aegis_control_media_player(cmd: String, param: Double): Int
 
     // ---------------------------------------------------------------------
-    // Option 2 (audit 2026-09-20) : dÃ©rivation de la master_key via HKDF-SHA256.
-    // Combine la clÃ© StrongBox (ROOT_KEY cÃ´tÃ© Rust) et le vault PIN.
+    // Option 2 (audit 2026-09-20) : dérivation de la master_key via HKDF-SHA256.
+    // Combine la clé StrongBox (ROOT_KEY côté Rust) et le vault PIN.
     // 0 = OK, -1 = JNI, -2 = PIN vide, -3 = ROOT_KEY manquante, -4 = autre.
     // ---------------------------------------------------------------------
     external fun aegis_derive_and_set_master_key(pin: String): Int
 
     // ---------------------------------------------------------------------
-    // Niveau 3 â€” Android Key Attestation.
-    // ReÃ§oit la chaÃ®ne DER concatÃ©nÃ©e + le challenge (SHA-256 APK).
-    // Retourne 0 si OK, un code nÃ©gatif sinon (Rust purge si compromis).
+    // Niveau 3 — Android Key Attestation.
+    // Reçoit la chaîne DER concaténée + le challenge (SHA-256 APK).
+    // Retourne 0 si OK, un code négatif sinon (Rust purge si compromis).
     // ---------------------------------------------------------------------
     external fun aegis_verify_attestation_chain(
         chain: ByteArray,
@@ -98,20 +98,20 @@ class MainActivity : FlutterActivity() {
     ): Int
 
     // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    // P0-A.3c.2 (2026-10-12) â€” BLE Mesh JNI pipes.
-    // AppelÃ©s depuis BleMeshBridge via la classe MainActivity.
+    // P0-A.3c.2 (2026-10-12) — BLE Mesh JNI pipes.
+    // Appelés depuis BleMeshBridge via la classe MainActivity.
     // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     external fun aegis_ble_mesh_set_pipes(inFd: Int, outFd: Int): Int
     external fun aegis_ble_mesh_shutdown(): Int
 
     // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    // P0-A.3d.3b (2026-10-14) â€” BLE Mesh reader thread.
+    // P0-A.3d.3b (2026-10-14) — BLE Mesh reader thread.
     // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     external fun aegis_ble_mesh_reader_start(inFd: Int, outFd: Int): Int
     external fun aegis_ble_mesh_reader_stop(): Int
 
     // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    // P0-A.3e.2b.1 (2026-10-16) â€” BLE handshake ed25519.
+    // P0-A.3e.2b.1 (2026-10-16) — BLE handshake ed25519.
     // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     external fun aegis_ble_handshake_start_initiator(fp: ByteArray): Int
     external fun aegis_ble_handshake_start_responder(fp: ByteArray): Int
@@ -119,13 +119,13 @@ class MainActivity : FlutterActivity() {
     external fun aegis_ble_handshake_reset(): Int
 
     /**
-     * Wrapper Kotlin : rÃ©cupÃ¨re l'attestation matÃ©rielle et la fait
-     * vÃ©rifier par Rust.
+     * Wrapper Kotlin : récupère l'attestation matérielle et la fait
+     * vérifier par Rust.
      *
      * 0  = attestation OK
      * -1 = pas de support d'attestation (device legacy)
-     * -2 = Ã©chec de rÃ©cupÃ©ration de la chaÃ®ne
-     * -3..-N = chaÃ®ne compromise (Rust a dÃ©jÃ  purgÃ©)
+     * -2 = échec de récupération de la chaîne
+     * -3..-N = chaîne compromise (Rust a déjà purgé)
      */
     fun aegisVerifyDeviceAttestation(): Int {
         val data = AttestationVerifier.getAttestationData(this)
@@ -134,13 +134,13 @@ class MainActivity : FlutterActivity() {
         return try {
             aegis_verify_attestation_chain(data.chain, data.challenge)
         } catch (t: Throwable) {
-            Log.e(TAG, "aegis_verify_attestation_chain a Ã©chouÃ©", t)
+            Log.e(TAG, "aegis_verify_attestation_chain a échoué", t)
             -1
         }
     }
 
     /**
-     * N3 (audit 2026-09-20) : dÃ©tecte si l'APK est signÃ©e avec la clÃ©
+     * N3 (audit 2026-09-20) : détecte si l'APK est signée avec la clé
      * debug standard Android (`CN=Android Debug, O=Android, C=US`).
      */
     private fun isSignedWithDebugKey(): Boolean {
@@ -172,26 +172,26 @@ class MainActivity : FlutterActivity() {
             }
             false
         } catch (e: Exception) {
-            Log.e(TAG, "Impossible de vÃ©rifier la signature de l'APK", e)
+            Log.e(TAG, "Impossible de vérifier la signature de l'APK", e)
             false
         }
     }
 
     // =====================================================================
-    // P1 / P2 â€” SÃ©curitÃ© Forensique & Anti-Root
+    // P1 / P2 — Sécurité Forensique & Anti-Root
     // =====================================================================
 
     /**
-     * P2 (P-5) : DÃ©tecte si l'environnement est compromis (Root, Frida, Debugger).
+     * P2 (P-5) : Détecte si l'environnement est compromis (Root, Frida, Debugger).
      */
     private fun isDeviceCompromised(): Boolean {
-        // 1. DÃ©tection de Debugger attachÃ©
+        // 1. Détection de Debugger attaché
         if (Debug.isDebuggerConnected() || Debug.waitingForDebugger()) {
-            Log.e(TAG, "P2: Debugger dÃ©tectÃ© !")
+            Log.e(TAG, "P2: Debugger détecté !")
             return true
         }
 
-        // 2. DÃ©tection de Root (fichiers / binaires su)
+        // 2. Détection de Root (fichiers / binaires su)
         val rootPaths = arrayOf(
             "/system/app/Superuser.apk", "/sbin/su", "/system/bin/su",
             "/system/xbin/su", "/data/local/xbin/su", "/data/local/bin/su",
@@ -199,18 +199,18 @@ class MainActivity : FlutterActivity() {
         )
         for (path in rootPaths) {
             if (File(path).exists()) {
-                Log.e(TAG, "P2: Root dÃ©tectÃ© via $path !")
+                Log.e(TAG, "P2: Root détecté via $path !")
                 return true
             }
         }
 
-        // 3. DÃ©tection de Frida (ports ouverts ou processus)
+        // 3. Détection de Frida (ports ouverts ou processus)
         try {
             val process = Runtime.getRuntime().exec("ps -A")
             val reader = process.inputStream.bufferedReader()
             val output = reader.readText()
             if (output.contains("frida-server") || output.contains("frida-helper")) {
-                Log.e(TAG, "P2: Frida dÃ©tectÃ© !")
+                Log.e(TAG, "P2: Frida détecté !")
                 return true
             }
         } catch (_: Throwable) {}
@@ -219,9 +219,9 @@ class MainActivity : FlutterActivity() {
     }
 
     /**
-     * P1 (fstrim) : Force l'OS Ã  Ã©craser les blocs libres.
-     * Alloue un fichier massif (100 Mo) pour Ã©craser les anciennes donnÃ©es, puis le supprime.
-     * NOTE : ExÃ©cutÃ© sur un thread sÃ©parÃ© pour Ã©viter un ANR si appelÃ© dans onDestroy.
+     * P1 (fstrim) : Force l'OS à écraser les blocs libres.
+     * Alloue un fichier massif (100 Mo) pour écraser les anciennes données, puis le supprime.
+     * NOTE : Exécuté sur un thread séparé pour éviter un ANR si appelé dans onDestroy.
      */
     fun aegisForceFstrim() {
         Thread {
@@ -267,8 +267,8 @@ class MainActivity : FlutterActivity() {
 
         // P2 (P-5) : Fail-closed si l'environnement est compromis.
         if (isDeviceCompromised()) {
-            Log.e(TAG, "P2: Environnement compromis â€” PanicPurge (Process Kill).")
-            // On tue le processus immÃ©diatement.
+            Log.e(TAG, "P2: Environnement compromis — PanicPurge (Process Kill).")
+            // On tue le processus immédiatement.
             android.os.Process.killProcess(android.os.Process.myPid())
             System.exit(0)
         }
@@ -277,7 +277,7 @@ class MainActivity : FlutterActivity() {
         try {
             aegisRegisterMainActivity(this)
         } catch (t: Throwable) {
-            Log.e(TAG, "aegisRegisterMainActivity a Ã©chouÃ©", t)
+            Log.e(TAG, "aegisRegisterMainActivity a échoué", t)
         }
 
         // P0-A.2a (2026-10-07) : initialisation du bridge Wi-Fi Direct.
@@ -285,7 +285,7 @@ class MainActivity : FlutterActivity() {
             val wifiOk = WifiDirectBridge.initialize(this)
             Log.i(TAG, "WifiDirectBridge.initialize = $wifiOk")
         } catch (t: Throwable) {
-            Log.e(TAG, "WifiDirectBridge.initialize a Ã©chouÃ©", t)
+            Log.e(TAG, "WifiDirectBridge.initialize a échoué", t)
         }
 
         // ============================================================
@@ -293,9 +293,9 @@ class MainActivity : FlutterActivity() {
         // ============================================================
         val isDebugSigned = isSignedWithDebugKey()
         if (isDebugSigned) {
-            Log.w(TAG, "APK signÃ©e avec clÃ© DEBUG â€” ATTESTATION SKIPPED (mode dev)")
+            Log.w(TAG, "APK signée avec clé DEBUG — ATTESTATION SKIPPED (mode dev)")
         } else {
-            Log.i(TAG, "APK release-signÃ©e â€” ATTESTATION ACTIVE")
+            Log.i(TAG, "APK release-signée — ATTESTATION ACTIVE")
             try {
                 val attestationResult = aegisVerifyDeviceAttestation()
                 Log.i(TAG, "Attestation result: $attestationResult")
@@ -303,18 +303,18 @@ class MainActivity : FlutterActivity() {
                     Log.e(TAG, "Attestation compromise (code=$attestationResult)")
                 }
             } catch (t: Throwable) {
-                Log.e(TAG, "Attestation verification a Ã©chouÃ©", t)
+                Log.e(TAG, "Attestation verification a échoué", t)
             }
         }
     }
 
     override fun onDestroy() {
-        // P1 : Force l'OS Ã  Ã©craser les blocs libres aprÃ¨s le dÃ©part de l'app.
+        // P1 : Force l'OS à écraser les blocs libres après le départ de l'app.
         try { aegisForceFstrim() } catch (_: Throwable) {}
 
         try { cameraProvider?.unbindAll() } catch (_: Throwable) {}
         try { aegis_release_surface() } catch (_: Throwable) {}
-        // P0-A.3a : arrÃªt du bridge BLE Mesh
+        // P0-A.3a : arrêt du bridge BLE Mesh
         try { bleMeshBridge?.destroy() } catch (_: Throwable) {}
         bleMeshBridge = null
         try { WifiDirectBridge.shutdown() } catch (_: Throwable) {}
@@ -323,7 +323,7 @@ class MainActivity : FlutterActivity() {
     }
 
     // =====================================================================
-    // MÃ©thode appelÃ©e depuis Rust via JNI (aegis_capture_ndk_camera)
+    // Méthode appelée depuis Rust via JNI (aegis_capture_ndk_camera)
     // =====================================================================
 
     fun aegisStartHardwareCapture(): Int {
@@ -344,7 +344,7 @@ class MainActivity : FlutterActivity() {
                 0
             }
         } catch (t: Throwable) {
-            Log.e(TAG, "aegisStartHardwareCapture a Ã©chouÃ©", t)
+            Log.e(TAG, "aegisStartHardwareCapture a échoué", t)
             -1
         }
     }
@@ -355,7 +355,7 @@ class MainActivity : FlutterActivity() {
             Log.i(TAG, "CameraX: unbindAll (stop hardware capture)")
             0
         } catch (t: Throwable) {
-            Log.e(TAG, "aegisStopHardwareCapture a Ã©chouÃ©", t)
+            Log.e(TAG, "aegisStopHardwareCapture a échoué", t)
             -1
         }
     }
@@ -377,7 +377,7 @@ class MainActivity : FlutterActivity() {
             BlindViewFactory()
         )
 
-        // PlatformView : aperÃ§u camÃ©ra live (CameraPreviewView).
+        // PlatformView : aperçu caméra live (CameraPreviewView).
         flutterEngine.platformViewsController.registry.registerViewFactory(
             "com.aegis.p2p/camera_preview",
             CameraPreviewViewFactory()
@@ -397,7 +397,7 @@ class MainActivity : FlutterActivity() {
                                     Log.i(TAG, "Hardware secret OK (niveau=${hw.level})")
                                     result.success(hw.secret)
                                 } else {
-                                    result.error("TEE_ERROR", "Taille secrÃ¨te invalide: ${hw.secret.size} (attendu 32)", null)
+                                    result.error("TEE_ERROR", "Taille secrète invalide: ${hw.secret.size} (attendu 32)", null)
                                 }
                             }
                             is HardwareKeystore.HardwareSecretResult.Failure -> {
@@ -415,10 +415,10 @@ class MainActivity : FlutterActivity() {
                         }
                         val rc = aegis_derive_and_set_master_key(pin)
                         if (rc == 0) {
-                            Log.i(TAG, "Master key dÃ©rivÃ©e (HKDF-SHA256) â€” PIN combinÃ© StrongBox")
+                            Log.i(TAG, "Master key dérivée (HKDF-SHA256) — PIN combiné StrongBox")
                             result.success(true)
                         } else {
-                            Log.e(TAG, "deriveMasterKey a Ã©chouÃ©: rc=$rc")
+                            Log.e(TAG, "deriveMasterKey a échoué: rc=$rc")
                             result.error("MASTER_ERROR", "rc=$rc", null)
                         }
                     }
@@ -474,7 +474,7 @@ class MainActivity : FlutterActivity() {
                             pendingResult = result
                             startActivityForResult(intent, 1001)
                         } else {
-                            result.error("UNSECURE_DEVICE", "Aucun PIN systÃ¨me.", null)
+                            result.error("UNSECURE_DEVICE", "Aucun PIN système.", null)
                         }
                     }
                     "triggerPanic" -> {
@@ -530,7 +530,7 @@ class MainActivity : FlutterActivity() {
                 }
             })
 
-        // --- Canal camÃ©ra native ---
+        // --- Canal caméra native ---
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CAMERA_CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -546,14 +546,14 @@ class MainActivity : FlutterActivity() {
                 }
             }
 
-        // --- P0-A.8b â€” Updater in-app (P-6) ---
-        // ChaÃ®ne de confiance Q22-Q27 :
-        //   Q22 : Dart vÃ©rifie ed25519 du manifeste via FFI Rust.
-        //   Q23 : Kotlin tÃ©lÃ©charge l'APK (OkHttp, whitelist aresmaxima.com).
-        //   Q24 : Kotlin vÃ©rifie SHA-256 en temps constant.
+        // --- P0-A.8b — Updater in-app (P-6) ---
+        // Chaîne de confiance Q22-Q27 :
+        //   Q22 : Dart vérifie ed25519 du manifeste via FFI Rust.
+        //   Q23 : Kotlin télécharge l'APK (OkHttp, whitelist aresmaxima.com).
+        //   Q24 : Kotlin vérifie SHA-256 en temps constant.
         //   Q25 : Kotlin lance l'installateur via FileProvider.
-        //   Q26 : Kotlin vÃ©rifie canRequestPackageInstalls() avant l'Intent.
-        //   Q27 : Kotlin supprime l'APK aprÃ¨s consommation du fd par l'installateur.
+        //   Q26 : Kotlin vérifie canRequestPackageInstalls() avant l'Intent.
+        //   Q27 : Kotlin supprime l'APK après consommation du fd par l'installateur.
         val updaterChannel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             AegisUpdater.CHANNEL_NAME
@@ -562,7 +562,7 @@ class MainActivity : FlutterActivity() {
     }
 
     // =====================================================================
-    // Capture camÃ©ra
+    // Capture caméra
     // =====================================================================
 
     private fun startCameraInternal() {
@@ -573,7 +573,7 @@ class MainActivity : FlutterActivity() {
 
                 val previewView = getPreviewView()
                 if (previewView == null) {
-                    Log.e(TAG, "startCameraInternal: pas de PreviewView attachÃ©e")
+                    Log.e(TAG, "startCameraInternal: pas de PreviewView attachée")
                     return@addListener
                 }
 
@@ -601,7 +601,7 @@ class MainActivity : FlutterActivity() {
                             image.width, image.height
                         )
                     } catch (t: Throwable) {
-                        Log.e(TAG, "Frame ingest a Ã©chouÃ©", t)
+                        Log.e(TAG, "Frame ingest a échoué", t)
                     } finally {
                         image.close()
                     }
@@ -614,9 +614,9 @@ class MainActivity : FlutterActivity() {
                     preview,
                     imageAnalysis
                 )
-                Log.i(TAG, "CameraX: Preview + ImageAnalysis liÃ©s")
+                Log.i(TAG, "CameraX: Preview + ImageAnalysis liés")
             } catch (e: Exception) {
-                Log.e(TAG, "startCamera a Ã©chouÃ©", e)
+                Log.e(TAG, "startCamera a échoué", e)
             }
         }, ContextCompat.getMainExecutor(this))
     }
@@ -635,7 +635,7 @@ class MainActivity : FlutterActivity() {
     }
 
     // =====================================================================
-    // RÃ©sultats d'activitÃ©
+    // Résultats d'activité
     // =====================================================================
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -651,7 +651,7 @@ class MainActivity : FlutterActivity() {
     }
 
     // =====================================================================
-    // Callback permission camÃ©ra (filet de sÃ©curitÃ©)
+    // Callback permission caméra (filet de sécurité)
     // =====================================================================
 
     override fun onRequestPermissionsResult(
@@ -663,10 +663,10 @@ class MainActivity : FlutterActivity() {
         if (requestCode == CAMERA_PERMISSION_CODE) {
             if (grantResults.isNotEmpty() &&
                 grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                Log.i(TAG, "Permission camÃ©ra accordÃ©e â€” dÃ©marrage automatique")
+                Log.i(TAG, "Permission caméra accordée — démarrage automatique")
                 runOnUiThread { startCameraInternal() }
             } else {
-                Log.w(TAG, "Permission camÃ©ra refusÃ©e")
+                Log.w(TAG, "Permission caméra refusée")
             }
         }
     }

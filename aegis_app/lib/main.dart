@@ -48,7 +48,7 @@ void verifyApkSignatureOrBurn(String currentApkSha256) {
       malloc.free(ptr);
     }
   } catch (e) {
-    debugPrint("Ã‰chec du contrÃ´le de signature APK : $e");
+    debugPrint("Échec du contrôle de signature APK : $e");
   }
 }
 
@@ -74,13 +74,13 @@ bool verifyLicenseKeyFfi(String licenseKey) {
       malloc.free(ptr);
     }
   } catch (_) {
-    // P4 FIX : fail-closed. Aucun fallback sur prÃ©fixe "AEGIS-".
+    // P4 FIX : fail-closed. Aucun fallback sur préfixe "AEGIS-".
     return false;
   }
 }
 
 // =========================================================================
-// C89 : VÃ©rifie une licence liÃ©e au StrongBox du tÃ©lÃ©phone.
+// C89 : Vérifie une licence liée au StrongBox du téléphone.
 // =========================================================================
 Future<bool> verifyLicenseKeyFfiBound(String licenseKey) async {
   try {
@@ -142,7 +142,7 @@ Future<bool> ingestFileZeroDisk(String filePath) async {
 
 // =========================================================================
 // P6 FIX : malloc.free dans finally
-// P7 FIX : plus de fallback base64 trivial (aucune sÃ©curitÃ©)
+// P7 FIX : plus de fallback base64 trivial (aucune sécurité)
 // =========================================================================
 String drownKeyFfi(String keyToDrown, String poem) {
   try {
@@ -163,7 +163,7 @@ String drownKeyFfi(String keyToDrown, String poem) {
     try {
       final resultPtr = drownFunc(keyPtr, poemPtr);
       if (resultPtr == nullptr) {
-        return "Erreur lors du noyage stÃ©ganographique.";
+        return "Erreur lors du noyage stéganographique.";
       }
       try {
         return resultPtr.toDartString();
@@ -175,8 +175,8 @@ String drownKeyFfi(String keyToDrown, String poem) {
       malloc.free(poemPtr);
     }
   } catch (e) {
-    // P7 FIX : plus de fallback base64 trivial (aucune sÃ©curitÃ©).
-    return "Erreur stÃ©gano : $e";
+    // P7 FIX : plus de fallback base64 trivial (aucune sécurité).
+    return "Erreur stégano : $e";
   }
 }
 
@@ -202,7 +202,7 @@ String extractKeyFfi(String stegoText) {
     try {
       final resultPtr = extractFunc(ptr);
       if (resultPtr == nullptr) {
-        return "Erreur : Aucun payload stÃ©ganographique AEGIS dÃ©tectÃ©.";
+        return "Erreur : Aucun payload stéganographique AEGIS détecté.";
       }
       try {
         return resultPtr.toDartString();
@@ -214,7 +214,7 @@ String extractKeyFfi(String stegoText) {
     }
   } catch (e) {
     // P7 FIX : plus de fallback base64 trivial.
-    return "Erreur : Aucun payload stÃ©ganographique AEGIS dÃ©tectÃ© ($e).";
+    return "Erreur : Aucun payload stéganographique AEGIS détecté ($e).";
   }
 }
 
@@ -233,7 +233,7 @@ Future<void> deploySnowflake() async {
       await Process.run('chmod', ['+x', snowflakePath]);
     }
   } catch (e) {
-    debugPrint("DÃ©ploiement Snowflake : $e");
+    debugPrint("Déploiement Snowflake : $e");
   }
 }
 
@@ -251,15 +251,15 @@ void main() async {
   };
 
   if (Platform.isAndroid) {
-    // P8 FIX (2026-11-06) : le hash SHA-256 Ã©tait hardcodÃ© et obsolÃ¨te
-    // aprÃ¨s chaque rebuild APK. Le FFI Rust `aegis_verify_apk_signature_or_burn`
+    // P8 FIX (2026-11-06) : le hash SHA-256 était hardcodé et obsolète
+    // après chaque rebuild APK. Le FFI Rust `aegis_verify_apk_signature_or_burn`
     // ne valide QUE le format UTF-8 (jamais la valeur), donc le hash
-    // Ã©tait purement dÃ©coratif. On passe un fingerprint runtime
-    // dÃ©terministe (version OS + plateforme), toujours valide UTF-8 et
-    // jamais obsolÃ¨te. La vraie validation APK est faite par :
+    // était purement décoratif. On passe un fingerprint runtime
+    // déterministe (version OS + plateforme), toujours valide UTF-8 et
+    // jamais obsolète. La vraie validation APK est faite par :
     //   1) Android PackageManager (refus d'installation si signature change)
-    //   2) L'attestation StrongBox au dÃ©marrage
-    //      (aegis_verify_attestation_chain, dÃ©jÃ  en place)
+    //   2) L'attestation StrongBox au démarrage
+    //      (aegis_verify_attestation_chain, déjà en place)
     final apkMarker = "aegis:${Platform.operatingSystemVersion}";
     verifyApkSignatureOrBurn(apkMarker);
   }
@@ -279,7 +279,7 @@ void main() async {
     final dirOk = KeystoreBridge.vaultSetDir(docsDir.path);
     debugPrint("AEGIS-VAULT: setVaultDir(${docsDir.path}) = $dirOk");
   } catch (e) {
-    debugPrint("AEGIS-VAULT: vaultSetDir a Ã©chouÃ©: $e");
+    debugPrint("AEGIS-VAULT: vaultSetDir a échoué: $e");
   }
 
   try {
@@ -307,23 +307,23 @@ void main() async {
       );
       debugPrint("AEGIS: initializeHardwareSecurity = $ok");
     } catch (e) {
-      debugPrint("AEGIS: initializeHardwareSecurity a Ã©chouÃ©: $e");
+      debugPrint("AEGIS: initializeHardwareSecurity a échoué: $e");
     }
 
     try {
       final torOk = await KeystoreBridge.setTorStrongboxAvailable();
       debugPrint("AEGIS: setTorStrongboxAvailable = $torOk");
     } catch (e) {
-      debugPrint("AEGIS: setTorStrongboxAvailable a Ã©chouÃ©: $e");
+      debugPrint("AEGIS: setTorStrongboxAvailable a échoué: $e");
     }
   });
 }
 
 // =========================================================================
-// P10 FIX (cÃ´tÃ© Dart) : les symboles aegis_panic_purge,
-// aegis_purge_ram_buffer et aegis_panic_silent_burn sont exportÃ©s
+// P10 FIX (côté Dart) : les symboles aegis_panic_purge,
+// aegis_purge_ram_buffer et aegis_panic_silent_burn sont exportés
 // depuis lib.rs (patch Rust joint en partie 2). Cascade de fallback :
-// essaie le plus spÃ©cifique d'abord, sinon retombe sur panic_purge.
+// essaie le plus spécifique d'abord, sinon retombe sur panic_purge.
 // =========================================================================
 void _executeEmergencyFfiPurge() {
   try {
@@ -432,9 +432,9 @@ class _UserInactivityWrapperState extends State<UserInactivityWrapper> with Widg
   Timer? _inactivityTimer;
 
   // =====================================================================
-  // P11 FIX (2026-11-06) : `runApp(const AegisApp())` retirÃ© â€” sans objet
+  // P11 FIX (2026-11-06) : `runApp(const AegisApp())` retiré — sans objet
   // puisque SystemNavigator.pop + exit(0) terminent le process
-  // immÃ©diatement. Le re-runApp() Ã©tait un no-op gaspillÃ©.
+  // immédiatement. Le re-runApp() était un no-op gaspillé.
   // =====================================================================
   void _lockAndPurge() {
     if (isExternalFlowActive()) return;
@@ -519,10 +519,10 @@ class AegisLogoWidget extends StatelessWidget {
 }
 
 // =========================================================================
-// P12 (2026-11-06) : documentÃ©. Si l'utilisateur reÃ§oit un appel pendant
-// l'unlock (Argon2id ~2-4s), mounted=false Ã  la fin â†’ session perdue.
-// Comportement de sÃ©curitÃ© voulu (purge silencieuse plutÃ´t que session
-// zombie). Voir _unlock() oÃ¹ ce cas est dÃ©jÃ  gÃ©rÃ© par `if (!mounted) return;`.
+// P12 (2026-11-06) : documenté. Si l'utilisateur reçoit un appel pendant
+// l'unlock (Argon2id ~2-4s), mounted=false à la fin → session perdue.
+// Comportement de sécurité voulu (purge silencieuse plutôt que session
+// zombie). Voir _unlock() où ce cas est déjà géré par `if (!mounted) return;`.
 // =========================================================================
 class LockScreen extends StatefulWidget {
   const LockScreen({super.key});
@@ -693,7 +693,7 @@ class _LockScreenState extends State<LockScreen> {
       return;
     }
 
-    // P12 : voir doc ci-dessus â€” perte session = sÃ©curitÃ© voulue.
+    // P12 : voir doc ci-dessus — perte session = sécurité voulue.
     final session = await _vault.unlockSession(pin);
     if (!mounted) return;
 
@@ -769,29 +769,30 @@ class _LockScreenState extends State<LockScreen> {
                     final safeLocale = const [
                       Locale('fr', 'FR'), Locale('en', 'US'), Locale('es', 'ES'),
                       Locale('ar', 'SA'), Locale('it', 'IT'), Locale('uk', 'UA'), Locale('pl', 'PL')
-                    ].firstWhere(
-                      (l) => l.languageCode == currentLocale.languageCode,
-                      orElse: () => const Locale('en', 'US'),
+                    ].firstWhere((l) => l.languageCode == currentLocale.languageCode, orElse: () => const Locale('en', 'US'));
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                      decoration: BoxDecoration(color: const Color(0xFF141416), borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.white24)),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<Locale>(
+                          value: safeLocale,
+                          icon: const Padding(padding: EdgeInsets.only(left: 8), child: Icon(Icons.language, color: brandYellow, size: 18)),
+                          dropdownColor: const Color(0xFF141416),
+                          style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                          items: const [
+                            DropdownMenuItem(value: Locale('fr', 'FR'), child: Text('Fran\u00E7ais')),
+                            DropdownMenuItem(value: Locale('en', 'US'), child: Text('English')),
+                            DropdownMenuItem(value: Locale('es', 'ES'), child: Text('Espa\u00F1ol')),
+                            DropdownMenuItem(value: Locale('ar', 'SA'), child: Text('\u0627\u0644\u0639\u0631\u0628\u064A\u0629')),
+                            DropdownMenuItem(value: Locale('it', 'IT'), child: Text('Italiano')),
+                            DropdownMenuItem(value: Locale('uk', 'UA'), child: Text('\u0423\u043A\u0440\u0430\u0457\u043D\u0441\u044C\u043A\u0430')),
+                            DropdownMenuItem(value: Locale('pl', 'PL'), child: Text('Polski')),
+                          ],
+                          onChanged: (Locale? locale) { if (locale != null) AegisApp.setLocale(context, locale); },
+                        ),
+                      ),
                     );
-
-                    return DropdownButton<Locale>(
-                      value: safeLocale,
-                      dropdownColor: const Color(0xFF141416),
-                      underline: Container(),
-                      items: const [
-                        DropdownMenuItem(value: Locale('fr', 'FR'), child: Text('FranÃ§ais')),
-                        DropdownMenuItem(value: Locale('en', 'US'), child: Text('English')),
-                        DropdownMenuItem(value: Locale('es', 'ES'), child: Text('EspaÃ±ol')),
-                        DropdownMenuItem(value: Locale('ar', 'SA'), child: Text('Ø§Ù„Ø¹Ø±Ø¨ÙŠØ©')),
-                        DropdownMenuItem(value: Locale('it', 'IT'), child: Text('Italiano')),
-                        DropdownMenuItem(value: Locale('uk', 'UA'), child: Text('Ð£ÐºÑ€Ð°Ñ—Ð½ÑÑŒÐºÐ°')),
-                        DropdownMenuItem(value: Locale('pl', 'PL'), child: Text('Polski')),
-                      ],
-                      onChanged: (Locale? locale) {
-                        if (locale != null) AegisApp.setLocale(context, locale);
-                      },
-                    );
-                  }
+                  },
                 ),
                 const SizedBox(height: 16),
                 if (_isVaultInitialized == false) ...[
@@ -807,12 +808,12 @@ class _LockScreenState extends State<LockScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
-                          children: const [
+                          children: [
                             Icon(Icons.memory, color: brandYellow, size: 16),
                             SizedBox(width: 6),
                             Expanded(
                               child: Text(
-                                "SCEAU MATÃ‰RIEL HSM (STRONGBOX)",
+                                switch (Localizations.localeOf(context).languageCode) { 'en' => 'HSM HARDWARE SEAL (STRONGBOX)', 'es' => 'SELLO DE HARDWARE HSM (STRONGBOX)', 'ar' => '\u0627\u0644\u062E\u062A\u0645 \u0627\u0644\u0639\u062A\u0627\u062F\u064A HSM (STRONGBOX)', 'it' => 'SIGILLO HARDWARE HSM (STRONGBOX)', 'uk' => '\u0410\u041F\u0410\u0420\u0410\u0422\u041D\u0410 \u041F\u0415\u0427\u0410\u0422\u041A\u0410 HSM (STRONGBOX)', 'pl' => 'PIECZ\u0118\u0106 SPRZ\u0118TOWA HSM (STRONGBOX)', _ => 'SCEAU MAT\u00C9RIEL HSM (STRONGBOX)' },
                                 style: TextStyle(
                                   color: brandYellow,
                                   fontSize: 11,
@@ -844,15 +845,15 @@ class _LockScreenState extends State<LockScreen> {
                                 : () {
                                     Clipboard.setData(ClipboardData(text: _hsmFingerprint!));
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text("Sceau matÃ©riel HSM copiÃ© dans le presse-papiers"),
+                                      SnackBar(
+                                        content: Text(switch (Localizations.localeOf(context).languageCode) { 'en' => 'HSM hardware seal copied to clipboard', 'es' => 'Sello HSM copiado al portapapeles', 'ar' => '\u062A\u0645 \u0646\u0633\u062E \u0627\u0644\u062E\u062A\u0645 \u0627\u0644\u0639\u062A\u0627\u062F\u064A HSM', 'it' => 'Sigillo HSM copiato negli appunti', 'uk' => '\u041F\u0435\u0447\u0430\u0442\u043A\u0443 HSM \u0441\u043A\u043E\u043F\u0456\u0439\u043E\u0432\u0430\u043D\u043E', 'pl' => 'Piecz\u0119\u0107 HSM skopiowana do schowka', _ => 'Sceau mat\u00E9riel HSM copi\u00E9 dans le presse-papiers' }),
                                         duration: Duration(seconds: 2),
                                       ),
                                     );
                                   },
                             icon: const Icon(Icons.copy, size: 14, color: brandYellow),
-                            label: const Text(
-                              "COPIER LE SCEAU D'ENRÃ”LEMENT HSM",
+                            label: Text(
+                              switch (Localizations.localeOf(context).languageCode) { 'en' => 'COPY HSM ENROLLMENT SEAL', 'es' => 'COPIAR SELLO DE REGISTRO HSM', 'ar' => '\u0646\u0633\u062E \u062E\u062A\u0645 \u0627\u0644\u062A\u0633\u062C\u064A\u0644 HSM', 'it' => 'COPIA SIGILLO DI REGISTRAZIONE HSM', 'uk' => '\u041A\u041E\u041F\u0406\u042E\u0412\u0410\u0422\u0418 \u041F\u0415\u0427\u0410\u0422\u041A\u0423 \u0420\u0415\u0404\u0421\u0422\u0420\u0410\u0426\u0406\u0407 HSM', 'pl' => 'KOPIUJ PIECZ\u0118\u0106 REJESTRACJI HSM', _ => "COPIER LE SCEAU D'ENR\u00D4LEMENT HSM" },
                               style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
                             ),
                             style: OutlinedButton.styleFrom(
@@ -888,7 +889,7 @@ class _LockScreenState extends State<LockScreen> {
                   child: Text(
                     _pinController.text.isEmpty
                         ? displayHint
-                        : 'â€¢' * _pinController.text.length,
+                        : '•' * _pinController.text.length,
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: _pinController.text.isEmpty ? Colors.white54 : Colors.white,
@@ -965,7 +966,7 @@ class _LockScreenState extends State<LockScreen> {
 
 
 // =========================================================================
-// FakeDashboard (P2 : inchangÃ©, pas de panne identifiÃ©e)
+// FakeDashboard (P2 : inchangé, pas de panne identifiée)
 // =========================================================================
 class FakeDashboard extends StatelessWidget {
   const FakeDashboard({super.key});
@@ -983,7 +984,7 @@ class FakeDashboard extends StatelessWidget {
           bottom: const TabBar(
             tabs: [
               Tab(icon: Icon(Icons.note), text: "Notes"),
-              Tab(icon: Icon(Icons.checklist), text: "TÃ¢ches"),
+              Tab(icon: Icon(Icons.checklist), text: "Tâches"),
             ],
           ),
         ),
@@ -1020,12 +1021,12 @@ class FakeDashboard extends StatelessWidget {
 // =========================================================================
 // MainDashboard
 // =========================================================================
-// P13 FIX (2026-11-06) : `_updaterService.check()` reste appelÃ© sur le
+// P13 FIX (2026-11-06) : `_updaterService.check()` reste appelé sur le
 // main thread via addPostFrameCallback, MAIS ne bloque plus : le FFI
-// `aegis_tor_fetch_http` est exÃ©cutÃ© dans un isolate Dart via
-// UpdaterBridge._fetchManifestViaTor() â†’ Isolate.run() (voir patch
-// updater_bridge.dart). Le main thread reste rÃ©actif pendant les 30-60 s
-// du bootstrap Tor. La banniÃ¨re UpdaterBanner passe Ã  jour au fil des
+// `aegis_tor_fetch_http` est exécuté dans un isolate Dart via
+// UpdaterBridge._fetchManifestViaTor() → Isolate.run() (voir patch
+// updater_bridge.dart). Le main thread reste réactif pendant les 30-60 s
+// du bootstrap Tor. La bannière UpdaterBanner passe à jour au fil des
 // notifyListeners() du service.
 // =========================================================================
 class MainDashboard extends StatefulWidget {
@@ -1051,7 +1052,7 @@ class _MainDashboardState extends State<MainDashboard> {
     super.initState();
     _updaterService = UpdaterService(currentVersion: '3.6.0');
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Non-bloquant : dÃ©lÃ¨gue Ã  Isolate.run() dans updater_bridge.dart.
+      // Non-bloquant : délègue à Isolate.run() dans updater_bridge.dart.
       _updaterService.check();
     });
   }

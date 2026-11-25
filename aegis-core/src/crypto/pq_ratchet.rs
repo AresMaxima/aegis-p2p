@@ -182,6 +182,22 @@ impl ContinuousPqRatchet {
 
     /// Etape 1 du re-encapsulage PCS : genere une nouvelle paire ephemere ML-KEM-1024
     /// et retourne les 4 cellules de 512 octets contenant EK pour envoi au pair.
+    /// Clone l'etat courant avant re-encapsulage pour prouver formellement a chaque saut
+    /// qu'un attaquant detenant les cles de l'epoque N-1 est aveugle a l'epoque N.
+    pub fn clone_for_pcs_audit(&self) -> Self {
+        Self {
+            root_key: self.root_key,
+            send_chain_key: self.send_chain_key,
+            recv_chain_key: self.recv_chain_key,
+            pending_dk_bytes: [0u8; MLKEM1024_DK_BYTES],
+            has_pending_dk: false,
+            pq_epoch: self.pq_epoch,
+            send_seq: self.send_seq,
+            recv_seq: self.recv_seq,
+            assembler: SpqrFragmentAssembler::new(),
+        }
+    }
+
     pub fn initiate_pq_step(&mut self) -> Result<[[u8; CELL_BYTES]; SPQR_FRAG_COUNT], SpqrError> {
         let (ek, dk) = ml_kem_1024::KG::try_keygen().map_err(|_| SpqrError::CryptoFailure)?;
         let ek_bytes = ek.into_bytes();

@@ -15,22 +15,22 @@ import java.security.cert.X509Certificate
 import java.security.spec.ECGenParameterSpec
 
 /**
- * Android Key Attestation â€” Niveau 3 (CdCM v2.2-RC3).
+ * Android Key Attestation — Niveau 3 (CdCM v2.2-RC3).
  *
  * â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
  * PRINCIPE :
- *   1. GÃ©nÃ¨re une clÃ© EC P-256 dans StrongBox/TEE avec attestation.
+ *   1. Génère une clé EC P-256 dans StrongBox/TEE avec attestation.
  *   2. Le challenge d'attestation = SHA-256 de la signature APK.
- *   3. La chaÃ®ne de certificats X.509 retournÃ©e est signÃ©e par la
- *      racine matÃ©rielle (Samsung Knox / Google Titan).
- *   4. Rust vÃ©rifie :
- *      â€¢ la chaÃ®ne cryptographique remonte Ã  Samsung/Google,
- *      â€¢ le challenge == hash de la signature APK,
- *      â€¢ verifiedBootState == GREEN (bootloader verrouillÃ©),
- *      â€¢ deviceLocked == true,
- *      â€¢ verifiedBootHash non-vide (systÃ¨me intÃ¨gre).
+ *   3. La chaîne de certificats X.509 retournée est signée par la
+ *      racine matérielle (Samsung Knox / Google Titan).
+ *   4. Rust vérifie :
+ *      • la chaîne cryptographique remonte à Samsung/Google,
+ *      • le challenge == hash de la signature APK,
+ *      • verifiedBootState == GREEN (bootloader verrouillé),
+ *      • deviceLocked == true,
+ *      • verifiedBootHash non-vide (système intègre).
  *
- *   Si l'une des vÃ©rifications Ã©choue â†’ PanicPurge (exit 137).
+ *   Si l'une des vérifications échoue → PanicPurge (exit 137).
  * â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
  */
 object AttestationVerifier {
@@ -39,7 +39,7 @@ object AttestationVerifier {
     private const val PROVIDER = "AndroidKeyStore"
 
     /**
-     * RÃ©sultat d'attestation prÃªt Ã  Ãªtre envoyÃ© Ã  Rust.
+     * Résultat d'attestation prêt à être envoyé à Rust.
      */
     data class AttestationData(
         /** Concatenation DER : cert[0]_DER || cert[1]_DER || ... */
@@ -49,8 +49,8 @@ object AttestationVerifier {
     )
 
     /**
-     * RÃ©cupÃ¨re (ou gÃ©nÃ¨re) la chaÃ®ne d'attestation matÃ©rielle.
-     * Retourne null si l'attestation n'est pas supportÃ©e ou Ã©choue.
+     * Récupère (ou génère) la chaîne d'attestation matérielle.
+     * Retourne null si l'attestation n'est pas supportée ou échoue.
      */
     @JvmStatic
     fun getAttestationData(context: Context): AttestationData? {
@@ -65,23 +65,23 @@ object AttestationVerifier {
             // 2) Charger le KeyStore Android
             val ks = KeyStore.getInstance(PROVIDER).apply { load(null) }
 
-            // 3) D63 FIX : Toujours rÃ©gÃ©nÃ©rer la clÃ© d'attestation.
-            // Le challenge change Ã  chaque signature d'APK (nouvelle clÃ© de release).
-            // Une clÃ© d'attestation liÃ©e Ã  un ancien challenge produit un certificat
-            // avec un ChallengeMismatch, ce qui dÃ©clenche panic_purge() cÃ´tÃ© Rust.
+            // 3) D63 FIX : Toujours régénérer la clé d'attestation.
+            // Le challenge change à chaque signature d'APK (nouvelle clé de release).
+            // Une clé d'attestation liée à un ancien challenge produit un certificat
+            // avec un ChallengeMismatch, ce qui déclenche panic_purge() côté Rust.
             if (ks.containsAlias(ATTESTATION_ALIAS)) {
                 try {
                     ks.deleteEntry(ATTESTATION_ALIAS)
-                    Log.i(TAG, "D63 FIX : ancienne clÃ© d'attestation supprimÃ©e")
+                    Log.i(TAG, "D63 FIX : ancienne clé d'attestation supprimée")
                 } catch (e: Exception) {
-                    Log.w(TAG, "Impossible de supprimer l'ancienne clÃ© d'attestation", e)
+                    Log.w(TAG, "Impossible de supprimer l'ancienne clé d'attestation", e)
                 }
             }
 
-            // 4) GÃ©nÃ©rer la clÃ© d'attestation avec le nouveau challenge
+            // 4) Générer la clé d'attestation avec le nouveau challenge
             generateAttestationKey(challenge)
 
-            // 5) RÃ©cupÃ©rer l'entrÃ©e (doit Ãªtre un PrivateKeyEntry)
+            // 5) Récupérer l'entrée (doit être un PrivateKeyEntry)
             val entry = ks.getEntry(ATTESTATION_ALIAS, null)
                     as? KeyStore.PrivateKeyEntry
                 ?: run {
@@ -89,10 +89,10 @@ object AttestationVerifier {
                     return null
                 }
 
-            // 6) RÃ©cupÃ©rer la chaÃ®ne de certificats
+            // 6) Récupérer la chaîne de certificats
             val certs = entry.certificateChain
             if (certs.isEmpty()) {
-                Log.e(TAG, "ChaÃ®ne de certificats vide")
+                Log.e(TAG, "Chaîne de certificats vide")
                 return null
             }
 
@@ -106,13 +106,13 @@ object AttestationVerifier {
                 }
             }
             if (x509Count == 0) {
-                Log.e(TAG, "Aucun certificat X.509 dans la chaÃ®ne")
+                Log.e(TAG, "Aucun certificat X.509 dans la chaîne")
                 return null
             }
 
             Log.i(
                 TAG,
-                "Attestation rÃ©cupÃ©rÃ©e : $x509Count certs, ${out.size()} bytes DER, " +
+                "Attestation récupérée : $x509Count certs, ${out.size()} bytes DER, " +
                 "challenge=${challenge.size} bytes"
             )
 
@@ -121,7 +121,7 @@ object AttestationVerifier {
                 challenge = challenge,
             )
         } catch (e: Exception) {
-            Log.e(TAG, "getAttestationData a Ã©chouÃ©", e)
+            Log.e(TAG, "getAttestationData a échoué", e)
             null
         }
     }
@@ -130,7 +130,7 @@ object AttestationVerifier {
      * Calcule SHA-256 de la signature APK.
      *
      * Utilise `GET_SIGNING_CERTIFICATES` (API 28+) ou `GET_SIGNATURES` (legacy).
-     * Le certificat APK est encodÃ© en DER, puis hashÃ© en SHA-256.
+     * Le certificat APK est encodé en DER, puis hashé en SHA-256.
      */
     private fun computeApkSignatureHash(context: Context): ByteArray? {
         return try {
@@ -155,7 +155,7 @@ object AttestationVerifier {
             }
 
             if (signatures.isEmpty()) {
-                Log.e(TAG, "Aucune signature APK trouvÃ©e")
+                Log.e(TAG, "Aucune signature APK trouvée")
                 return null
             }
 
@@ -166,15 +166,15 @@ object AttestationVerifier {
             Log.i(TAG, "APK signature hash: ${hash.joinToString("") { "%02x".format(it) }}")
             hash
         } catch (e: Exception) {
-            Log.e(TAG, "computeApkSignatureHash a Ã©chouÃ©", e)
+            Log.e(TAG, "computeApkSignatureHash a échoué", e)
             null
         }
     }
 
     /**
-     * GÃ©nÃ¨re une clÃ© EC P-256 avec attestation et challenge.
+     * Génère une clé EC P-256 avec attestation et challenge.
      *
-     * Tente StrongBox (API 28+) en prioritÃ©, avec fallback TEE.
+     * Tente StrongBox (API 28+) en priorité, avec fallback TEE.
      */
     private fun generateAttestationKey(challenge: ByteArray) {
         val kg = KeyPairGenerator.getInstance(
@@ -197,12 +197,12 @@ object AttestationVerifier {
                 builder.setIsStrongBoxBacked(true)
                 kg.initialize(builder.build())
                 kg.generateKeyPair()
-                Log.i(TAG, "ClÃ© d'attestation gÃ©nÃ©rÃ©e (StrongBox)")
+                Log.i(TAG, "Clé d'attestation générée (StrongBox)")
                 return
             } catch (e: StrongBoxUnavailableException) {
                 Log.w(TAG, "StrongBox indisponible, fallback TEE", e)
             } catch (e: Exception) {
-                Log.w(TAG, "StrongBox a Ã©chouÃ© (code=${e.javaClass.simpleName}), fallback TEE", e)
+                Log.w(TAG, "StrongBox a échoué (code=${e.javaClass.simpleName}), fallback TEE", e)
             }
         }
 
@@ -210,7 +210,7 @@ object AttestationVerifier {
         builder.setIsStrongBoxBacked(false)
         kg.initialize(builder.build())
         kg.generateKeyPair()
-        Log.i(TAG, "ClÃ© d'attestation gÃ©nÃ©rÃ©e (TEE)")
+        Log.i(TAG, "Clé d'attestation générée (TEE)")
     }
 
     @JvmStatic
@@ -218,7 +218,8 @@ object AttestationVerifier {
         if (peerPk.size != 32 || nonce.size != 32) return null
         return try {
             val md = MessageDigest.getInstance("SHA-256")
-            md.update("AEGIS-P2P-ATTEST-v3.6:".toByteArray())
+            val ksPre = KeyStore.getInstance(PROVIDER).apply { load(null) }; if (ksPre.containsAlias(ATTESTATION_ALIAS)) { try { ksPre.deleteEntry(ATTESTATION_ALIAS) } catch (_: Exception) {} }
+            md.update("AEGIS-P2P-ATTEST-v1:".toByteArray())
             md.update(peerPk); md.update(nonce)
             generateAttestationKey(md.digest())
             val ks = KeyStore.getInstance(PROVIDER).apply { load(null) }
