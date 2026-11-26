@@ -1,84 +1,89 @@
-# AEGIS P2P v3.0-Option2-Q1Q2 - Zero-Trust Decentralized Platform
+# 🛡️ AEGIS P2P v3.7.0 — High-Assurance Zero-Disk Mobile Messenger
 
-![License: Proprietary](https://img.shields.io/badge/License-Proprietary%20%7C%20Source--Available-red.svg)
-![Security Model](https://img.shields.io/badge/Security-Zero--Trust%20%7C%20Zero--Trace-black.svg)
-![Build](https://img.shields.io/badge/Architecture-Rust%20%2B%20Flutter-orange.svg)
-![Audit](https://img.shields.io/badge/Audit-PASSED%20(v2.2--GA)-brightgreen.svg)
-![CI/CD](https://img.shields.io/badge/Verification-Kani%20%7C%20Miri-blue.svg)
+[![CI Assurance](https://img.shields.io/badge/Formal_CI-14%2F14_Passing-4ade80?style=flat-square&logo=githubactions&logoColor=black)](https://github.com/AresMaxima/aegis-p2p/actions)
+[![SLSA Provenance](https://img.shields.io/badge/Supply_Chain-SLSA_Build_Provenance-FCBE0B?style=flat-square&logo=sigstore&logoColor=black)](https://github.com/AresMaxima/aegis-p2p/attestations)
+[![Post-Quantum](https://img.shields.io/badge/NIST_PQC-SPQR_ML--KEM--1024_%2B_ML--DSA--87-4ade80?style=flat-square)](https://csrc.nist.gov/pubs/fips/203/final)
+[![COTS Status](https://img.shields.io/badge/U.S._EAR-ECCN_5D992.c_COTS-blue?style=flat-square)](https://aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/)
+[![ANSSI](https://img.shields.io/badge/ANSSI_Registration-n%C2%B0_35567570-informational?style=flat-square)](https://aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/)
 
-AEGIS est une plateforme de communication P2P ultra-sécurisée conçue sur un modèle de confiance nulle (Zero-Trust), d'empreinte mémoire minimale (Zero-Trace), d'étanchéité post-quantique et d'auto-destruction matérielle sous contrainte.
+**AEGIS P2P v3.7.0** (`SKU: AM-AEGIS-P2P-370`) is a serverless, SIM-less, peer-to-peer encrypted mobile communication suite engineered around a strict **Zero-Disk Volatile RAM** architecture, **Continuous Post-Quantum Ratcheting (SPQR)**, and **Android StrongBox HSM Hardware Binding**.
 
-Le système repose sur un découplage strict :
-* **aegis-core (Rust)** : Moteur cryptographique, gestionnaires de mémoire verrouillée (mlock) et polymorphe, contrôle d'intégrité noyau/TPM, déclencheurs matériels de crise, réseau maillé hors-ligne et protocole de purge matérielle.[cite: 9]
-* **aegis_app (Flutter / Dart)** : Coque d'affichage aveugle, isolée de la mémoire vive cryptographique, protégée contre les captures d'écran (FLAG_SECURE) et les fuites système.[cite: 9]
+> **Official Portal & HSM-Bound Licensing:** [https://aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/](https://aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/)
 
 ---
 
-## Rapport d'Audit, Miri, Kani et Conformité Scellée
+## 🔍 Don't Trust Us, Verify (Cryptographic & SLSA Supply-Chain Proofs)
 
-L'application est certifiée par un pipeline d'intégration continue sticte (GitHub Actions) exécutant les outils formels de l'industrie. Le pipeline d'audit continu est exécuté sur GitHub Actions à chaque push (voir .github/workflows/reproducible.yml).
+Every official **AEGIS P2P v3.7.0** binary is compiled deterministically on ephemeral GitHub Actions runners, verified via independent **Bit-for-Bit Vendor A/B rebuilds (Debian vs. Ubuntu 24.04)**, and sealed with cryptographic **Sigstore / SLSA Build Provenance**.
 
-* **Statut de l'audit** : PASSED
-* **Version certifiée** : v3.0-Option2-Q1Q2
-* **Preuve Formelle (Kani)** : Validée (Contrôle des bornes mémoire cryptographiques de l'enclave 512B)
-* **Sécurité Mémoire (Miri)** : Validée (Aucun comportement indéfini, fuite mémoire ou violation FFI)
-* **Fonctions FFI vérifiées** : aegis_ingest_file_zero_disk, aegis_purge_ram_buffer, aegis_panic_silent_burn
-* **Profil Cargo** : panic = "abort", lto = true, strip = true
+### 1. Official v3.7.0 Reference Digests (`arm64-v8a`)
 
----
+| Artifact | SHA-256 Digest |
+| :--- | :--- |
+| **`aegis-v3.7.apk`** (Signed Release APK) | `bd7005e01d05df98338208e4d6cd6a003a059c7651e4cef53fe6ee4a2cb048fa` |
+| **`libaegis_core.so`** (Rust Native Engine) | `c8fcd620135f2213faf87d436993f35aa30d5a9811d0b22ecd68c70042fb70c4` |
+| **APK Signing Certificate (SHA-256)** | `c3e55c0b0a9369bba0fb738c9277aa09fa928924bd5fa40ad32ecf85faca88db` |
 
-## Licence, Code Source et Distribution Officielle
+### 2. One-Line Client Verification Commands
 
-### Cadre Légal et Transparence du Code Source
-> **Notice d'utilisation et de propriété intellectuelle :**  
-> Ce dépôt contient l'implémentation de référence de l'architecture AEGIS. Le code source est rendu accessible public (*Source-Available*) exclusivement à des fins d'inspection, d'audit cryptographique indépendant et de vérification d'absence de portes dérobées. [cite: 9]
-> 
-> Alors que le papier scientifique (Whitepaper) associé est publié sous licence CC-BY 4.0, **le code source présent dans ce dépôt est distribué sous licence propriétaire (Tous Droits Réservés / All Rights Reserved)**. Toute modification, redistribution ou exploitation commerciale non autorisée est strictement interdite sans accord préalable. [cite: 9]
-> 
-> Pour toute demande de licence commerciale ou d'intégration entreprise, contactez : **sales@aresmaxima.com**[cite: 9]
+```bash
+# 1. Verify SHA-256 binary integrity (Linux / macOS)
+sha256sum -c aegis-v3.7.apk.sha256
 
-### Binaires Officiels et Certifiés
-La compilation requiert une chaîne de compilation croisée complexe (Rust aarch64-linux-android, SDK Flutter, Android NDK et dépendances C).[cite: 9]
+# 2. Verify cryptographic SLSA Build Provenance against GitHub's Sigstore transparency log
+gh attestation verify aegis-v3.7.apk --repo AresMaxima/aegis-p2p
+gh attestation verify libaegis_core.so --repo AresMaxima/aegis-p2p
 
-Les binaires pré-compilés et signés numériquement par Ares Maxima, accompagnés des garanties d'intégrité officielle (SHA-256), sont distribués exclusivement sur notre plateforme officielle :[cite: 9]
-
-https://aresmaxima.com[cite: 9]
+# 3. Verify X.509 APK signing certificate fingerprint (must match c3e55c0b...ca88db)
+apksigner verify --print-certs aegis-v3.7.apk
+```
 
 ---
 
-## Matrice des Fonctionnalités et Spécifications de Sécurité
+## ⚙️ Core Security Architecture (v3.7.0 — Milestones C89 to C96)
 
-### 1. Hardening Mémoire RAM et Attestation Matérielle
-* **Verrouillage Mémoire Précis (mlock)** : (`src/secure_buffer.rs`) Alignement dynamique sur la taille de page matérielle de l'OS. Verrouillage en RAM via `libc::mlock` pour interdire toute écriture dans le SWAP ou le fichier de pagination disque. Nettoyage déterministe par `zeroize()` avant déverrouillage (`munlock`).[cite: 9]
-* **Obfuscation Mémoire Polymorphe** : (`src/polymorphic_ram.rs`) Masquage XOR des tampons secrets avec un masque d'entropie glissant. Révision du masque à chaque lecture, effacement de l'ancien masque via `.zeroize()`, et re-obfuscation à une nouvelle empreinte binaire.[cite: 9]
-* **Enclave Matérielle et Measured Boot** : Ancrage matériel StrongBox (Android/TEE) (`src/keystore.rs`). Refus d'initialisation en me de détection de Rootkit ou Kernel altéré.[cite: 9]
-* **Coffre d'Isolation Opaque Rust / Dart** : Confinement total des secrets dans le binaire Rust. Dérivation cryptographique HKDF-SHA256 (RFC 5869) et déchiffrement AES-256-GCM. Flutter ne manipule qu'un pointeur opaque 64-bit non déférençable en Dart.[cite: 9]
-* **Interception Signaux OS et Canaris Anti-Cold Boot** : Écoute dédiée des signaux critiques (SIGSEGV / SIGBUS / SIGABRT / SIGFPE / SIGILL) déclenchant PanicPurge. Allocation de N tampons leurres ancrés en RAM remplis d'entropie pour brouiller les scanners forensiques à chaud (Volatility/Rekall).[cite: 9]
-
-##### 1bis. Filtre Seccomp-BPF Strict
-* **Blocage syscalls critiques** : (src/seccomp.rs) Filtre BPF qui bloque `execve`, `ptrace`, `process_vm_readv/writev`, `kexec_load`. Kill processus immédiat (`SECCOMP_RET_KILL_PROCESS`) si tenté.
-
-# 2. Cryptographie Post-Quantique et Anti-Coercition
-* **Échange de Clés Hybride ML-KEM-768 / X25519** : Combinaison de la courbe elliptique X25519 et de l'algorithme à réseaux euclidiens ML-KEM-768 via HKDF-SHA256.[cite: 9]
-* **Protocole d'Auto-Destruction Matérielle (Silent Burn)** : La saisie du PIN de crise (9999) ordonne l'invalidation définitive de la clé racine scellée dans la NVRAM sécurisée StrongBox, détruit les conteneurs et force un exit 137 immédiat.[cite: 9]
-* **Brûlure par Inactivité (Dead Man's Switch)** : Minuteur d'inactivité mécano-électrique réarticulé à chaque déverrouillage valide. Si aucun accès n'intervient dans la fenêtre configurable (15 min à 4 h, max 4 h), le système exécute automatiquement le Silent Burn.[cite: 9]
-* **Déclencheurs Physiques d'Urgence** : Exécution immédiate du Silent Burn lors d'anomalies physiques : retrait brutal de carte SIM/MicroSD, déconnexion USB suspecte pendant une extraction de données, ou secousse de crise captée par l'accéléromètre.[cite: 9]
-
-### 3. Protection Surface OS et Réseau OPSEC
-* **Protection Surface OS (FLAG_SECURE et Clipboard Bypass)** : Activation de FLAG_SECURE sur Android (interdiction des captures, enregistrements vidéo et floutage dans le gestionnaire de tâches). Désactivation de la sélection interactive sur tous les champs sensibles.[cite: 9]
-* **P2P Transport Hopping Dynamique** : Bascule à chaud automatique et déterministe entre Tor v3 (WAN), Direct WAN (libp2p KadDHT) et Réseau local isolé (Air-Gapped / BLE / Wi-Fi Direct).[cite: 9]
-* **Réseau Maillé Hors-Ligne (Sneakernet)** : Propagation opportuniste de proche en proche des trames chiffrées de 512 octets via BLE / Wi-Fi Direct en zone de coupure réseau. Déduplication par Hash SHA-256 et limitation TTL à 10 sauts.[cite: 9]
-* **Trafic d'Ombre à Débit Constant (Constant-Bitrate Padding)** : Enrobage de toutes les charges utiles dans des trames fixes de 512 octets transmises à intervalle régulier. Émission continue de trames leurres remplies de bruit blanc cryptographique.[cite: 9]
+* **Zero-Disk Polymorphic RAM Engine:** Zero SQLite message databases, zero flash media caches. Payloads reside exclusively in XOR-masked dual-rail volatile RAM buffers with integrity canaries and physical `/proc/self/mem` zeroization verification (**C94**).
+* **Continuous Stateful Post-Quantum Ratchet (SPQR — C95):** Hybrid initial key agreement (`ML-KEM-1024` NIST FIPS 203 + `X25519`) reinforced by continuous intra-session `ML-KEM-1024` epoch re-encapsulation (`#1 → #N` fragmented across `4 × 512B` cells for active Post-Compromise Security) and hybrid **`ML-DSA-87` (FIPS 204) + `Ed25519`** signatures.
+* **StrongBox HSM Binding & Mutual X.509 Attestation (C89 / C91 / C94):** Offline `Ed25519` license binding to the handset's non-exportable hardware `ECDSA P-256` StrongBox keypair (*Fail-Closed*), peer-to-peer mutual X.509 hardware attestation (`VerifiedBoot GREEN`, `security_level=2`), and optional external **YubiKey 5 NFC** sealing.
+* **4 Autonomous & Anti-DPI Transports (C90 / C92 / C93 / C96):**
+  1. **Embedded Tor (`Arti` `rustls+ring`) + Stealth `HTTP/3 MASQUE` (RFC 9297) + `TLS 1.3 ECH` + `GREASE`** & **512B Chaff cover traffic** against state-level Deep Packet Inspection (DPI).
+  2. **0-RF Optical Air-Gap Bridge (15 fps Luby Fountain QR)** for bidirectional communication in full Airplane Mode with zero radio emissions.
+  3. **Wi-Fi Direct** high-throughput local peer-to-peer link without routers.
+  4. **BLE Mesh** (`TTL=5`, 60s deduplication) + self-burning hourly **RAM Dead-Drops**.
+* **Anti-Coercion & Media Sanitization:** Plausible **Decoy PIN** workspace under physical duress, instant **Panic Kill Switch** (60s background auto-purge), automatic **EXIF stripping**, **Anti-PRNU** camera sensor noise attenuation, VRAM **BlindView**, and global `FLAG_SECURE`.
 
 ---
 
-## Guide de Compilation et Distribution
+## 🧪 14/14 Automated Formal Verification & CI Assurance
 
-### Prérequis
-* Rust MSRV : 1.75.0+[cite: 9]
-* Flutter SDK : 3.19.0+[cite: 9]
-* Java JDK : Version 17[cite: 9]
+Every release commit must pass **14 independent verification pipelines** before packaging:
+1. **AWS Kani Model Checking:** Mathematical absence of panics/overflows across critical primitives.
+2. **Rust Miri (5 Suites):** Exhaustive Undefined Behavior (UB), pointer provenance, and concurrency verification.
+3. **Continuous Fuzzing (5 LibFuzzer Targets):** Wire parsers, steganography, ratchet frames, and FFI boundaries.
+4. **Valgrind / Linux `mmap` Lock Audit:** Zero residual memory leaks across locked volatile pages.
+5. **Bit-for-Bit Reproducible NDK Build:** Independent Vendor A (Debian) vs. Vendor B (Ubuntu 24.04) `.so` hash match + CycloneDX SBOM (`aegis-core.cdx.json`).
+6. **RustSec, Clippy (`all-targets`), TPM2 & JNI Symbol Export Gates:** 0 active vulnerabilities across 503 crates, 52/52 verified FFI wrappers.
 
-### Exécution
-```powershell
-powershell -ExecutionPolicy Bypass -File "force_build.ps1"
+---
+
+## 📚 Official Multilingual Documentation (7 Languages: FR / EN / ES / IT / PL / UK / AR)
+
+All official `v3.7.0` operational, technical, and legal manuals are available under [`GUIDE UTILISATEUR/`](./GUIDE%20UTILISATEUR/):
+
+* 📄 [**Internal Security Audit Report (v3.7.0)**](./GUIDE%20UTILISATEUR/AUDIT%20INTERNE/AEGIS_v3.7.0_AUDIT_REPORT_MULTI.html)
+* 📊 [**Technical Proofs & Competitive Benchmark (v3.7.0)**](./GUIDE%20UTILISATEUR/TECH%20DATAS/AEGIS_v3.7.0_TECH_DATAS_MULTI.html)
+* 🛡️ [**Operations Guide & OpSec Manual (v3.7.0)**](./GUIDE%20UTILISATEUR/TECH%20SHEET/AEGIS_v3.7.0_OpSec_MULTI.html)
+* 🚀 [**Quick Start User Guide (v3.7.0)**](./GUIDE%20UTILISATEUR/MANUAL/AEGIS_v3.7.0_USER_GUIDE_MULTI.html)
+* ❓ [**Step-by-Step Operational Guide & 21 FAQs (v3.7.0)**](./GUIDE%20UTILISATEUR/FAQ%20USER/FAQ_MULTI.HTML)
+* 💼 [**Executive Commercial Brochure (v3.7.0)**](./GUIDE%20UTILISATEUR/BUSINESS%20BROCHURE/AEGIS_v3.7.0_COMMERCIAL_BROCHURE_MULTI.html)
+* ⚖️ [**COTS End-User License Agreement — HSM Bound (v3.7.0)**](./GUIDE%20UTILISATEUR/LICENSE%20AEGIS/LICENSE%20AEGIS.html)
+
+---
+
+## ⚖️ Regulatory Classification & Intellectual Property Notice
+
+* **Civil COTS Export Status:** Standalone civilian Commercial Off-The-Shelf (COTS) information security software classified under **U.S. EAR ECCN 5D992.c (Mass Market, 15 CFR 740.17(b)(1))** — non-ITAR / non-EU ML11. Registered with the French **ANSSI** under file **n° 35567570**.
+* **Sanctions Compliance:** No APK distribution or offline HSM Enrollment Seal activation is provided to embargoed jurisdictions or parties listed on U.S. OFAC SDN, BIS Denied Persons / Entity List, or EU sanctions lists.
+* **Commercial Operator & Ownership:** Exclusively operated and distributed by **AresMaxima LLC** (New Mexico, USA — USPPI) under license. Source code is published for transparency and security auditability only; no open-source license is granted.
+
+**Copyright © 2026 AresMaxima LLC and its Licensors. All Rights Reserved.**

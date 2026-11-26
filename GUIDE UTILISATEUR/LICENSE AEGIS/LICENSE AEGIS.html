@@ -1,246 +1,517 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr" dir="ltr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AEGIS P2P — Proprietary Commercial License &amp; U.S. Export Compliance</title>
+    <title>AEGIS P2P v3.7.0 — Contrat de Licence Logicielle COTS &amp; Scellement HSM (EULA)</title>
+    <script>
+        var UI_TEXTS = {
+            fr: { allBtn: "🌍 Toutes les langues (7)", printBtn: "🖨️ Télécharger le PDF", title: "AEGIS P2P v3.7.0 — Contrat de Licence COTS & Scellement HSM" },
+            en: { allBtn: "🌍 All Languages (7)", printBtn: "🖨️ Download PDF", title: "AEGIS P2P v3.7.0 — COTS End-User License Agreement (HSM Bound)" },
+            es: { allBtn: "🌍 Todos los idiomas (7)", printBtn: "🖨️ Descargar PDF", title: "AEGIS P2P v3.7.0 — Contrato de Licencia COTS y Sellado HSM" },
+            it: { allBtn: "🌍 Tutte le lingue (7)", printBtn: "🖨️ Scarica PDF", title: "AEGIS P2P v3.7.0 — Contratto di Licenza COTS & Sigillo HSM" },
+            pl: { allBtn: "🌍 Wszystkie języki (7)", printBtn: "🖨️ Pobierz PDF", title: "AEGIS P2P v3.7.0 — Umowa Licencyjna COTS i Pieczęć HSM" },
+            uk: { allBtn: "🌍 Усі мови (7)", printBtn: "🖨️ Завантажити PDF", title: "AEGIS P2P v3.7.0 — Ліцензійна Угода COTS та Печатка HSM" },
+            ar: { allBtn: "🌍 جميع اللغات (7)", printBtn: "🖨️ تحميل PDF", title: "AEGIS P2P v3.7.0 — اتفاقية ترخيص المستخدم النهائي COTS وختم HSM" }
+        };
+        var currentLang = 'fr';
+        window.filterLang = function(lang) {
+            var blocks = document.querySelectorAll('.lang-block');
+            var btns = document.querySelectorAll('.lang-btn');
+            for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
+            var activeBtn = document.getElementById('btn-' + lang);
+            if (activeBtn) activeBtn.classList.add('active');
+            if (lang !== 'all' && UI_TEXTS[lang]) {
+                currentLang = lang;
+                document.documentElement.lang = lang;
+                document.documentElement.dir = (lang === 'ar') ? 'rtl' : 'ltr';
+            } else {
+                document.documentElement.dir = 'ltr';
+            }
+            var ui = UI_TEXTS[currentLang] || UI_TEXTS.fr;
+            document.getElementById('btn-all').textContent = ui.allBtn;
+            document.getElementById('btn-print').textContent = ui.printBtn;
+            document.title = ui.title;
+            for (var j = 0; j < blocks.length; j++) {
+                if (lang === 'all' || blocks[j].id === 'lang-' + lang) blocks[j].classList.add('active');
+                else blocks[j].classList.remove('active');
+            }
+        };
+        window.addEventListener('DOMContentLoaded', function() {
+            var navLang = (navigator.language || navigator.userLanguage || 'fr').slice(0, 2).toLowerCase();
+            filterLang(UI_TEXTS[navLang] ? navLang : 'fr');
+        });
+    </script>
     <style>
         :root {
             --primary: #FCBE0B;
+            --primary-dim: rgba(252, 190, 11, 0.14);
             --bg-dark: #0d0d0e;
-            --card-bg: #141416;
-            --text-color: #e0e0e0;
-            --text-muted: #a0a0a0;
-            --border-color: #26262a;
+            --sheet-bg: #121215;
+            --card-bg: #17171b;
+            --card-inner: #1d1d22;
+            --text-color: #e6e6ea;
+            --text-muted: #a2a2ac;
+            --border-color: #292930;
             --hsm-green: #4ade80;
+            --hsm-green-dim: rgba(74, 222, 128, 0.12);
         }
-
-        * {
-            box-sizing: border-box;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-        }
-
-        body {
+        @page { size: A4 portrait; margin: 0mm; }
+        * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        html, body {
+            margin: 0; padding: 0; background-color: var(--bg-dark) !important; color: var(--text-color) !important;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-dark) !important;
-            color: var(--text-color) !important;
-            line-height: 1.6;
-            margin: 0;
-            padding: 25px 20px;
-            text-align: justify;
+            font-size: 8.3pt; line-height: 1.35;
         }
-
+        p, li { text-align: justify !important; text-justify: inter-word; -webkit-hyphens: none !important; hyphens: none !important; }
+        .lang-block[dir="ltr"] p, .lang-block[dir="ltr"] li { text-align-last: left; }
+        .lang-block[dir="rtl"] { font-family: "Segoe UI", Tahoma, Arial, sans-serif; }
+        .lang-block[dir="rtl"] p, .lang-block[dir="rtl"] li { text-align-last: right; }
         .toolbar-no-print {
-            max-width: 820px;
-            margin: 0 auto 18px auto;
-            display: flex;
-            justify-content: flex-end;
+            width: 210mm; max-width: 96%; margin: 18px auto; background: var(--sheet-bg); border: 1px solid var(--border-color);
+            border-radius: 8px; padding: 11px 16px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+            gap: 10px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.65); direction: ltr;
         }
-
+        .toolbar-links { display: flex; flex-wrap: wrap; gap: 6px; }
+        .lang-btn {
+            background: #1d1d22; color: var(--text-muted); border: 1px solid var(--border-color); padding: 6px 10px;
+            border-radius: 5px; cursor: pointer; font-size: 0.84em; font-weight: 700;
+        }
+        .lang-btn.active { background: var(--primary); color: #000; border-color: var(--primary); }
         .print-btn {
-            background: var(--hsm-green);
-            color: #000000;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.85em;
-            font-weight: bold;
-            text-transform: uppercase;
+            background: var(--hsm-green); color: #000; border: none; padding: 8px 16px; border-radius: 5px;
+            cursor: pointer; font-size: 0.85em; font-weight: 800; text-transform: uppercase;
         }
-
-        .container {
-            max-width: 820px;
-            margin: 0 auto;
-            background: var(--card-bg) !important;
-            border: 1px solid var(--border-color);
-            border-top: 4px solid var(--primary);
-            border-radius: 8px;
-            padding: 32px 38px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.7);
+        .lang-block { display: none; }
+        .lang-block.active { display: block; }
+        .a4-sheet {
+            width: 210mm; min-height: 297mm; margin: 0 auto 22px auto; background: var(--sheet-bg) !important;
+            border: 1px solid var(--border-color); border-top: 4px solid var(--primary); padding: 11mm 13mm 9mm 13mm;
+            display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 12px 38px rgba(0,0,0,0.8);
         }
-
-        header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 18px;
-            margin-bottom: 22px;
-            gap: 15px;
+        header.doc-header {
+            display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid var(--primary);
+            padding-bottom: 8px; margin-bottom: 9px; gap: 16px;
         }
-
-        .header-title h1 {
-            color: var(--primary) !important;
-            margin: 0 0 5px 0;
-            font-size: 1.45em;
-            text-transform: uppercase;
-            letter-spacing: 0.8px;
+        .lic-tag {
+            display: inline-block; background: var(--hsm-green-dim) !important; color: var(--hsm-green) !important;
+            border: 1px solid rgba(74,222,128,0.4); font-family: "Courier New", monospace; font-size: 7.3pt;
+            font-weight: 700; padding: 1.5px 7px; border-radius: 3px; margin-bottom: 4px; text-transform: uppercase;
         }
-
-        .header-title p {
-            color: var(--text-muted) !important;
-            margin: 0;
-            font-size: 0.85em;
-            font-weight: bold;
-            text-transform: uppercase;
+        h1 { color: #fff !important; margin: 0 0 2px 0; font-size: 15.2pt; text-transform: uppercase; }
+        h1 span { color: var(--primary) !important; }
+        .subtitle { color: var(--text-muted) !important; font-size: 7.9pt; margin: 0; text-transform: uppercase; font-weight: 700; }
+        .logo { height: 42px; width: auto; max-width: 145px; object-fit: contain; }
+        .clauses { display: flex; flex-direction: column; gap: 8px; }
+        section.clause-card {
+            background: var(--card-bg) !important; border: 1px solid var(--border-color); border-radius: 6px; padding: 9.5px 13px;
         }
-
-        .logo {
-            height: 48px;
-            width: auto;
-            max-width: 170px;
-            object-fit: contain;
+        section.clause-card.hsm-clause {
+            border-left: 3.5px solid var(--hsm-green) !important; border-right: 3.5px solid var(--hsm-green) !important;
+            background: var(--card-inner) !important;
         }
-
-        .copyright-banner {
-            background: rgba(252, 190, 11, 0.1) !important;
-            border-left: 4px solid var(--primary) !important;
-            padding: 13px 16px;
-            border-radius: 4px;
-            font-weight: bold;
-            color: #ffffff !important;
-            margin-bottom: 20px;
-            font-size: 1em;
-        }
-
         h2 {
-            color: var(--primary) !important;
-            font-size: 1.1em;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 7px;
-            margin-top: 26px;
-            margin-bottom: 14px;
+            color: var(--primary) !important; border-bottom: 1px solid var(--border-color); padding-bottom: 3px;
+            margin: 0 0 5px 0; font-size: 8.9pt; text-transform: uppercase; letter-spacing: 0.4px;
         }
-
-        p {
-            margin-top: 0;
-            margin-bottom: 15px;
-            font-size: 0.94em;
+        p { margin: 0 0 5px 0; font-size: 8.05pt; }
+        p:last-child { margin-bottom: 0; }
+        code {
+            font-family: "Courier New", monospace; color: var(--primary) !important;
+            background: rgba(252,190,11,0.09); padding: 0 4px; border-radius: 3px; font-size: 0.92em;
         }
-
-        ol {
-            margin-top: 10px;
-            margin-bottom: 20px;
-            padding-left: 22px;
+        .cta-container {
+            margin-top: 8px; padding: 10px 15px; background: linear-gradient(135deg, #1a1a20 0%, #121915 100%) !important;
+            border: 1px solid rgba(74,222,128,0.45); border-radius: 6px; display: flex; align-items: center; justify-content: space-between; gap: 14px;
         }
-
-        li {
-            margin-bottom: 11px;
-            font-size: 0.93em;
-            padding-left: 6px;
+        .cta-info strong { display: block; color: #fff !important; font-size: 8.5pt; margin-bottom: 2px; }
+        .link-url { color: var(--primary) !important; font-family: "Courier New", monospace; font-size: 7.4pt; text-decoration: none; }
+        .btn-cta {
+            background-color: var(--primary) !important; color: #000 !important; font-weight: 800; text-decoration: none;
+            padding: 8px 14px; border-radius: 5px; text-transform: uppercase; font-size: 7.8pt; white-space: nowrap;
         }
-
-        li::marker {
-            color: var(--primary) !important;
-            font-weight: bold;
+        .sheet-footer {
+            margin-top: 8px; padding-top: 5px; border-top: 1px solid var(--border-color);
+            display: flex; justify-content: space-between; align-items: center; font-size: 7.2pt; color: var(--text-muted) !important;
         }
-
-        .eccn-badge {
-            display: inline-block;
-            font-family: monospace;
-            background: #1c241e !important;
-            color: var(--hsm-green) !important;
-            border: 1px solid rgba(74, 222, 128, 0.4);
-            padding: 1px 7px;
-            border-radius: 4px;
-            font-weight: bold;
-            font-size: 0.92em;
-        }
-
-        footer {
-            margin-top: 30px;
-            padding-top: 14px;
-            border-top: 1px solid var(--border-color);
-            text-align: center;
-            font-size: 0.8em;
-            color: var(--text-muted) !important;
-        }
-
-        @page {
-            size: A4 portrait;
-            margin: 12mm;
-        }
-
+        .page-num { font-family: "Courier New", monospace; font-weight: 700; color: var(--primary) !important; }
         @media print {
-            body {
-                padding: 0;
+            html, body { width: 210mm !important; background-color: var(--sheet-bg) !important; margin: 0 !important; padding: 0 !important; }
+            .toolbar-no-print { display: none !important; }
+            .a4-sheet {
+                width: 210mm !important; height: 297mm !important; min-height: 297mm !important; max-height: 297mm !important;
+                margin: 0 !important; padding: 10mm 13mm 8.5mm 13mm !important; border: none !important;
+                border-top: 4px solid var(--primary) !important; box-shadow: none !important;
+                page-break-after: always !important; break-after: page !important; page-break-inside: avoid !important; break-inside: avoid !important; overflow: hidden !important;
             }
-            .toolbar-no-print {
-                display: none !important;
-            }
-            .container {
-                box-shadow: none;
-            }
+            .lang-block.active:last-of-type .a4-sheet:last-of-type { page-break-after: auto !important; break-after: auto !important; }
         }
     </style>
 </head>
 <body>
 
 <div class="toolbar-no-print">
-    <button class="print-btn" onclick="window.print()">🖨️ Export / Print License to PDF</button>
+    <div class="toolbar-links">
+        <button type="button" id="btn-all" class="lang-btn" onclick="filterLang('all')">🌍 Toutes les langues (7)</button>
+        <button type="button" id="btn-en" class="lang-btn" onclick="filterLang('en')">🇬🇧 EN</button>
+        <button type="button" id="btn-fr" class="lang-btn active" onclick="filterLang('fr')">🇫🇷 FR</button>
+        <button type="button" id="btn-es" class="lang-btn" onclick="filterLang('es')">🇪🇸 ES</button>
+        <button type="button" id="btn-it" class="lang-btn" onclick="filterLang('it')">🇮🇹 IT</button>
+        <button type="button" id="btn-pl" class="lang-btn" onclick="filterLang('pl')">🇵🇱 PL</button>
+        <button type="button" id="btn-uk" class="lang-btn" onclick="filterLang('uk')">🇺🇦 UA</button>
+        <button type="button" id="btn-ar" class="lang-btn" onclick="filterLang('ar')">🇸🇦 AR</button>
+    </div>
+    <button type="button" id="btn-print" class="print-btn" onclick="window.print()">🖨️ Télécharger le PDF</button>
 </div>
 
-<div class="container">
-    <header>
-        <div class="header-title">
-            <h1>AEGIS P2P — Proprietary Commercial License &amp; U.S. Export Compliance</h1>
-            <p>AresMaxima LLC (New Mexico, USA) — Exclusive Commercial Operator</p>
+<div id="lang-fr" class="lang-block active" lang="fr" dir="ltr">
+    <div class="a4-sheet">
+        <div>
+            <header class="doc-header">
+                <div class="header-title">
+                    <div class="lic-tag">CONTRAT DE LICENCE UTILISATEUR FINAL (CLUF / EULA) • RÉF. AM-AEGIS-P2P-370</div>
+                    <h1>AEGIS <span>P2P v3.7.0</span> — Licence Logicielle COTS</h1>
+                    <p class="subtitle">Exploitant Commercial Exclusif : AresMaxima LLC (NM, USA) • Édition Scellement HSM &amp; COTS EAR 5D992.c</p>
+                </div>
+                <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima Logo" class="logo">
+            </header>
+            <div class="clauses">
+                <section class="clause-card">
+                    <h2>1. Titularité des Droits, Exploitant Exclusif &amp; Concession de Sous-Licence</h2>
+                    <p>L'intégralité des droits de propriété intellectuelle, titres, codes sources, architectures cryptographiques, secrets d'affaires (18 U.S.C. § 1836) et droits d'auteur (17 U.S.C. § 101 et seq.) afférents à <strong>AEGIS P2P v3.7.0</strong> (incluant le moteur natif Rust <code>libaegis_core.so</code> vérifié par preuves formelles AWS Kani / Miri et sceau <strong>SLSA Provenance</strong>) demeure la propriété exclusive des concédants de droits amont (<em>Licensors</em>). <strong>AresMaxima LLC</strong> (New Mexico Limited Liability Company, USA) agit exclusivement en qualité d'<strong>Exploitant Commercial Exclusif et Licencié Autorisé</strong> (17 U.S.C. § 501(b)), seul habilité à commercialiser le logiciel et à concéder au Client, sous réserve du paiement des droits applicables, une sous-licence d'utilisation personnelle ou corporative, non exclusive, non transférable et révocable sur le terminal physique enrôlé. Le logiciel est concédé sous licence et n'est en aucun cas vendu.</p>
+                </section>
+                <section class="clause-card hsm-clause">
+                    <h2>2. Scellement Matériel HSM (StrongBox — C89) &amp; Règle de Non-Désinstallation</h2>
+                    <p>Chaque clé d'activation (<code>LICENSE:v1:</code>) est émise et signée hors-ligne (Ed25519) par AresMaxima LLC et liée mathématiquement à l'empreinte SHA-256 de la clé publique matérielle non-exportable générée dans le coprocesseur <strong>StrongBox / TEE</strong> du terminal du Client (<code>aegis_verify_license_key_bound</code>), sans serveur cloud ni télémétrie. <strong>Avertissement critique :</strong> la désinstallation de l'application ou l'effacement des données système Android détruit irréversiblement la clé matérielle StrongBox et invalide la licence liée. Les mises à jour doivent impérativement être installées directement par-dessus l'application existante.</p>
+                </section>
+                <section class="clause-card">
+                    <h2>3. Architecture Zéro-Connaissance (Zero-Knowledge) &amp; Absence de Récupération</h2>
+                    <p>AEGIS P2P s'exécute à 100 % en mémoire vive volatile (<strong>Zero-Disk RAM</strong>) avec chiffrement post-quantique continu (<strong>SPQR ML-KEM-1024 FIPS 203 + ML-DSA-87 FIPS 204</strong>). Ni AresMaxima LLC ni ses Concédants ne détiennent de clé maître, de code PIN, d'annuaire ou de porte dérobée, et ne peuvent techniquement ni réinitialiser un PIN oublié ni restaurer des données purgées par le Kill Switch ou l'extinction du terminal.</p>
+                </section>
+                <section class="clause-card">
+                    <h2>4. Classification Civile COTS (U.S. EAR ECCN 5D992.c) &amp; Conformité OFAC / BIS</h2>
+                    <p>AEGIS P2P v3.7.0 est un logiciel civil commercial autonome sur étagère (<strong>COTS</strong>) implémentant exclusivement des standards publics (NIST FIPS 203/204, RFC 9297 HTTP/3 MASQUE, TLS 1.3 ECH, Tor Arti), régi par les <strong>U.S. Export Administration Regulations (15 CFR § 740.17(b)(1), ECCN 5D992.c Mass Market)</strong> et distinct de tout article de défense (non-ITAR / non-ML11). AresMaxima LLC agit en qualité d'exportateur attitré (USPPI). Il est strictement interdit d'exporter, réexporter ou transférer ce logiciel vers Cuba, l'Iran, la Corée du Nord, la Syrie, la Russie, la Biélorussie, les régions sous sanctions, ou à toute personne inscrite sur les listes U.S. OFAC SDN, BIS Denied Persons / Entity List ou sanctions de l'UE.</p>
+                </section>
+                <section class="clause-card">
+                    <h2>5. Séparation des Entités, Garantie Limitée &amp; Droit Applicable</h2>
+                    <p>Toute ingénierie inverse, altération binaire ou contournement de l'attestation mutuelle X.509 (C91) est interdit. Le Client contracte exclusivement avec <strong>AresMaxima LLC</strong> en tant qu'opérateur indépendant ; aucun concédant amont (<em>Licensor</em>) n'est partie au présent contrat ni ne saurait encourir une quelconque responsabilité contractuelle ou délictuelle. Fourni « EN L'ÉTAT » (<em>AS IS</em>), la responsabilité totale cumulée d'AresMaxima LLC et de ses Concédants ne pourra excéder le prix payé pour la licence au cours des douze (12) derniers mois. Régi par les lois de l'État du Nouveau-Mexique et le droit fédéral des États-Unis d'Amérique.</p>
+                </section>
+            </div>
         </div>
-        <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima Logo" class="logo">
-    </header>
-
-    <div class="copyright-banner">
-        Copyright (c) 2026 AresMaxima LLC and its Licensors. All Rights Reserved.
+        <div>
+            <div class="cta-container">
+                <div class="cta-info">
+                    <strong>Exploitant Officiel &amp; Support Licences HSM — AresMaxima LLC (Français)</strong>
+                    <a href="https://aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="link-url" target="_blank" rel="noopener noreferrer">https://aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/</a>
+                </div>
+                <a href="https://aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="btn-cta" target="_blank" rel="noopener noreferrer">aresmaxima.com →</a>
+            </div>
+            <footer class="sheet-footer">
+                <span>Copyright © 2026 AresMaxima LLC and its Licensors. All Rights Reserved. • COTS Software (EAR ECCN 5D992.c)</span>
+                <span class="page-num">1 / 1</span>
+            </footer>
+        </div>
     </div>
+</div>
 
-    <p>
-        This source code, binary executable (APK/IPA), cryptographic implementations,
-        and associated documentation are proprietary intellectual property exclusively
-        licensed to and commercially operated by <strong>AresMaxima LLC (New Mexico, USA)</strong>.
-        Unauthorized copying, modification, reverse engineering, decompilation,
-        distribution, or commercial exploitation of this software, via any medium, is
-        strictly prohibited without prior written permission from <strong>AresMaxima LLC</strong>.
-    </p>
+<div id="lang-en" class="lang-block" lang="en" dir="ltr">
+    <div class="a4-sheet">
+        <div>
+            <header class="doc-header">
+                <div class="header-title">
+                    <div class="lic-tag">END-USER LICENSE AGREEMENT (EULA) • SKU AM-AEGIS-P2P-370</div>
+                    <h1>AEGIS <span>P2P v3.7.0</span> — COTS Software License</h1>
+                    <p class="subtitle">Exclusive Commercial Operator: AresMaxima LLC (NM, USA) • HSM Hardware-Bound &amp; EAR 5D992.c COTS</p>
+                </div>
+                <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima Logo" class="logo">
+            </header>
+            <div class="clauses">
+                <section class="clause-card">
+                    <h2>1. Intellectual Property Ownership, Exclusive Operator &amp; Sublicense Grant</h2>
+                    <p>All worldwide right, title, and interest, including copyrights (17 U.S.C. § 101 et seq.), patent rights, and trade secrets (18 U.S.C. § 1836) in and to <strong>AEGIS P2P v3.7.0</strong> (including the native Rust engine <code>libaegis_core.so</code> verified by AWS Kani / Miri formal proofs and <strong>SLSA Provenance</strong> seal, binaries, and documentation) are and shall remain the sole and exclusive property of its upstream intellectual property owner(s) (<em>Licensors</em>). <strong>AresMaxima LLC</strong> (a New Mexico Limited Liability Company, USA) acts strictly as the <strong>Exclusive Commercial Operator and Authorized Exclusive Licensee</strong> (with full enforcement standing under 17 U.S.C. § 501(b)) and, subject to valid payment, grants End-User a revocable, non-exclusive, non-transferable sublicense to execute the binary solely on the enrolled physical handset. The software is licensed, not sold.</p>
+                </section>
+                <section class="clause-card hsm-clause">
+                    <h2>2. HSM Hardware Binding (StrongBox — C89) &amp; In-Place Update Mandate</h2>
+                    <p>Each activation key (<code>LICENSE:v1:</code>) is issued and signed offline (Ed25519) by AresMaxima LLC and mathematically bound to the SHA-256 fingerprint of the non-exportable ECDSA P-256 hardware key generated inside the handset's <strong>StrongBox / TEE</strong> coprocessor (<code>aegis_verify_license_key_bound</code>), with zero cloud servers or telemetry. <strong>Critical Notice:</strong> uninstalling the application or clearing Android system storage permanently destroys the StrongBox hardware keypair and invalidates the bound license. Updates must always be installed directly in-place over the existing application.</p>
+                </section>
+                <section class="clause-card">
+                    <h2>3. Zero-Knowledge RAM Architecture &amp; Irrecoverability</h2>
+                    <p>AEGIS P2P executes 100% in volatile memory (<strong>Zero-Disk RAM</strong>) using continuous post-quantum ratcheting (<strong>SPQR ML-KEM-1024 FIPS 203 + ML-DSA-87 FIPS 204</strong>). Neither AresMaxima LLC nor its Licensors hold master keys, PINs, contact graphs, or backdoors, and cannot reset forgotten PINs or recover data purged by the Kill Switch or power loss.</p>
+                </section>
+                <section class="clause-card">
+                    <h2>4. Civil COTS Export Classification (U.S. EAR ECCN 5D992.c) &amp; OFAC Compliance</h2>
+                    <p>AEGIS P2P v3.7.0 is standalone civilian <strong>Commercial Off-The-Shelf (COTS)</strong> software implementing exclusively public standards (NIST FIPS 203/204, RFC 9297 HTTP/3 MASQUE, TLS 1.3 ECH, Tor Arti), governed by the <strong>U.S. Export Administration Regulations (15 CFR § 740.17(b)(1), ECCN 5D992.c Mass Market)</strong> and segregated from defense articles (non-ITAR / non-EU ML11). AresMaxima LLC acts as sole Exporter of Record (USPPI). End-User shall not export, re-export, or transfer the software to Cuba, Iran, North Korea, Syria, Russia, Belarus, sanctioned regions, or any party on the U.S. OFAC SDN, BIS Denied Persons / Entity List, or EU sanctions lists.</p>
+                </section>
+                <section class="clause-card">
+                    <h2>5. Corporate Separateness, Disclaimer of Warranty &amp; Governing Law</h2>
+                    <p>Reverse engineering, binary modification, or bypassing mutual X.509 hardware attestation (C91) is prohibited. End-User contracts solely with <strong>AresMaxima LLC</strong> as independent commercial operator; upstream <em>Licensors</em> are separate legal entities, assume zero contractual obligation or liability hereunder, and are express third-party beneficiaries of these protections. Provided "AS IS" without warranty, the aggregate liability of AresMaxima LLC and its Licensors shall not exceed the license fee paid in the preceding twelve (12) months. Governed by the laws of the State of New Mexico and U.S. Federal law.</p>
+                </section>
+            </div>
+        </div>
+        <div>
+            <div class="cta-container">
+                <div class="cta-info">
+                    <strong>Official Commercial Operator &amp; HSM Licensing — AresMaxima LLC (English)</strong>
+                    <a href="https://en.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="link-url" target="_blank" rel="noopener noreferrer">https://en.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/</a>
+                </div>
+                <a href="https://en.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="btn-cta" target="_blank" rel="noopener noreferrer">en.aresmaxima.com →</a>
+            </div>
+            <footer class="sheet-footer">
+                <span>Copyright © 2026 AresMaxima LLC and its Licensors. All Rights Reserved. • COTS Software (EAR ECCN 5D992.c)</span>
+                <span class="page-num">1 / 1</span>
+            </footer>
+        </div>
+    </div>
+</div>
 
-    <h2>U.S. Export Control &amp; Sanctions Compliance (EAR / OFAC)</h2>
+<div id="lang-es" class="lang-block" lang="es" dir="ltr">
+    <div class="a4-sheet">
+        <div>
+            <header class="doc-header">
+                <div class="header-title">
+                    <div class="lic-tag">CONTRATO DE LICENCIA DE USUARIO FINAL (EULA) • REF. AM-AEGIS-P2P-370</div>
+                    <h1>AEGIS <span>P2P v3.7.0</span> — Licencia de Software COTS</h1>
+                    <p class="subtitle">Operador Comercial Exclusivo : AresMaxima LLC (NM, EE. UU.) • Sellado HSM y COTS EAR 5D992.c</p>
+                </div>
+                <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima Logo" class="logo">
+            </header>
+            <div class="clauses">
+                <section class="clause-card">
+                    <h2>1. Titularidad de Propiedad Intelectual, Operador Exclusivo y Sublicencia</h2>
+                    <p>Todos los derechos de propiedad intelectual, títulos, código fuente, secretos comerciales (18 U.S.C. § 1836) y derechos de autor (17 U.S.C. § 101 et seq.) sobre <strong>AEGIS P2P v3.7.0</strong> (incluido el núcleo Rust <code>libaegis_core.so</code> verificado con AWS Kani / Miri y sello <strong>SLSA Provenance</strong>) pertenecen exclusivamente a sus titulares licenciantes propietarios (<em>Licensors</em>). <strong>AresMaxima LLC</strong> (New Mexico LLC, EE. UU.) actúa únicamente como <strong>Operador Comercial Exclusivo y Licenciatario Autorizado</strong> (17 U.S.C. § 501(b)) y otorga al Usuario Final, previo pago, una sublicencia revocable, no exclusiva e intransferible para ejecutar el binario en el terminal físico registrado. El software se otorga bajo licencia y no se vende.</p>
+                </section>
+                <section class="clause-card hsm-clause">
+                    <h2>2. Sellado de Hardware HSM (StrongBox — C89) y Regla de Actualización</h2>
+                    <p>Cada clave de licencia (<code>LICENSE:v1:</code>) es emitida y firmada fuera de línea (Ed25519) por AresMaxima LLC vinculada a la huella SHA-256 de la clave pública física no exportable del coprocesador <strong>StrongBox / TEE</strong> del teléfono (<code>aegis_verify_license_key_bound</code>), sin nube ni telemetría. <strong>Aviso crítico :</strong> desinstalar la app o borrar datos del sistema en Android destruye irreversiblemente la clave StrongBox e invalida la licencia. Las actualizaciones deben instalarse siempre encima.</p>
+                </section>
+                <section class="clause-card">
+                    <h2>3. Arquitectura Conocimiento Cero (Zero-Disk RAM) e Irrecuperabilidad</h2>
+                    <p>AEGIS P2P opera al 100 % en memoria volátil (<strong>Zero-Disk RAM</strong>) con cifrado post-cuántico continuo (<strong>SPQR ML-KEM-1024 FIPS 203 + ML-DSA-87 FIPS 204</strong>). Ni AresMaxima LLC ni sus Licenciantes poseen claves maestras, códigos PIN ni puertas traseras, y no pueden restablecer un PIN olvidado ni recuperar datos purgados por el Kill Switch.</p>
+                </section>
+                <section class="clause-card">
+                    <h2>4. Clasificación Civil COTS (U.S. EAR ECCN 5D992.c) y Sanciones OFAC / BIS</h2>
+                    <p>AEGIS P2P v3.7.0 es software civil comercial estándar (<strong>COTS</strong>) basado en estándares públicos (NIST FIPS 203/204, RFC 9297 HTTP/3 MASQUE, TLS 1.3 ECH, Tor Arti), regido por <strong>U.S. EAR (15 CFR § 740.17(b)(1), ECCN 5D992.c Mass Market)</strong> y separado de artículos militares (no-ITAR / no-ML11). AresMaxima LLC actúa como exportador registrado (USPPI). Queda prohibido exportar o transferir el software a Cuba, Irán, Corea del Norte, Siria, Rusia, Bielorrusia, regiones sancionadas o partes incluidas en listas OFAC SDN, BIS o sanciones de la UE.</p>
+                </section>
+                <section class="clause-card">
+                    <h2>5. Separación Societaria, Limitación de Responsabilidad y Ley Aplicable</h2>
+                    <p>Se prohíbe la ingeniería inversa, alteración binaria o elusión de la atestación mutua X.509 (C91). El Usuario contrata únicamente con <strong>AresMaxima LLC</strong> como operador independiente; los titulares de propiedad intelectual (<em>Licensors</em>) son entidades jurídicas separadas y no asumen ninguna responsabilidad frente a terceros. Entregado «TAL CUAL» (<em>AS IS</em>), la responsabilidad acumulada de AresMaxima LLC y sus Licenciantes se limita al importe pagado en los últimos doce (12) meses. Regido por las leyes del Estado de Nuevo México y la ley federal de EE. UU.</p>
+                </section>
+            </div>
+        </div>
+        <div>
+            <div class="cta-container">
+                <div class="cta-info">
+                    <strong>Operador Oficial y Soporte de Licencias HSM — AresMaxima LLC (Español)</strong>
+                    <a href="https://es.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="link-url" target="_blank" rel="noopener noreferrer">https://es.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/</a>
+                </div>
+                <a href="https://es.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="btn-cta" target="_blank" rel="noopener noreferrer">es.aresmaxima.com →</a>
+            </div>
+            <footer class="sheet-footer">
+                <span>Copyright © 2026 AresMaxima LLC and its Licensors. All Rights Reserved. • COTS Software (EAR ECCN 5D992.c)</span>
+                <span class="page-num">1 / 1</span>
+            </footer>
+        </div>
+    </div>
+</div>
 
-    <p>
-        This software is standalone commercial off-the-shelf (COTS) information security
-        software subject to the U.S. Export Administration Regulations (EAR, 15 CFR
-        Parts 730-774) and classified under <span class="eccn-badge">ECCN 5D992.c</span> (Mass Market, 15 CFR
-        § 740.17(b)(1)).
-    </p>
+<div id="lang-it" class="lang-block" lang="it" dir="ltr">
+    <div class="a4-sheet">
+        <div>
+            <header class="doc-header">
+                <div class="header-title">
+                    <div class="lic-tag">CONTRATTO DI LICENZA D'USO (EULA) • RIF. AM-AEGIS-P2P-370</div>
+                    <h1>AEGIS <span>P2P v3.7.0</span> — Licenza Software COTS</h1>
+                    <p class="subtitle">Operatore Commerciale Esclusivo : AresMaxima LLC (NM, USA) • Sigillo HSM &amp; COTS EAR 5D992.c</p>
+                </div>
+                <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima Logo" class="logo">
+            </header>
+            <div class="clauses">
+                <section class="clause-card">
+                    <h2>1. Titolarità della Proprietà Intellettuale, Operatore Esclusivo &amp; Sublicenza</h2>
+                    <p>Tutti i diritti di proprietà intellettuale, titoli, codice sorgente, segreti industriali (18 U.S.C. § 1836) e copyright (17 U.S.C. § 101 et seq.) relativi ad <strong>AEGIS P2P v3.7.0</strong> (incluso il motore Rust <code>libaegis_core.so</code> certificato da prove formali AWS Kani / Miri e sigillo <strong>SLSA Provenance</strong>) restano di proprietà esclusiva dei rispettivi titolari concedenti a monte (<em>Licensors</em>). <strong>AresMaxima LLC</strong> (New Mexico LLC, USA) agisce esclusivamente quale <strong>Operatore Commerciale Esclusivo e Licenziatario Autorizzato</strong> (17 U.S.C. § 501(b)) e concede all'Utente, previo pagamento, una sublicenza revocabile, non esclusiva e non trasferibile per il solo terminale fisico registrato. Il software è concesso in licenza e non venduto.</p>
+                </section>
+                <section class="clause-card hsm-clause">
+                    <h2>2. Sigillo Hardware HSM (StrongBox — C89) &amp; Aggiornamenti Sovrascritti</h2>
+                    <p>Ogni chiave di licenza (<code>LICENSE:v1:</code>) è emessa e firmata offline (Ed25519) da AresMaxima LLC e vincolata all'impronta SHA-256 della chiave pubblica hardware non esportabile del coprocessore <strong>StrongBox / TEE</strong> dello smartphone (<code>aegis_verify_license_key_bound</code>), senza server cloud né telemetria. <strong>Avviso critico :</strong> disinstallare l'app o cancellare i dati di sistema Android distrugge irreversibilmente la chiave StrongBox invalidando la licenza. Gli aggiornamenti vanno sempre installati sopra l'app esistente.</p>
+                </section>
+                <section class="clause-card">
+                    <h2>3. Architettura Zero-Knowledge (Zero-Disk RAM) &amp; Irrecuperabilità</h2>
+                    <p>AEGIS P2P opera al 100% in memoria volatile (<strong>Zero-Disk RAM</strong>) con crittografia post-quantistica continua (<strong>SPQR ML-KEM-1024 FIPS 203 + ML-DSA-87 FIPS 204</strong>). Né AresMaxima LLC né i suoi Concedenti detengono chiavi master, PIN o backdoor e non possono reimpostare PIN dimenticati né recuperare dati azzerati dal Kill Switch.</p>
+                </section>
+                <section class="clause-card">
+                    <h2>4. Classificazione Civile COTS (U.S. EAR ECCN 5D992.c) &amp; Conformità OFAC / BIS</h2>
+                    <p>AEGIS P2P v3.7.0 è un software civile commerciale standard (<strong>COTS</strong>) basato su standard pubblici (NIST FIPS 203/204, RFC 9297 HTTP/3 MASQUE, TLS 1.3 ECH, Tor Arti), disciplinato dalle <strong>U.S. EAR (15 CFR § 740.17(b)(1), ECCN 5D992.c Mass Market)</strong> e separato da articoli militari (non-ITAR / non-ML11). AresMaxima LLC opera quale esportatore registrato (USPPI). È vietata l'esportazione o il trasferimento verso Cuba, Iran, Corea del Nord, Siria, Russia, Bielorussia, regioni sanzionate o soggetti inclusi nelle liste OFAC SDN, BIS o UE.</p>
+                </section>
+                <section class="clause-card">
+                    <h2>5. Separazione Societaria, Limitazione di Responsabilità &amp; Legge Applicabile</h2>
+                    <p>Sono vietati reverse engineering, alterazione binaria o aggiramento dell'attestazione X.509 (C91). L'Utente contrae esclusivamente con <strong>AresMaxima LLC</strong> quale operatore autonomo; i titolari concedenti a monte (<em>Licensors</em>) sono entità giuridiche distinte ed esenti da qualsiasi responsabilità verso terzi. Fornito «COSÌ COM'È» (<em>AS IS</em>), la responsabilità complessiva di AresMaxima LLC e dei suoi Concedenti è limitata all'importo pagato negli ultimi dodici (12) mesi. Regolato dalle leggi dello Stato del Nuovo Messico e dal diritto federale USA.</p>
+                </section>
+            </div>
+        </div>
+        <div>
+            <div class="cta-container">
+                <div class="cta-info">
+                    <strong>Operatore Ufficiale &amp; Supporto Licenze HSM — AresMaxima LLC (Italiano)</strong>
+                    <a href="https://it.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="link-url" target="_blank" rel="noopener noreferrer">https://it.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/</a>
+                </div>
+                <a href="https://it.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="btn-cta" target="_blank" rel="noopener noreferrer">it.aresmaxima.com →</a>
+            </div>
+            <footer class="sheet-footer">
+                <span>Copyright © 2026 AresMaxima LLC and its Licensors. All Rights Reserved. • COTS Software (EAR ECCN 5D992.c)</span>
+                <span class="page-num">1 / 1</span>
+            </footer>
+        </div>
+    </div>
+</div>
 
-    <p>
-        By downloading, installing, or activating this software via an HSM Enrollment Seal,
-        the End-User / Licensee represents and warrants that:
-    </p>
+<div id="lang-pl" class="lang-block" lang="pl" dir="ltr">
+    <div class="a4-sheet">
+        <div>
+            <header class="doc-header">
+                <div class="header-title">
+                    <div class="lic-tag">UMOWA LICENCYJNA UŻYTKOWNIKA KOŃCOWEGO (EULA) • SKU AM-AEGIS-P2P-370</div>
+                    <h1>AEGIS <span>P2P v3.7.0</span> — Licencja Oprogramowania COTS</h1>
+                    <p class="subtitle">Wyłączny Operator Handlowy : AresMaxima LLC (NM, USA) • Pieczęć HSM i COTS EAR 5D992.c</p>
+                </div>
+                <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima Logo" class="logo">
+            </header>
+            <div class="clauses">
+                <section class="clause-card">
+                    <h2>1. Własność Intelektualna, Wyłączny Operator i Udzielenie Sublicencji</h2>
+                    <p>Wszelkie prawa własności intelektualnej, tytuły prawne, kod źródłowy, tajemnice przedsiębiorstwa (18 U.S.C. § 1836) oraz prawa autorskie (17 U.S.C. § 101 et seq.) do <strong>AEGIS P2P v3.7.0</strong> (w tym natywnego silnika Rust <code>libaegis_core.so</code> zweryfikowanego dowodami AWS Kani / Miri i pieczęcią <strong>SLSA Provenance</strong>) pozostają wyłączną własnością podmiotów licencjonujących wyższego szczebla (<em>Licensors</em>). <strong>AresMaxima LLC</strong> (New Mexico LLC, USA) działa wyłącznie jako <strong>Wyłączny Operator Handlowy i Autoryzowany Licencjobiorca</strong> (17 U.S.C. § 501(b)) i po opłaceniu zamówienia udziela Użytkownikowi odwołalnej, niewyłącznej, nieprzenoszalnej sublicencji na zarejestrowane urządzenie fizyczne. Oprogramowanie jest licencjonowane, a nie sprzedawane.</p>
+                </section>
+                <section class="clause-card hsm-clause">
+                    <h2>2. Sprzętowa Pieczęć HSM (StrongBox — C89) i Zakaz Odinstalowywania</h2>
+                    <p>Każdy klucz licencyjny (<code>LICENSE:v1:</code>) jest wydawany i podpisywany offline (Ed25519) przez AresMaxima LLC oraz powiązany z odciskiem SHA-256 nieeksportowalnego klucza układu <strong>StrongBox / TEE</strong> smartfona (<code>aegis_verify_license_key_bound</code>), bez chmury i telemetrii. <strong>Ostrzeżenie :</strong> odinstalowanie aplikacji lub wyczyszczenie danych systemowych Androida trwale niszczy klucz StrongBox i unieważnia licencję. Aktualizacje należy zawsze instalować nakładkowo.</p>
+                </section>
+                <section class="clause-card">
+                    <h2>3. Architektura Zero-Knowledge (Zero-Disk RAM) i Brak Odzyskiwania</h2>
+                    <p>AEGIS P2P działa w 100% w pamięci ulotnej (<strong>Zero-Disk RAM</strong>) z ciągłym szyfrowaniem post-kwantowym (<strong>SPQR ML-KEM-1024 FIPS 203 + ML-DSA-87 FIPS 204</strong>). Ani AresMaxima LLC, ani jej Licencjodawcy nie posiadają kluczy głównych, kodów PIN ani furtek (backdoor) i nie mogą zresetować zapomnianego PIN-u ani odzyskać wyczyszczonych danych.</p>
+                </section>
+                <section class="clause-card">
+                    <h2>4. Klasyfikacja Cywilna COTS (U.S. EAR ECCN 5D992.c) i Sankcje OFAC / BIS</h2>
+                    <p>AEGIS P2P v3.7.0 jest cywilnym oprogramowaniem komercyjnym (<strong>COTS</strong>) opartym na otwartych standardach (NIST FIPS 203/204, RFC 9297 HTTP/3 MASQUE, TLS 1.3 ECH, Tor Arti), podlegającym przepisom <strong>U.S. EAR (15 CFR § 740.17(b)(1), ECCN 5D992.c Mass Market)</strong> poza wykazami uzbrojenia (non-ITAR / non-ML11). AresMaxima LLC działa jako wyłączny eksporter (USPPI). Zabrania się eksportu lub przekazywania oprogramowania na Kubę, do Iranu, Korei Północnej, Syrii, Rosji, Białorusi, regionów objętych sankcjami oraz podmiotom z list OFAC SDN, BIS i UE.</p>
+                </section>
+                <section class="clause-card">
+                    <h2>5. Odrębność Prawna Podmiotów, Ograniczenie Odpowiedzialności i Prawo</h2>
+                    <p>Inżynieria wsteczna, modyfikacja binarna oraz obchodzenie wzajemnej atestacji X.509 (C91) są zabronione. Użytkownik zawiera umowę wyłącznie z <strong>AresMaxima LLC</strong> jako niezależnym operatorem; właściciele własności intelektualnej (<em>Licensors</em>) są odrębnymi podmiotami prawnymi i nie ponoszą żadnej odpowiedzialności wobec osób trzecich. Oprogramowanie dostarczane jest w stanie „TAK JAK JEST” (<em>AS IS</em>), a łączna odpowiedzialność ograniczona jest do opłaty uiszczonej w ciągu ostatnich dwunastu (12) miesięcy. Prawem właściwym jest prawo stanu Nowy Meksyk oraz prawo federalne USA.</p>
+                </section>
+            </div>
+        </div>
+        <div>
+            <div class="cta-container">
+                <div class="cta-info">
+                    <strong>Oficjalny Operator i Wsparcie Licencji HSM — AresMaxima LLC (Polski)</strong>
+                    <a href="https://pl.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="link-url" target="_blank" rel="noopener noreferrer">https://pl.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/</a>
+                </div>
+                <a href="https://pl.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="btn-cta" target="_blank" rel="noopener noreferrer">pl.aresmaxima.com →</a>
+            </div>
+            <footer class="sheet-footer">
+                <span>Copyright © 2026 AresMaxima LLC and its Licensors. All Rights Reserved. • COTS Software (EAR ECCN 5D992.c)</span>
+                <span class="page-num">1 / 1</span>
+            </footer>
+        </div>
+    </div>
+</div>
 
-    <ol>
-        <li>
-            The End-User is not located in, under the control of, or a national or resident
-            of any country or territory subject to U.S. comprehensive embargoes (Country
-            Group E:1/E:2, including Cuba, Iran, North Korea, Syria, and the Crimea,
-            Donetsk, and Luhansk regions) or Belarus and the Russian Federation;
-        </li>
-        <li>
-            The End-User is not listed on any U.S. Government restricted party list
-            (including the U.S. Treasury Department's SDN List or the U.S. Commerce
-            Department's Denied Persons, Unverified, or Entity Lists);
-        </li>
-        <li>
-            The software will not be used for any prohibited end-use under 15 CFR Part 744
-            (including nuclear, missile, or chemical/biological weapons proliferation).
-        </li>
-    </ol>
+<div id="lang-uk" class="lang-block" lang="uk" dir="ltr">
+    <div class="a4-sheet">
+        <div>
+            <header class="doc-header">
+                <div class="header-title">
+                    <div class="lic-tag">ЛІЦЕНЗІЙНА УГОДА КІНЦЕВОГО КОРИСТУВАЧА (EULA) • АРТ. AM-AEGIS-P2P-370</div>
+                    <h1>AEGIS <span>P2P v3.7.0</span> — Ліцензія COTS ПЗ</h1>
+                    <p class="subtitle">Ексклюзивний Комерційний Оператор : AresMaxima LLC (NM, USA) • Печатка HSM та EAR 5D992.c</p>
+                </div>
+                <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima Logo" class="logo">
+            </header>
+            <div class="clauses">
+                <section class="clause-card">
+                    <h2>1. Інтелектуальна Власність, Ексклюзивний Оператор та Субліцензія</h2>
+                    <p>Усі права інтелектуальної власності, титули, вихідний код, комерційна таємниця (18 U.S.C. § 1836) та авторські права (17 U.S.C. § 101 et seq.) на <strong>AEGIS P2P v3.7.0</strong> (включно з нативним ядром Rust <code>libaegis_core.so</code>, верифікованим доказами AWS Kani / Miri та печаткою <strong>SLSA Provenance</strong>) належать виключно правовласникам-ліцензіарам (<em>Licensors</em>). <strong>AresMaxima LLC</strong> (New Mexico LLC, США) діє суворо як <strong>Ексклюзивний Комерційний Оператор та Уповноважений Ліцензіат</strong> (17 U.S.C. § 501(b)) і за умови оплати надає Користувачу відкличну, невиключну, непередавану субліцензію на зареєстрований фізичний смартфон. ПЗ надається в користування за ліцензією і не продається.</p>
+                </section>
+                <section class="clause-card hsm-clause">
+                    <h2>2. Апаратна Прив'язка HSM (StrongBox — C89) та Правило Оновлення</h2>
+                    <p>Кожен ключ активації (<code>LICENSE:v1:</code>) випускається й підписується офлайн (Ed25519) компанією AresMaxima LLC і прив'язується до SHA-256 відбитка неекспортованого ключа чипа <strong>StrongBox / TEE</strong> пристрою (<code>aegis_verify_license_key_bound</code>), без хмари і телеметрії. <strong>Попередження :</strong> видалення додатка або очищення системних даних Android незворотно знищує ключ StrongBox і анулює ліцензію. Оновлення встановлюються виключно поверх існуючої версії.</p>
+                </section>
+                <section class="clause-card">
+                    <h2>3. Архітектура Zero-Knowledge (Zero-Disk RAM) та Невідновність</h2>
+                    <p>AEGIS P2P працює на 100% в оперативній пам'яті (<strong>Zero-Disk RAM</strong>) із безперервним постквантовим шифруванням (<strong>SPQR ML-KEM-1024 FIPS 203 + ML-DSA-87 FIPS 204</strong>). Ані AresMaxima LLC, ані її Ліцензіари не володіють майстер-ключами, PIN-кодами чи бекдорами і технічно не можуть скинути забутий PIN або відновити очищені дані.</p>
+                </section>
+                <section class="clause-card">
+                    <h2>4. Цивільна Класифікація COTS (U.S. EAR ECCN 5D992.c) та Санкції OFAC / BIS</h2>
+                    <p>AEGIS P2P v3.7.0 є автономним цивільним комерційним ПЗ (<strong>COTS</strong>) на базі публічних стандартів (NIST FIPS 203/204, RFC 9297 HTTP/3 MASQUE, TLS 1.3 ECH, Tor Arti), що регулюється <strong>U.S. EAR (15 CFR § 740.17(b)(1), ECCN 5D992.c Mass Market)</strong> поза військовими списками (non-ITAR / non-ML11). AresMaxima LLC виступає єдиним експортером (USPPI). Заборонено експорт або передачу ПЗ до Куби, Ірану, КНДР, Сирії, Росії, Білорусі, підсанкційних територій або особам зі списків OFAC SDN, BIS чи ЄС.</p>
+                </section>
+                <section class="clause-card">
+                    <h2>5. Корпоративна Відокремленість, Обмеження Відповідальності та Право</h2>
+                    <p>Зворотна розробка, модифікація бінарного коду або обхід взаємної атестації X.509 (C91) суворо заборонені. Користувач укладає угоду виключно з <strong>AresMaxima LLC</strong> як незалежним оператором; правовласники-ліцензіари (<em>Licensors</em>) є окремими юридичними особами і не несуть жодної відповідальності перед третіми особами. ПЗ надається «ЯК Є» (<em>AS IS</em>), а сукупна відповідальність обмежується сумою, сплаченою за ліцензію протягом останніх дванадцяти (12) місяців. Регулюється правом штату Нью-Мексико та федеральним правом США.</p>
+                </section>
+            </div>
+        </div>
+        <div>
+            <div class="cta-container">
+                <div class="cta-info">
+                    <strong>Офіційний Оператор та Підтримка HSM-Ліцензій — AresMaxima LLC (Українська)</strong>
+                    <a href="https://uk.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="link-url" target="_blank" rel="noopener noreferrer">https://uk.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/</a>
+                </div>
+                <a href="https://uk.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="btn-cta" target="_blank" rel="noopener noreferrer">uk.aresmaxima.com →</a>
+            </div>
+            <footer class="sheet-footer">
+                <span>Copyright © 2026 AresMaxima LLC and its Licensors. All Rights Reserved. • COTS Software (EAR ECCN 5D992.c)</span>
+                <span class="page-num">1 / 1</span>
+            </footer>
+        </div>
+    </div>
+</div>
 
-    <footer>
-        AEGIS P2P v3.5.0 • Copyright © 2026 AresMaxima LLC and its Licensors. All Rights Reserved. • <a href="https://aresmaxima.com" style="color: var(--primary); text-decoration: none;">aresmaxima.com</a>
-    </footer>
+<div id="lang-ar" class="lang-block" lang="ar" dir="rtl">
+    <div class="a4-sheet">
+        <div>
+            <header class="doc-header">
+                <div class="header-title">
+                    <div class="lic-tag">اتفاقية ترخيص المستخدم النهائي (EULA) • المرجع AM-AEGIS-P2P-370</div>
+                    <h1>AEGIS <span>P2P v3.7.0</span> — ترخيص برمجيات COTS</h1>
+                    <p class="subtitle">المشغل التجاري الحصري : AresMaxima LLC (نيو مكسيكو، الولايات المتحدة) • ختم HSM وتصنيف EAR 5D992.c</p>
+                </div>
+                <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima Logo" class="logo">
+            </header>
+            <div class="clauses">
+                <section class="clause-card">
+                    <h2>1. ملكية الحقوق الفكرية، المشغل التجاري الحصري ومنح الترخيص الفرعي</h2>
+                    <p>تظل جميع حقوق الملكية الفكرية وحقوق النشر (17 U.S.C. § 101 et seq.) والأسرار التجارية (18 U.S.C. § 1836) والكود المصدري الخاصة ببرنامج <strong>AEGIS P2P v3.7.0</strong> (بما يشمل النواة الأصلية بلغة Rust <code>libaegis_core.so</code> الموثقة ببراهين AWS Kani / Miri وختم <strong>SLSA Provenance</strong>) ملكية خالصة وحصرية لمالكي الحقوق المرخِّصين الأصليين (<em>Licensors</em>). تعمل شركة <strong>AresMaxima LLC</strong> (شركة ذات مسؤولية محدودة في ولاية نيو مكسيكو، الولايات المتحدة) حصرياً بصفتها <strong>المشغل التجاري الحصري والمرخَّص له المفوض</strong> (17 U.S.C. § 501(b))، وتمنح المستخدم النهائي مقابل الرسوم المقررة ترخيصاً فرعياً غير حصري وغير قابل للتحويل وقابلاً للإلغاء لتشغيل البرنامج على الهاتف المادي المسجل فقط. البرنامج مرخَّص ولا يُباع.</p>
+                </section>
+                <section class="clause-card hsm-clause">
+                    <h2>2. الختم المادي HSM (StrongBox — C89) وقاعدة التحديث المباشر</h2>
+                    <p>تُصدر AresMaxima LLC كل مفتاح تفعيل (<code>LICENSE:v1:</code>) وتوقعه دون اتصال (Ed25519) مرتبطاً رياضياً ببصمة SHA-256 للمفتاح العام المادي غير القابل للتصدير داخل شريحة <strong>StrongBox / TEE</strong> في الهاتف (<code>aegis_verify_license_key_bound</code>) دون خوادم سحابية أو تتبع. <strong>تنبيه جوهري :</strong> يؤدي إلغاء تثبيت التطبيق أو مسح بيانات النظام في أندرويد إلى إتلاف مفتاح StrongBox نهائياً وإبطال الترخيص؛ يجب دائماً تثبيت التحديثات فوق النسخة الحالية.</p>
+                </section>
+                <section class="clause-card">
+                    <h2>3. بنية انعدام المعرفة (Zero-Disk RAM) واستحالة الاسترجاع</h2>
+                    <p>يعمل AEGIS P2P بنسبة 100% في الذاكرة المتطايرة (<strong>Zero-Disk RAM</strong>) بتدوير مستمر ما بعد الكم (<strong>SPQR ML-KEM-1024 FIPS 203 + ML-DSA-87 FIPS 204</strong>). لا تمتلك AresMaxima LLC ولا مانحو التراخيص الأصليون أي مفاتيح رئيسية أو رموز PIN أو أبواب خلفية، ولا يمكن استعادة رمز PIN المنسي أو البيانات المطهرة عبر Kill Switch.</p>
+                </section>
+                <section class="clause-card">
+                    <h2>4. التصنيف المدني القياسي (U.S. EAR ECCN 5D992.c) والامتثال لعقوبات OFAC</h2>
+                    <p>يُعد AEGIS P2P v3.7.0 برمجية تجارية مدنية مستقلة (<strong>COTS</strong>) تطبق معايير عامة مفتوحة (NIST FIPS 203/204، وRFC 9297 HTTP/3 MASQUE، وTLS 1.3 ECH، وTor Arti) وتخضع للوائح التصدير الأمريكية <strong>U.S. EAR (15 CFR § 740.17(b)(1), ECCN 5D992.c Mass Market)</strong> خارج القوائم العسكرية (غير خاضع لـ ITAR أو ML11). تتولى AresMaxima LLC دور المصدِّر المسجل (USPPI). يُحظر تصدير البرنامج أو نقله إلى كوبا أو إيران أو كوريا الشمالية أو سوريا أو روسيا أو بيلاروسيا أو المناطق الخاضعة للعقوبات أو أي طرف مدرج في قوائم العقوبات (OFAC SDN، وBIS، والاتحاد الأوروبي).</p>
+                </section>
+                <section class="clause-card">
+                    <h2>5. الاستقلالية القانونية للكيانات، حدود المسؤولية والقانون الواجب التطبيق</h2>
+                    <p>تُحظر الهندسة العكسية أو تعديل الحزمة الثنائية أو تجاوز التصديق المادي المتبادل X.509 (C91). يتعاقد المستخدم حصرياً مع <strong>AresMaxima LLC</strong> كمشغل تجاري مستقل؛ ويُعد مالكو الملكية الفكرية الأصليون (<em>Licensors</em>) كيانات قانونية منفصلة ولا يتحملون أي التزام تعاقدي أو مسؤولية تجاه الغير. يُقدّم البرنامج «كما هو» (<em>AS IS</em>)، ولا تتجاوز المسؤولية الإجمالية لشركة AresMaxima LLC ومرخِّصيها قيمة الترخيص المدفوعة خلال الاثني عشر (12) شهراً السابقة. تخضع الاتفاقية لقوانين ولاية نيو مكسيكو والقانون الفيدرالي الأمريكي.</p>
+                </section>
+            </div>
+        </div>
+        <div>
+            <div class="cta-container">
+                <div class="cta-info">
+                    <strong>المشغل التجاري الرسمي ودعم تراخيص HSM — AresMaxima LLC (العربية)</strong>
+                    <a href="https://ar.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="link-url" target="_blank" rel="noopener noreferrer">https://ar.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/</a>
+                </div>
+                <a href="https://ar.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="btn-cta" target="_blank" rel="noopener noreferrer">ar.aresmaxima.com ←</a>
+            </div>
+            <footer class="sheet-footer">
+                <span>Copyright © 2026 AresMaxima LLC and its Licensors. All Rights Reserved. • COTS Software (EAR ECCN 5D992.c)</span>
+                <span class="page-num">1 / 1</span>
+            </footer>
+        </div>
+    </div>
 </div>
 
 </body>

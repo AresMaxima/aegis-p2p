@@ -1,0 +1,1774 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AEGIS P2P v3.7 — Guide de Démarrage Rapide</title>
+    <script>
+        var UI_TEXTS = {
+            fr: {
+                allBtn: "🌍 Toutes les langues (7)",
+                printBtn: "🖨️ Télécharger le PDF",
+                title: "AEGIS P2P v3.7 — Guide de Démarrage Rapide"
+            },
+            en: {
+                allBtn: "🌍 All Languages (7)",
+                printBtn: "🖨️ Download PDF",
+                title: "AEGIS P2P v3.7 — Quick Start Guide"
+            },
+            es: {
+                allBtn: "🌍 Todos los idiomas (7)",
+                printBtn: "🖨️ Descargar PDF",
+                title: "AEGIS P2P v3.7 — Guía de Inicio Rápido"
+            },
+            it: {
+                allBtn: "🌍 Tutte le lingue (7)",
+                printBtn: "🖨️ Scarica PDF",
+                title: "AEGIS P2P v3.7 — Guida Rapida all'Avvio"
+            },
+            pl: {
+                allBtn: "🌍 Wszystkie języki (7)",
+                printBtn: "🖨️ Pobierz PDF",
+                title: "AEGIS P2P v3.7 — Skrócona Instrukcja Obsługi"
+            },
+            uk: {
+                allBtn: "🌍 Усі мови (7)",
+                printBtn: "🖨️ Завантажити PDF",
+                title: "AEGIS P2P v3.7 — Посібник зі Швидкого Старту"
+            },
+            ar: {
+                allBtn: "🌍 جميع اللغات (7)",
+                printBtn: "🖨️ تحميل PDF",
+                title: "AEGIS P2P v3.7 — دليل البدء السريع"
+            }
+        };
+
+        var currentLang = 'fr';
+
+        window.filterLang = function(lang) {
+            var blocks = document.querySelectorAll('.lang-block');
+            var btns = document.querySelectorAll('.lang-btn');
+
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].classList.remove('active');
+            }
+            var activeBtn = document.getElementById('btn-' + lang);
+            if (activeBtn) activeBtn.classList.add('active');
+
+            if (lang !== 'all' && UI_TEXTS[lang]) {
+                currentLang = lang;
+                document.documentElement.lang = lang;
+                document.documentElement.dir = (lang === 'ar') ? 'rtl' : 'ltr';
+            } else {
+                document.documentElement.dir = 'ltr';
+            }
+
+            var ui = UI_TEXTS[currentLang] || UI_TEXTS.fr;
+            var allBtnEl = document.getElementById('btn-all');
+            var printBtnEl = document.getElementById('btn-print');
+            if (allBtnEl) allBtnEl.textContent = ui.allBtn;
+            if (printBtnEl) printBtnEl.textContent = ui.printBtn;
+            document.title = ui.title;
+
+            for (var j = 0; j < blocks.length; j++) {
+                if (lang === 'all' || blocks[j].id === 'lang-' + lang) {
+                    blocks[j].classList.add('active');
+                } else {
+                    blocks[j].classList.remove('active');
+                }
+            }
+        };
+
+        window.addEventListener('DOMContentLoaded', function() {
+            var navLang = (navigator.language || navigator.userLanguage || 'fr').slice(0, 2).toLowerCase();
+            if (UI_TEXTS[navLang]) {
+                filterLang(navLang);
+            } else {
+                filterLang('fr');
+            }
+        });
+    </script>
+    <style>
+        :root {
+            --primary: #FCBE0B;
+            --primary-dim: rgba(252, 190, 11, 0.14);
+            --bg-dark: #0d0d0e;
+            --sheet-bg: #121215;
+            --card-bg: #17171b;
+            --card-inner: #1d1d22;
+            --text-color: #e6e6ea;
+            --text-muted: #a2a2ac;
+            --border-color: #292930;
+            --alert-color: #f87171;
+            --hsm-green: #4ade80;
+            --hsm-green-dim: rgba(74, 222, 128, 0.12);
+        }
+
+        @page {
+            size: A4 portrait;
+            margin: 0mm;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-dark) !important;
+            color: var(--text-color) !important;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-size: 8.6pt;
+            line-height: 1.36;
+        }
+
+        /* JUSTIFICATION SYMÉTRIQUE STRICTE SANS CÉSURE */
+        p,
+        li,
+        .welcome-banner p,
+        .alert-box p,
+        .hsm-box p,
+        .danger-box p {
+            text-align: justify !important;
+            text-justify: inter-word;
+            -webkit-hyphens: none !important;
+            hyphens: none !important;
+        }
+
+        .lang-block[dir="ltr"] p,
+        .lang-block[dir="ltr"] li {
+            text-align-last: left;
+        }
+
+        .lang-block[dir="rtl"] {
+            font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+        }
+
+        .lang-block[dir="rtl"] p,
+        .lang-block[dir="rtl"] li {
+            text-align-last: right;
+        }
+
+        /* BARRE D'OUTILS MULTILINGUE (ÉCRAN UNIQUEMENT) */
+        .toolbar-no-print {
+            width: 210mm;
+            max-width: 96%;
+            margin: 18px auto;
+            background: var(--sheet-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 11px 16px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            box-shadow: 0 6px 24px rgba(0, 0, 0, 0.65);
+            direction: ltr;
+        }
+
+        .toolbar-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .lang-btn {
+            background: #1d1d22;
+            color: var(--text-muted);
+            border: 1px solid var(--border-color);
+            padding: 6px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.84em;
+            font-weight: 700;
+            transition: all 0.15s ease;
+        }
+
+        .lang-btn:hover {
+            border-color: var(--primary);
+            color: #ffffff;
+        }
+
+        .lang-btn.active {
+            background: var(--primary);
+            color: #000000;
+            border-color: var(--primary);
+        }
+
+        .print-btn {
+            background: var(--hsm-green);
+            color: #000000;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.85em;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+
+        .lang-block {
+            display: none;
+        }
+
+        .lang-block.active {
+            display: block;
+        }
+
+        /* FEUILLE A4 EXACTE */
+        .a4-sheet {
+            width: 210mm;
+            min-height: 297mm;
+            margin: 0 auto 22px auto;
+            background: var(--sheet-bg) !important;
+            border: 1px solid var(--border-color);
+            border-top: 4px solid var(--primary);
+            padding: 10.5mm 13mm 8.5mm 13mm;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-shadow: 0 12px 38px rgba(0, 0, 0, 0.8);
+        }
+
+        .sheet-body {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .sections-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 9px;
+        }
+
+        /* EN-TÊTE PAGE 1 */
+        header.doc-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 8px;
+            margin-bottom: 2px;
+            gap: 18px;
+        }
+
+        .header-title {
+            flex: 1;
+        }
+
+        .guide-tag {
+            display: inline-block;
+            background: var(--hsm-green-dim) !important;
+            color: var(--hsm-green) !important;
+            border: 1px solid rgba(74, 222, 128, 0.4);
+            font-family: "Courier New", Courier, monospace;
+            font-size: 7.3pt;
+            font-weight: 700;
+            padding: 1.5px 7px;
+            border-radius: 3px;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        h1 {
+            color: #ffffff !important;
+            margin: 0 0 2px 0;
+            font-size: 15.8pt;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            text-align: left;
+        }
+
+        h1 span {
+            color: var(--primary) !important;
+        }
+
+        .lang-block[dir="rtl"] h1 {
+            text-align: right;
+        }
+
+        .subtitle {
+            color: var(--text-muted) !important;
+            font-size: 8.2pt;
+            margin: 0;
+            text-transform: uppercase;
+            font-weight: 700;
+            text-align: left !important;
+        }
+
+        .lang-block[dir="rtl"] .subtitle {
+            text-align: right !important;
+        }
+
+        .logo {
+            height: 44px;
+            width: auto;
+            max-width: 150px;
+            object-fit: contain;
+            flex-shrink: 0;
+        }
+
+        /* BANDEAU D'ACCUEIL SYMÉTRIQUE */
+        .welcome-banner {
+            background: var(--card-inner) !important;
+            border: 1px solid var(--border-color);
+            border-left: 4px solid var(--primary);
+            border-right: 4px solid var(--primary);
+            border-radius: 5px;
+            padding: 8px 13px;
+        }
+
+        .welcome-banner p {
+            margin: 0;
+            font-size: 8.3pt;
+            color: #ededf0 !important;
+        }
+
+        /* MINI-HEADER PAGE 2 */
+        .p2-mini-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 6px;
+            margin-bottom: 2px;
+        }
+
+        .p2-mini-header span {
+            font-family: "Courier New", Courier, monospace;
+            font-size: 7.7pt;
+            font-weight: 700;
+            color: var(--primary) !important;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .p2-mini-header .logo-sm {
+            height: 24px;
+            width: auto;
+        }
+
+        /* CARTES DE SECTIONS */
+        section.guide-card {
+            background: var(--card-bg) !important;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 10px 13px;
+        }
+
+        /* GRILLES SYMÉTRIQUES 50% / 50% */
+        .dual-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 9px;
+            align-items: stretch;
+        }
+
+        .sub-panel {
+            background: var(--card-inner) !important;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            padding: 9px 11px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        h2 {
+            color: var(--primary) !important;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 4px;
+            margin: 0 0 7px 0;
+            font-size: 9.4pt;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            text-align: left;
+        }
+
+        .lang-block[dir="rtl"] h2 {
+            text-align: right;
+        }
+
+        h3 {
+            color: #ffffff !important;
+            font-size: 8.6pt;
+            margin: 0 0 5px 0;
+            padding-bottom: 3px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            text-align: left;
+        }
+
+        .lang-block[dir="rtl"] h3 {
+            text-align: right;
+        }
+
+        p {
+            margin: 0 0 6px 0;
+            font-size: 8.25pt;
+        }
+
+        p:last-child {
+            margin-bottom: 0;
+        }
+
+        ul {
+            list-style-type: none;
+            padding: 0;
+            margin: 0 0 6px 0;
+        }
+
+        ul:last-child {
+            margin-bottom: 0;
+        }
+
+        li {
+            margin-bottom: 4.5px;
+            position: relative;
+            padding-left: 13px;
+            font-size: 8.15pt;
+            line-height: 1.34;
+        }
+
+        li:last-child {
+            margin-bottom: 0;
+        }
+
+        .lang-block[dir="rtl"] li {
+            padding-left: 0;
+            padding-right: 13px;
+        }
+
+        li::before {
+            content: "▪";
+            color: var(--primary) !important;
+            font-weight: bold;
+            position: absolute;
+            left: 0;
+            top: 0;
+        }
+
+        .lang-block[dir="rtl"] li::before {
+            left: auto;
+            right: 0;
+        }
+
+        /* ENCADRÉS D'ALERTE / HSM / DANGER */
+        .alert-box {
+            background: rgba(252, 190, 11, 0.09) !important;
+            border: 1px solid rgba(252, 190, 11, 0.28);
+            border-left: 3.5px solid var(--primary) !important;
+            padding: 7px 11px;
+            border-radius: 4px;
+            margin-top: 6px;
+        }
+
+        .lang-block[dir="rtl"] .alert-box {
+            border-left: 1px solid rgba(252, 190, 11, 0.28) !important;
+            border-right: 3.5px solid var(--primary) !important;
+        }
+
+        .hsm-box {
+            background: rgba(74, 222, 128, 0.07) !important;
+            border: 1px solid rgba(74, 222, 128, 0.32) !important;
+            border-left: 3.5px solid var(--hsm-green) !important;
+            padding: 7px 11px;
+            border-radius: 4px;
+            margin: 6px 0 8px 0;
+        }
+
+        .lang-block[dir="rtl"] .hsm-box {
+            border-left: 1px solid rgba(74, 222, 128, 0.32) !important;
+            border-right: 3.5px solid var(--hsm-green) !important;
+        }
+
+        .danger-box {
+            background: rgba(248, 113, 113, 0.09) !important;
+            border: 1px solid rgba(248, 113, 113, 0.3);
+            border-left: 3.5px solid var(--alert-color) !important;
+            padding: 7px 10px;
+            border-radius: 4px;
+            margin-top: 6px;
+        }
+
+        .lang-block[dir="rtl"] .danger-box {
+            border-left: 1px solid rgba(248, 113, 113, 0.3) !important;
+            border-right: 3.5px solid var(--alert-color) !important;
+        }
+
+        .alert-box p,
+        .danger-box p,
+        .hsm-box p {
+            margin: 0;
+            font-size: 8pt;
+            line-height: 1.33;
+            color: #ffffff !important;
+        }
+
+        strong {
+            color: #ffffff !important;
+        }
+
+        .highlight {
+            color: var(--primary) !important;
+            font-weight: 700;
+        }
+
+        code {
+            font-family: "Courier New", Courier, monospace;
+            color: var(--primary) !important;
+            background: rgba(252, 190, 11, 0.09);
+            padding: 0 4px;
+            border-radius: 3px;
+            font-size: 0.94em;
+        }
+
+        .hsm-tag {
+            font-family: "Courier New", Courier, monospace;
+            background: #19241c !important;
+            color: var(--hsm-green) !important;
+            padding: 1px 6px;
+            border-radius: 3px;
+            border: 1px solid rgba(74, 222, 128, 0.38);
+            font-weight: 700;
+            font-size: 0.88em;
+        }
+
+        /* BANNIÈRE CTA PAR LANGUE */
+        .cta-container {
+            margin-top: 8px;
+            padding: 11px 16px;
+            background: linear-gradient(135deg, #1a1a20 0%, #121915 100%) !important;
+            border: 1px solid rgba(74, 222, 128, 0.45);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .cta-info {
+            flex: 1;
+            text-align: left;
+        }
+
+        .lang-block[dir="rtl"] .cta-info {
+            text-align: right;
+        }
+
+        .cta-info strong {
+            display: block;
+            color: #ffffff !important;
+            font-size: 8.8pt;
+            margin-bottom: 2px;
+        }
+
+        .link-url {
+            color: var(--primary) !important;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 7.5pt;
+            text-decoration: none;
+        }
+
+        .btn-cta {
+            display: inline-block;
+            background-color: var(--primary) !important;
+            color: #000000 !important;
+            font-weight: 800;
+            text-decoration: none;
+            padding: 9px 15px;
+            border-radius: 5px;
+            text-transform: uppercase;
+            font-size: 7.9pt;
+            letter-spacing: 0.4px;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        /* PIED DE PAGE DE CHAQUE FEUILLE A4 */
+        .sheet-footer {
+            margin-top: 8px;
+            padding-top: 6px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 7.3pt;
+            color: var(--text-muted) !important;
+        }
+
+        .sheet-footer a {
+            color: var(--primary) !important;
+            text-decoration: none;
+        }
+
+        .page-num {
+            font-family: "Courier New", Courier, monospace;
+            font-weight: 700;
+            color: var(--primary) !important;
+        }
+
+        /* IMPRESSION PDF STRICTE : 2 PAGES A4 PARFAITES PAR LANGUE */
+        @media print {
+            html, body {
+                width: 210mm !important;
+                background-color: var(--sheet-bg) !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+
+            .toolbar-no-print {
+                display: none !important;
+            }
+
+            .a4-sheet {
+                width: 210mm !important;
+                height: 297mm !important;
+                min-height: 297mm !important;
+                max-height: 297mm !important;
+                margin: 0 !important;
+                padding: 10mm 13mm 8mm 13mm !important;
+                border: none !important;
+                border-top: 4px solid var(--primary) !important;
+                box-shadow: none !important;
+                page-break-after: always !important;
+                break-after: page !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                overflow: hidden !important;
+            }
+
+            .lang-block.active:last-of-type .a4-sheet:last-of-type {
+                page-break-after: auto !important;
+                break-after: auto !important;
+            }
+        }
+
+        /* RESPONSIVE ÉCRAN MOBILE UNIQUEMENT (JAMAIS EN PDF) */
+        @media screen and (max-width: 780px) {
+            .a4-sheet {
+                width: 96%;
+                min-height: auto;
+                padding: 18px 16px;
+            }
+            .dual-grid {
+                grid-template-columns: 1fr;
+            }
+            header.doc-header, .cta-container {
+                flex-direction: column;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- BARRE D'OUTILS INTERACTIVE (Masquée à l'impression PDF) -->
+<div class="toolbar-no-print">
+    <div class="toolbar-links">
+        <button type="button" id="btn-all" class="lang-btn" onclick="filterLang('all')">🌍 Toutes les langues (7)</button>
+        <button type="button" id="btn-en" class="lang-btn" onclick="filterLang('en')">🇬🇧 EN</button>
+        <button type="button" id="btn-fr" class="lang-btn active" onclick="filterLang('fr')">🇫🇷 FR</button>
+        <button type="button" id="btn-es" class="lang-btn" onclick="filterLang('es')">🇪🇸 ES</button>
+        <button type="button" id="btn-it" class="lang-btn" onclick="filterLang('it')">🇮🇹 IT</button>
+        <button type="button" id="btn-pl" class="lang-btn" onclick="filterLang('pl')">🇵🇱 PL</button>
+        <button type="button" id="btn-uk" class="lang-btn" onclick="filterLang('uk')">🇺🇦 UA</button>
+        <button type="button" id="btn-ar" class="lang-btn" onclick="filterLang('ar')">🇸🇦 AR</button>
+    </div>
+    <button type="button" id="btn-print" class="print-btn" onclick="window.print()">🖨️ Télécharger le PDF</button>
+</div>
+
+<!-- =========================================================================
+     1. FRANÇAIS (FR — aresmaxima.com)
+     ========================================================================= -->
+<div id="lang-fr" class="lang-block active" lang="fr" dir="ltr">
+    <!-- PAGE 1 / 2 -->
+    <div class="a4-sheet">
+        <div class="sheet-body">
+            <div class="sections-stack">
+                <header class="doc-header">
+                    <div class="header-title">
+                        <div class="guide-tag">GUIDE UTILISATEUR PAS-À-PAS • RÉF. AM-AEGIS-P2P-370</div>
+                        <h1>AEGIS <span>P2P v3.7</span></h1>
+                        <p class="subtitle">Guide de Démarrage Rapide — Édition Scellement Matériel HSM</p>
+                    </div>
+                    <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima Logo" class="logo">
+                </header>
+
+                <div class="welcome-banner">
+                    <p>Bienvenue sur <strong>AEGIS P2P</strong>. Ce guide vous accompagne pas à pas, de l'installation autonome de l'application et du scellement cryptographique de votre puce matérielle jusqu'à votre première conversation chiffrée sans trace sur disque.</p>
+                </div>
+
+                <section class="guide-card">
+                    <h2>1. Installation de l'Application (L'Indépendance)</h2>
+                    <p>AEGIS P2P étant distribué en dehors des magasins d'applications centralisés (Google Play), vous installez directement un fichier binaire signé <span class="highlight">.apk</span> afin qu'aucun géant du numérique ne contrôle ni ne journalise votre messagerie.</p>
+                    <ul>
+                        <li><strong>Téléchargement :</strong> Récupérez sur votre téléphone le fichier <code>.apk</code> officiel fourni lors de votre commande.</li>
+                        <li><strong>Lancement :</strong> Ouvrez le fichier téléchargé et autorisez l'installation depuis cette source si Android vous le demande.</li>
+                        <li><strong>Ouverture :</strong> Une fois l'installation terminée, lancez directement AEGIS P2P.</li>
+                    </ul>
+                    <div class="alert-box">
+                        <p><strong>Alerte « Play Protect » :</strong> Android affiche systématiquement un avertissement indiquant que l'application provient d'une source externe. <strong>C'est normal.</strong> Appuyez sur « Installer quand même » : c'est la garantie d'une application indépendante hors surveillance store.</p>
+                    </div>
+                </section>
+
+                <section class="guide-card">
+                    <h2>2. Premier Lancement : Scellement Matériel HSM &amp; Codes d'Accès</h2>
+                    <p>AEGIS ne demande <strong>jamais</strong> d'e-mail, de numéro SIM ni de nom. Aucun serveur cloud d'activation n'intervient : votre licence est forgée hors-ligne sur mesure pour la puce de sécurité physique (StrongBox / HSM) de votre terminal.</p>
+
+                    <h3>Étape A — Enrôlement Matériel HSM (StrongBox) &amp; Clé de Licence</h3>
+                    <p>Au premier lancement, votre coprocesseur génère une paire de clés matérielle unique et affiche <span class="hsm-tag">SCEAU MATÉRIEL HSM (STRONGBOX)</span> :</p>
+                    <ul>
+                        <li>Appuyez sur <strong>« COPIER LE SCEAU D'ENRÔLEMENT HSM »</strong> et transmettez cette empreinte à Ares Maxima avec votre numéro de commande pour recevoir votre clé de licence scellée.</li>
+                        <li>Une fois votre <strong>Clé Client</strong> reçue, collez-la dans le champ dédié. Sans licence valide liée à votre puce StrongBox, le coffre refuse de s'initialiser (architecture <em>Fail-Closed</em>).</li>
+                    </ul>
+                    <div class="hsm-box">
+                        <p><strong>Souveraineté Matérielle :</strong> Votre licence est mathématiquement scellée (Ed25519) à l'empreinte SHA-256 de votre puce StrongBox et ne fonctionnera sur aucun autre appareil. <strong>Ne désinstallez jamais l'application</strong> (effectuez toujours les mises à jour par-dessus) afin de préserver la clé matérielle du téléphone.</p>
+                    </div>
+
+                    <div class="dual-grid">
+                        <div class="sub-panel">
+                            <div>
+                                <h3>Étape B — Le PIN Principal</h3>
+                                <p>Choisissez un code robuste (6+ caractères). Cette clé dérive localement votre <code>master_key</code> et déverrouille votre véritable tableau de bord.</p>
+                            </div>
+                            <div class="danger-box">
+                                <p><strong>Attention :</strong> En cas d'oubli de ce code, l'accès est définitivement perdu (aucune réinitialisation à distance n'existe).</p>
+                            </div>
+                        </div>
+                        <div class="sub-panel">
+                            <div>
+                                <h3>Étape C — PIN Leurre &amp; Kill Switch</h3>
+                                <ul>
+                                    <li><strong>PIN Leurre (Decoy) :</strong> Second code distinct ouvrant un faux tableau de bord contenant des notes anodines sous contrainte.</li>
+                                    <li><strong>Code Panique (0000 / 9999) :</strong> Purge irrécupérable de la RAM et fermeture instantanée de l'application.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+        <footer class="sheet-footer">
+            <span>AEGIS P2P v3.7 • Guide de Démarrage Rapide • AresMaxima LLC (USA) — COTS Software (EAR ECCN 5D992.c)</span>
+            <span class="page-num">1 / 2</span>
+        </footer>
+    </div>
+
+    <!-- PAGE 2 / 2 -->
+    <div class="a4-sheet">
+        <div class="sheet-body">
+            <div class="sections-stack">
+                <div class="p2-mini-header">
+                    <span>AEGIS P2P v3.7 — CONNEXION P2P, ÉCHANGES ZÉRO-TRACE &amp; RÈGLES D'HYGIÈNE</span>
+                    <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima" class="logo-sm">
+                </div>
+
+                <section class="guide-card">
+                    <h2>3. Ajouter un Contact (Sans Annuaire Central)</h2>
+                    <p>AEGIS fonctionne directement de téléphone à téléphone (Peer-to-Peer), sans serveur central d'annuaire stockant vos relations :</p>
+                    <div class="dual-grid">
+                        <div class="sub-panel">
+                            <h3>En face-à-face (Méthode optimale)</h3>
+                            <ul>
+                                <li>Dans l'onglet Réseau, appuyez sur <strong>« Mon QR Code »</strong>.</li>
+                                <li>Votre contact scanne via <strong>« Scanner un QR Code »</strong> (ou par <strong>Pont Optique Air-Gap 0-RF 15 fps</strong> en Mode Avion — C92) avec attestation mutuelle StrongBox X.509 (C91).</li>
+                            </ul>
+                        </div>
+                        <div class="sub-panel">
+                            <h3>À distance (Hors présence physique)</h3>
+                            <ul>
+                                <li>Appuyez sur <strong>« Copier ma clé »</strong> et transmettez votre clé publique éphémère par canal tiers (ou poème stéganographique).</li>
+                                <li>Collez la clé reçue dans le champ destinataire puis appuyez sur <strong>« Connecter le pair »</strong>.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="guide-card">
+                    <h2>4. Envoyer des Messages et des Fichiers (Zéro Trace sur Disque)</h2>
+                    <p>Une fois connectés, tous vos échanges sont chiffrés de bout en bout avec confidentialité post-quantique continue (<strong>SPQR ML-KEM-1024 + ML-DSA-87</strong> par époques — C95) :</p>
+                    <ul>
+                        <li><strong>Messages Texte :</strong> Rédigez et envoyez normalement ; aucune frappe ne quitte votre téléphone sans être chiffrée en mémoire vive.</li>
+                        <li><strong>Suppression EXIF Automatique :</strong> Retire intégralement des photos et vidéos toutes les métadonnées cachées (coordonnées GPS, modèle du téléphone, horodatage) avant l'envoi.</li>
+                        <li><strong>Camouflage Capteur Anti-PRNU :</strong> Neutralise l'empreinte optique unique du capteur photo afin d'empêcher toute attribution forensique d'une image à votre appareil.</li>
+                        <li><strong>Zéro Sauvegarde en Clair :</strong> Aucun fichier temporaire ni cache média n'est écrit sur la mémoire flash ; tout est traité à la volée en RAM volatile.</li>
+                    </ul>
+                </section>
+
+                <div class="dual-grid">
+                    <section class="guide-card">
+                        <h2>5. Changer de Réseau (Transport Switch)</h2>
+                        <p>Adaptez le routage à votre environnement opérationnel :</p>
+                        <ul>
+                            <li><strong>Tor (Arti) &amp; MASQUE+ECH (C96) :</strong> Anonymat maximal via Tor (<code>rustls+ring</code>), capsules HTTP/3 MASQUE anti-DPI et trafic Chaff 512 o (C90).</li>
+                            <li><strong>Wi-Fi Direct :</strong> Haut débit local à proximité immédiate, sans Internet ni routeur tiers.</li>
+                            <li><strong>BLE Mesh (Bluetooth) :</strong> Continuité en conditions extrêmes (mode avion, coupure Internet totale) de proche en proche.</li>
+                        </ul>
+                    </section>
+
+                    <section class="guide-card">
+                        <h2>6. Urgence &amp; Bonnes Pratiques</h2>
+                        <ul>
+                            <li><strong>Destruction Immédiate :</strong> Le bouton rouge en haut à droite purge toute la RAM, détruit les clés de session et ferme l'application.</li>
+                            <li><strong>Mises à jour sur place :</strong> Installez toujours les mises à jour par-dessus l'application existante pour conserver votre Sceau StrongBox.</li>
+                            <li><strong>Hash &amp; Zéro Capture :</strong> Vérifiez le SHA-256 de l'APK reçu. Le <code>FLAG_SECURE</code> bloque les captures ; ne photographiez jamais l'écran.</li>
+                        </ul>
+                    </section>
+                </div>
+            </div>
+
+            <div class="cta-container">
+                <div class="cta-info">
+                    <strong>Portail Officiel, Mises à jour &amp; Licences Scellées HSM (Français)</strong>
+                    <a href="https://aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="link-url" target="_blank" rel="noopener noreferrer">https://aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/</a>
+                </div>
+                <a href="https://aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="btn-cta" target="_blank" rel="noopener noreferrer">Accéder à aresmaxima.com →</a>
+            </div>
+        </div>
+        <footer class="sheet-footer">
+            <span>Copyright © 2026 AresMaxima LLC and its Licensors. All Rights Reserved. • <a href="https://aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" target="_blank" rel="noopener noreferrer">aresmaxima.com</a></span>
+            <span class="page-num">2 / 2</span>
+        </footer>
+    </div>
+</div>
+
+<!-- =========================================================================
+     2. ENGLISH (EN — en.aresmaxima.com)
+     ========================================================================= -->
+<div id="lang-en" class="lang-block" lang="en" dir="ltr">
+    <!-- PAGE 1 / 2 -->
+    <div class="a4-sheet">
+        <div class="sheet-body">
+            <div class="sections-stack">
+                <header class="doc-header">
+                    <div class="header-title">
+                        <div class="guide-tag">STEP-BY-STEP USER GUIDE • SKU AM-AEGIS-P2P-370</div>
+                        <h1>AEGIS <span>P2P v3.7</span></h1>
+                        <p class="subtitle">Quick Start Guide — HSM Hardware Binding Edition</p>
+                    </div>
+                    <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima Logo" class="logo">
+                </header>
+
+                <div class="welcome-banner">
+                    <p>Welcome to <strong>AEGIS P2P</strong>. This guide walks you step-by-step from standalone application installation and hardware security module binding to your first zero-disk encrypted conversation.</p>
+                </div>
+
+                <section class="guide-card">
+                    <h2>1. Installing the Application (Independence)</h2>
+                    <p>Because AEGIS P2P is distributed outside centralized app stores (Google Play), you directly install a signed <span class="highlight">.apk</span> binary to ensure no tech giant controls, logs, or monitors your communications.</p>
+                    <ul>
+                        <li><strong>Download:</strong> Save the official <code>.apk</code> file provided with your order onto your smartphone.</li>
+                        <li><strong>Launch:</strong> Open the downloaded file and allow installation from this source if prompted by Android.</li>
+                        <li><strong>Open:</strong> Once installation completes, launch AEGIS P2P directly.</li>
+                    </ul>
+                    <div class="alert-box">
+                        <p><strong>The "Play Protect" Warning:</strong> Android systematically displays a warning when installing apps outside Google Play. <strong>This is normal.</strong> Tap "Install anyway"—this confirms the binary is independent and free from store telemetry.</p>
+                    </div>
+                </section>
+
+                <section class="guide-card">
+                    <h2>2. First Launch: HSM Hardware Binding &amp; Access Codes</h2>
+                    <p>AEGIS will <strong>never</strong> ask for an email address, SIM phone number, or name. No cloud activation server is ever contacted: your license is forged offline specifically for your phone's physical security chip (StrongBox / HSM).</p>
+
+                    <h3>Step A — HSM Hardware Enrollment (StrongBox) &amp; License Key</h3>
+                    <p>Upon initial launch, your security coprocessor generates a unique hardware keypair and displays <span class="hsm-tag">HSM HARDWARE SEAL (STRONGBOX)</span>:</p>
+                    <ul>
+                        <li>Tap <strong>"COPY HSM ENROLLMENT SEAL"</strong> and send this hardware fingerprint to Ares Maxima with your order number to receive your hardware-bound license key.</li>
+                        <li>Once you receive your <strong>Client Key</strong>, paste it into the license field. Without a valid license bound to your StrongBox chip, the vault refuses to initialize (<em>Fail-Closed</em> architecture).</li>
+                    </ul>
+                    <div class="hsm-box">
+                        <p><strong>Hardware Sovereignty:</strong> Your license is mathematically sealed (Ed25519) to the SHA-256 fingerprint of your StrongBox chip and will not work on any other device. <strong>Never uninstall the application</strong> (always install updates directly over the existing app) to preserve your hardware keystore entry.</p>
+                    </div>
+
+                    <div class="dual-grid">
+                        <div class="sub-panel">
+                            <div>
+                                <h3>Step B — The Master PIN</h3>
+                                <p>Choose a strong code (6+ characters). This key locally derives your <code>master_key</code> and unlocks your genuine workspace.</p>
+                            </div>
+                            <div class="danger-box">
+                                <p><strong>Warning:</strong> If you forget this code, access is permanently lost (no remote reset mechanism exists).</p>
+                            </div>
+                        </div>
+                        <div class="sub-panel">
+                            <div>
+                                <h3>Step C — Decoy PIN &amp; Kill Switch</h3>
+                                <ul>
+                                    <li><strong>Decoy PIN:</strong> A second, distinct code opening a plausible fake dashboard with harmless notes under duress.</li>
+                                    <li><strong>Panic Code (0000 / 9999):</strong> Triggers unrecoverable RAM zeroization and instant app termination.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+        <footer class="sheet-footer">
+            <span>AEGIS P2P v3.7 • Quick Start Guide • AresMaxima LLC (USA) — COTS Software (EAR ECCN 5D992.c)</span>
+            <span class="page-num">1 / 2</span>
+        </footer>
+    </div>
+
+    <!-- PAGE 2 / 2 -->
+    <div class="a4-sheet">
+        <div class="sheet-body">
+            <div class="sections-stack">
+                <div class="p2-mini-header">
+                    <span>AEGIS P2P v3.7 — P2P PAIRING, ZERO-TRACE MESSAGING &amp; OPSEC HYGIENE</span>
+                    <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima" class="logo-sm">
+                </div>
+
+                <section class="guide-card">
+                    <h2>3. Adding a Contact (No Central Directory)</h2>
+                    <p>AEGIS operates strictly phone-to-phone (Peer-to-Peer) with no central contact server storing your social graph:</p>
+                    <div class="dual-grid">
+                        <div class="sub-panel">
+                            <h3>Face-to-Face (Most Secure)</h3>
+                            <ul>
+                                <li>In the Network tab, tap <strong>"My QR Code"</strong>.</li>
+                                <li>Your contact scans via <strong>"Scan QR"</strong> (or <strong>0-RF 15 fps Optical Air-Gap</strong> in Airplane Mode — C92) with mutual StrongBox X.509 attestation (C91).</li>
+                            </ul>
+                        </div>
+                        <div class="sub-panel">
+                            <h3>Remotely (Separate Locations)</h3>
+                            <ul>
+                                <li>Tap <strong>"Copy My Key"</strong> and send your ephemeral public key over a secondary channel (or steganographic poem).</li>
+                                <li>Paste the peer's key into the recipient field and tap <strong>"Connect Peer"</strong>.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="guide-card">
+                    <h2>4. Sending Messages &amp; Files (Zero Disk Footprint)</h2>
+                    <p>Once paired, every exchange is end-to-end encrypted with continuous post-quantum secrecy (<strong>SPQR ML-KEM-1024 + ML-DSA-87</strong> epoch rotation — C95):</p>
+                    <ul>
+                        <li><strong>Text Messages:</strong> Type and send normally; nothing ever leaves your handset unencrypted.</li>
+                        <li><strong>Automatic EXIF Stripping:</strong> Strips all hidden metadata (GPS coordinates, phone model, timestamps) from photos and videos in RAM prior to transmission.</li>
+                        <li><strong>Anti-PRNU Sensor Camouflage:</strong> Attenuates the camera sensor's unique optical noise pattern to prevent forensic attribution to your handset.</li>
+                        <li><strong>Zero Plaintext Storage:</strong> No temporary file or media cache is ever written to flash storage; all payloads are processed on the fly in volatile RAM.</li>
+                    </ul>
+                </section>
+
+                <div class="dual-grid">
+                    <section class="guide-card">
+                        <h2>5. Switching Networks (Transport Switch)</h2>
+                        <p>Adapt routing to your operational environment at any time:</p>
+                        <ul>
+                            <li><strong>Tor (Arti) &amp; MASQUE+ECH (C96):</strong> Maximum anonymity via Tor (<code>rustls+ring</code>), HTTP/3 MASQUE anti-DPI capsules, and 512B Chaff traffic (C90).</li>
+                            <li><strong>Wi-Fi Direct:</strong> High-speed local link at close range without relying on the Internet or third-party routers.</li>
+                            <li><strong>BLE Mesh (Bluetooth):</strong> Built for extreme blackouts or airplane mode via hop-by-hop Bluetooth relay.</li>
+                        </ul>
+                    </section>
+
+                    <section class="guide-card">
+                        <h2>6. Emergency Purge &amp; Best Practices</h2>
+                        <ul>
+                            <li><strong>Immediate Destruction:</strong> The top-right red alert icon instantly purges RAM, wipes session keys, and closes the app.</li>
+                            <li><strong>In-Place Updates Only:</strong> Always install updates directly over your existing app to preserve your StrongBox key and license.</li>
+                            <li><strong>Hash &amp; Zero Capture:</strong> Verify the APK SHA-256 hash upon receipt. <code>FLAG_SECURE</code> blocks screenshots; never photograph your screen.</li>
+                        </ul>
+                    </section>
+                </div>
+            </div>
+
+            <div class="cta-container">
+                <div class="cta-info">
+                    <strong>Official Portal, Updates &amp; HSM-Bound Licensing (English)</strong>
+                    <a href="https://en.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="link-url" target="_blank" rel="noopener noreferrer">https://en.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/</a>
+                </div>
+                <a href="https://en.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="btn-cta" target="_blank" rel="noopener noreferrer">Visit en.aresmaxima.com →</a>
+            </div>
+        </div>
+        <footer class="sheet-footer">
+            <span>Copyright © 2026 AresMaxima LLC and its Licensors. All Rights Reserved. • <a href="https://en.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" target="_blank" rel="noopener noreferrer">en.aresmaxima.com</a></span>
+            <span class="page-num">2 / 2</span>
+        </footer>
+    </div>
+</div>
+
+<!-- =========================================================================
+     3. ESPAÑOL (ES — es.aresmaxima.com)
+     ========================================================================= -->
+<div id="lang-es" class="lang-block" lang="es" dir="ltr">
+    <!-- PÁGINA 1 / 2 -->
+    <div class="a4-sheet">
+        <div class="sheet-body">
+            <div class="sections-stack">
+                <header class="doc-header">
+                    <div class="header-title">
+                        <div class="guide-tag">GUÍA DE USUARIO PASO A PASO • REF. AM-AEGIS-P2P-370</div>
+                        <h1>AEGIS <span>P2P v3.7</span></h1>
+                        <p class="subtitle">Guía de Inicio Rápido — Edición Sellado Físico HSM</p>
+                    </div>
+                    <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima Logo" class="logo">
+                </header>
+
+                <div class="welcome-banner">
+                    <p>Bienvenido a <strong>AEGIS P2P</strong>. Esta guía le acompaña paso a paso desde la instalación autónoma de la aplicación y el sellado criptográfico de su chip físico hasta su primera conversación segura sin rastro en disco.</p>
+                </div>
+
+                <section class="guide-card">
+                    <h2>1. Instalación de la Aplicación (La Independencia)</h2>
+                    <p>Dado que AEGIS P2P se distribuye fuera de las tiendas centralizadas (Google Play), instalará manualmente un binario firmado <span class="highlight">.apk</span> para garantizar que ningún gigante digital controle ni vigile su mensajería.</p>
+                    <ul>
+                        <li><strong>Descarga :</strong> Guarde en su teléfono el archivo <code>.apk</code> oficial proporcionado con su pedido.</li>
+                        <li><strong>Ejecución :</strong> Abra el archivo descargado y autorice la instalación desde esta fuente si Android se lo solicita.</li>
+                        <li><strong>Apertura :</strong> Una vez finalizada la instalación, inicie directamente AEGIS P2P.</li>
+                    </ul>
+                    <div class="alert-box">
+                        <p><strong>Alerta «Play Protect» :</strong> Android mostrará sistemáticamente un aviso indicando que la app proviene de una fuente externa. <strong>Es normal.</strong> Pulse «Instalar de todos modos»: es la garantía de una aplicación libre de vigilancia externa.</p>
+                    </div>
+                </section>
+
+                <section class="guide-card">
+                    <h2>2. Primer Inicio : Sellado de Hardware HSM y Códigos de Acceso</h2>
+                    <p>AEGIS <strong>nunca</strong> le pedirá correo electrónico, número SIM ni nombre. Ningún servidor en la nube interviene: su licencia se forja fuera de línea a medida para el chip de seguridad físico (StrongBox / HSM) de su teléfono.</p>
+
+                    <h3>Paso A — Registro de Hardware HSM (StrongBox) y Clave de Licencia</h3>
+                    <p>En el primer inicio, su coprocesador genera un par de claves físico único y muestra <span class="hsm-tag">SELLO DE HARDWARE HSM (STRONGBOX)</span> :</p>
+                    <ul>
+                        <li>Pulse <strong>«COPIAR SELLO DE REGISTRO HSM»</strong> y envíe esta huella física a Ares Maxima junto con su número de pedido para recibir su clave de licencia sellada.</li>
+                        <li>Una vez recibida su <strong>Clave de Cliente</strong>, péguela en el campo dedicado. Sin una licencia válida vinculada a su chip StrongBox, la bóveda rechaza inicializarse (arquitectura <em>Fail-Closed</em>).</li>
+                    </ul>
+                    <div class="hsm-box">
+                        <p><strong>Soberanía de Hardware :</strong> Su licencia está sellada matemáticamente (Ed25519) a la huella SHA-256 de su chip StrongBox y no funcionará en ningún otro dispositivo. <strong>No desinstale nunca la aplicación</strong> (actualice siempre instalando encima) para conservar la clave física del teléfono.</p>
+                    </div>
+
+                    <div class="dual-grid">
+                        <div class="sub-panel">
+                            <div>
+                                <h3>Paso B — El PIN Principal</h3>
+                                <p>Elija un código robusto (6+ caracteres). Esta clave deriva localmente su <code>master_key</code> y abre su verdadero panel de control.</p>
+                            </div>
+                            <div class="danger-box">
+                                <p><strong>Atención :</strong> Si olvida este código, el acceso se perderá definitivamente (nadie puede restablecerlo).</p>
+                            </div>
+                        </div>
+                        <div class="sub-panel">
+                            <div>
+                                <h3>Paso C — PIN Señuelo y Kill Switch</h3>
+                                <ul>
+                                    <li><strong>PIN Señuelo (Decoy) :</strong> Segundo código distinto que abre un panel falso con notas inofensivas bajo coacción física.</li>
+                                    <li><strong>Código de Pánico (0000 / 9999) :</strong> Purga irrecuperable de la memoria RAM y cierre instantáneo de la app.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+        <footer class="sheet-footer">
+            <span>AEGIS P2P v3.7 • Guía de Inicio Rápido • AresMaxima LLC (EE. UU.) — COTS Software (EAR ECCN 5D992.c)</span>
+            <span class="page-num">1 / 2</span>
+        </footer>
+    </div>
+
+    <!-- PÁGINA 2 / 2 -->
+    <div class="a4-sheet">
+        <div class="sheet-body">
+            <div class="sections-stack">
+                <div class="p2-mini-header">
+                    <span>AEGIS P2P v3.7 — CONEXIÓN P2P, MENSAJERÍA CERO-RASTRO Y BUENAS PRÁCTICAS</span>
+                    <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima" class="logo-sm">
+                </div>
+
+                <section class="guide-card">
+                    <h2>3. Añadir un Contacto (Sin Directorio Central)</h2>
+                    <p>AEGIS opera directamente de teléfono a teléfono (Peer-to-Peer) sin ningún servidor central que almacene su agenda :</p>
+                    <div class="dual-grid">
+                        <div class="sub-panel">
+                            <h3>Cara a cara (Método más seguro)</h3>
+                            <ul>
+                                <li>En la pestaña Red, pulse <strong>«Mi Código QR»</strong>.</li>
+                                <li>Su contacto escanea con <strong>«Escanear QR»</strong> (o <strong>Puente Óptico Air-Gap 0-RF 15 fps</strong> en Modo Avión — C92) y atestación mutua StrongBox X.509 (C91).</li>
+                            </ul>
+                        </div>
+                        <div class="sub-panel">
+                            <h3>A distancia (Ubicaciones distintas)</h3>
+                            <ul>
+                                <li>Pulse <strong>«Copiar mi clave»</strong> y envíe su clave pública efímera por un canal secundario (o poema esteganográfico).</li>
+                                <li>Pegue la clave recibida en el campo destinatario y pulse <strong>«Conectar Par»</strong>.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="guide-card">
+                    <h2>4. Enviar Mensajes y Archivos (Cero Rastros en Disco)</h2>
+                    <p>Una vez conectados, la conversación es privada y cifrada de extremo a extremo con seguridad post-cuántica continua (<strong>SPQR ML-KEM-1024 + ML-DSA-87</strong> por épocas — C95) :</p>
+                    <ul>
+                        <li><strong>Mensajes de Texto :</strong> Escriba y envíe con normalidad; nada sale de su teléfono sin cifrar en memoria viva.</li>
+                        <li><strong>Eliminación EXIF Automática :</strong> Retira todos los metadatos ocultos (posición GPS, modelo de dispositivo, fecha y hora) de fotos y vídeos antes del envío.</li>
+                        <li><strong>Camuflaje Óptico Anti-PRNU :</strong> Altera la huella única del sensor de cámara para impedir cualquier atribución forense a su terminal.</li>
+                        <li><strong>Cero Archivos en Claro :</strong> Ningún archivo temporal ni caché se guarda en la memoria flash; todo se procesa al vuelo en RAM volátil.</li>
+                    </ul>
+                </section>
+
+                <div class="dual-grid">
+                    <section class="guide-card">
+                        <h2>5. Cambiar de Red (Transport Switch)</h2>
+                        <p>Adapte el transporte según su entorno operativo :</p>
+                        <ul>
+                            <li><strong>Tor (Arti) y MASQUE+ECH (C96) :</strong> Máximo anonimato vía Tor (<code>rustls+ring</code>), cápsulas HTTP/3 MASQUE anti-DPI y cobertura Chaff 512B (C90).</li>
+                            <li><strong>Wi-Fi Direct :</strong> Alta velocidad a corta distancia sin pasar por Internet ni por routers externos.</li>
+                            <li><strong>BLE Mesh (Bluetooth) :</strong> Para situaciones extremas (modo avión, apagón total de Internet) nodo a nodo.</li>
+                        </ul>
+                    </section>
+
+                    <section class="guide-card">
+                        <h2>6. Emergencia y Buenas Prácticas</h2>
+                        <ul>
+                            <li><strong>Destrucción Inmediata :</strong> El botón rojo superior derecho purga toda la RAM, borra claves y cierra la aplicación.</li>
+                            <li><strong>Actualizaciones encima :</strong> Instale siempre las actualizaciones sobre la app existente para conservar su Sello StrongBox.</li>
+                            <li><strong>Hash y Cero Capturas :</strong> Verifique el SHA-256 del APK. <code>FLAG_SECURE</code> bloquea capturas; nunca fotografíe la pantalla.</li>
+                        </ul>
+                    </section>
+                </div>
+            </div>
+
+            <div class="cta-container">
+                <div class="cta-info">
+                    <strong>Portal Oficial, Actualizaciones y Licencias HSM (Español)</strong>
+                    <a href="https://es.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="link-url" target="_blank" rel="noopener noreferrer">https://es.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/</a>
+                </div>
+                <a href="https://es.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="btn-cta" target="_blank" rel="noopener noreferrer">Visitar es.aresmaxima.com →</a>
+            </div>
+        </div>
+        <footer class="sheet-footer">
+            <span>Copyright © 2026 AresMaxima LLC and its Licensors. All Rights Reserved. • <a href="https://es.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" target="_blank" rel="noopener noreferrer">es.aresmaxima.com</a></span>
+            <span class="page-num">2 / 2</span>
+        </footer>
+    </div>
+</div>
+
+<!-- =========================================================================
+     4. ITALIANO (IT — it.aresmaxima.com)
+     ========================================================================= -->
+<div id="lang-it" class="lang-block" lang="it" dir="ltr">
+    <!-- PAGINA 1 / 2 -->
+    <div class="a4-sheet">
+        <div class="sheet-body">
+            <div class="sections-stack">
+                <header class="doc-header">
+                    <div class="header-title">
+                        <div class="guide-tag">GUIDA UTENTE PASSO DOPO PASSO • RIF. AM-AEGIS-P2P-370</div>
+                        <h1>AEGIS <span>P2P v3.7</span></h1>
+                        <p class="subtitle">Guida Rapida all'Avvio — Edizione Sigillo Hardware HSM</p>
+                    </div>
+                    <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima Logo" class="logo">
+                </header>
+
+                <div class="welcome-banner">
+                    <p>Benvenuto in <strong>AEGIS P2P</strong>. Questa guida ti accompagna passo dopo passo dall'installazione autonoma dell'applicazione e dal sigillo crittografico del tuo chip hardware fino alla tua prima conversazione sicura senza tracce su disco.</p>
+                </div>
+
+                <section class="guide-card">
+                    <h2>1. Installazione dell'Applicazione (L'Indipendenza)</h2>
+                    <p>Poiché AEGIS P2P è distribuito al di fuori degli app store centralizzati (Google Play), installerai direttamente un file binario firmato <span class="highlight">.apk</span> per garantire che nessun gigante digitale controlli o sorvegli la tua messaggistica.</p>
+                    <ul>
+                        <li><strong>Download :</strong> Scarica sul telefono il file <code>.apk</code> ufficiale fornito insieme al tuo ordine.</li>
+                        <li><strong>Avvio :</strong> Apri il file scaricato e autorizza l'installazione da questa fonte se richiesto da Android.</li>
+                        <li><strong>Apertura :</strong> Una volta completata l'installazione, avvia direttamente AEGIS P2P.</li>
+                    </ul>
+                    <div class="alert-box">
+                        <p><strong>Avviso «Play Protect» :</strong> Android mostra sistematicamente un avviso indicando che l'app proviene da una fonte esterna. <strong>È normale.</strong> Tocca «Installa comunque»: è la prova che l'app è indipendente da qualsiasi controllo esterno.</p>
+                    </div>
+                </section>
+
+                <section class="guide-card">
+                    <h2>2. Primo Avvio : Sigillo Hardware HSM &amp; Codici di Accesso</h2>
+                    <p>AEGIS non chiederà <strong>mai</strong> e-mail, numero SIM o nome. Nessun server cloud interviene nell'attivazione: la tua licenza viene forgiata offline su misura per il chip di sicurezza fisico (StrongBox / HSM) del tuo smartphone.</p>
+
+                    <h3>Fase A — Registrazione Hardware HSM (StrongBox) &amp; Chiave di Licenza</h3>
+                    <p>Al primo avvio, il coprocessore di sicurezza genera una coppia di chiavi hardware unica e mostra <span class="hsm-tag">SIGILLO HARDWARE HSM (STRONGBOX)</span> :</p>
+                    <ul>
+                        <li>Tocca <strong>«COPIA SIGILLO DI REGISTRAZIONE HSM»</strong> e invia questa impronta hardware ad Ares Maxima con il numero d'ordine per ricevere la tua chiave di licenza sigillata.</li>
+                        <li>Una volta ricevuta la <strong>Chiave Cliente</strong>, incollala nell'apposito campo. Senza licenza valida legata al chip StrongBox, la cassaforte rifiuta di inizializzarsi (architettura <em>Fail-Closed</em>).</li>
+                    </ul>
+                    <div class="hsm-box">
+                        <p><strong>Sovranità Hardware :</strong> La licenza è sigillata matematicamente (Ed25519) all'impronta SHA-256 del tuo chip StrongBox e non funzionerà su nessun altro dispositivo. <strong>Non disinstallare mai l'applicazione</strong> (aggiorna sempre sovrascrivendo l'app esistente) per preservare la chiave hardware del telefono.</p>
+                    </div>
+
+                    <div class="dual-grid">
+                        <div class="sub-panel">
+                            <div>
+                                <h3>Fase B — Il PIN Principale</h3>
+                                <p>Scegli un codice robusto (6+ caratteri). Questa chiave deriva localmente la tua <code>master_key</code> e apre la tua vera dashboard.</p>
+                            </div>
+                            <div class="danger-box">
+                                <p><strong>Attenzione :</strong> Se dimentichi questo codice, i dati saranno persi definitivamente (nessun reset remoto è possibile).</p>
+                            </div>
+                        </div>
+                        <div class="sub-panel">
+                            <div>
+                                <h3>Fase C — PIN Esca &amp; Kill Switch</h3>
+                                <ul>
+                                    <li><strong>PIN Esca (Decoy) :</strong> Secondo codice distinto che apre una falsa dashboard con note innocue sotto costrizione.</li>
+                                    <li><strong>Codice di Panico (0000 / 9999) :</strong> Azzeramento irrecuperabile della RAM e chiusura istantanea dell'app.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+        <footer class="sheet-footer">
+            <span>AEGIS P2P v3.7 • Guida Rapida all'Avvio • AresMaxima LLC (USA) — COTS Software (EAR ECCN 5D992.c)</span>
+            <span class="page-num">1 / 2</span>
+        </footer>
+    </div>
+
+    <!-- PAGINA 2 / 2 -->
+    <div class="a4-sheet">
+        <div class="sheet-body">
+            <div class="sections-stack">
+                <div class="p2-mini-header">
+                    <span>AEGIS P2P v3.7 — CONNESSIONE P2P, COMUNICAZIONI ZERO-TRACCE &amp; BUONE PRATICHE</span>
+                    <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima" class="logo-sm">
+                </div>
+
+                <section class="guide-card">
+                    <h2>3. Aggiungere un Contatto (Senza Rubrica Centrale)</h2>
+                    <p>AEGIS opera direttamente da telefono a telefono (Peer-to-Peer), senza alcun server centrale che memorizzi i tuoi contatti :</p>
+                    <div class="dual-grid">
+                        <div class="sub-panel">
+                            <h3>Di persona (Metodo più sicuro)</h3>
+                            <ul>
+                                <li>Nella scheda Rete, tocca <strong>«Il mio codice QR»</strong>.</li>
+                                <li>Il contatto inquadra con <strong>«Scansiona QR»</strong> (o <strong>Ponte Ottico Air-Gap 0-RF 15 fps</strong> in Modalità Aereo — C92) con attestazione mutua StrongBox X.509 (C91).</li>
+                            </ul>
+                        </div>
+                        <div class="sub-panel">
+                            <h3>A distanza (Luoghi separati)</h3>
+                            <ul>
+                                <li>Tocca <strong>«Copia la mia chiave»</strong> e invia la chiave pubblica effimera tramite canale secondario (o poesia steganografica).</li>
+                                <li>Incolla la chiave ricevuta nel campo destinatario e tocca <strong>«Connetti Peer»</strong>.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="guide-card">
+                    <h2>4. Inviare Messaggi e File (Zero Tracce su Disco)</h2>
+                    <p>Una volta connessi, ogni scambio è crittografato end-to-end con sicurezza post-quantistica continua (<strong>SPQR ML-KEM-1024 + ML-DSA-87</strong> a epoche — C95) :</p>
+                    <ul>
+                        <li><strong>Messaggi di Testo :</strong> Scrivi e invia normalmente; nulla esce mai dal tuo telefono senza essere cifrato in RAM.</li>
+                        <li><strong>Rimozione EXIF Automatica :</strong> Elimina tutti i metadati nascosti (posizione GPS, modello telefono, timestamp) da foto e video prima dell'invio.</li>
+                        <li><strong>Camuffamento Sensore Anti-PRNU :</strong> Altera l'impronta ottica unica del sensore fotografico per impedire attribuzioni forensi al tuo dispositivo.</li>
+                        <li><strong>Zero Salvataggi in Chiaro :</strong> Nessun file temporaneo né cache viene scritto sulla memoria flash; tutto è elaborato al volo in RAM volatile.</li>
+                    </ul>
+                </section>
+
+                <div class="dual-grid">
+                    <section class="guide-card">
+                        <h2>5. Cambiare Rete (Transport Switch)</h2>
+                        <p>Adatta l'instradamento al contesto operativo in ogni momento :</p>
+                        <ul>
+                            <li><strong>Tor (Arti) &amp; MASQUE+ECH (C96) :</strong> Massimo anonimato via Tor (<code>rustls+ring</code>), capsule HTTP/3 MASQUE anti-DPI e copertura Chaff 512B (C90).</li>
+                            <li><strong>Wi-Fi Direct :</strong> Alta velocità a distanza ravvicinata senza Internet né router esterni.</li>
+                            <li><strong>BLE Mesh (Bluetooth) :</strong> Continuità in condizioni estreme (modalità aereo, blackout Internet totale) nodo-a-nodo.</li>
+                        </ul>
+                    </section>
+
+                    <section class="guide-card">
+                        <h2>6. Emergenza &amp; Buone Pratiche</h2>
+                        <ul>
+                            <li><strong>Distruzione Immediata :</strong> Il pulsante rosso in alto a destra svuota tutta la RAM, cancella le chiavi e chiude l'app.</li>
+                            <li><strong>Aggiornamenti diretti :</strong> Installa sempre gli aggiornamenti sopra l'app esistente per preservare il Sigillo StrongBox.</li>
+                            <li><strong>Hash &amp; Zero Screenshot :</strong> Verifica l'hash SHA-256 dell'APK. <code>FLAG_SECURE</code> blocca catture; non fotografare mai lo schermo.</li>
+                        </ul>
+                    </section>
+                </div>
+            </div>
+
+            <div class="cta-container">
+                <div class="cta-info">
+                    <strong>Portale Ufficiale, Aggiornamenti &amp; Licenze HSM (Italiano)</strong>
+                    <a href="https://it.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="link-url" target="_blank" rel="noopener noreferrer">https://it.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/</a>
+                </div>
+                <a href="https://it.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="btn-cta" target="_blank" rel="noopener noreferrer">Visita it.aresmaxima.com →</a>
+            </div>
+        </div>
+        <footer class="sheet-footer">
+            <span>Copyright © 2026 AresMaxima LLC and its Licensors. All Rights Reserved. • <a href="https://it.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" target="_blank" rel="noopener noreferrer">it.aresmaxima.com</a></span>
+            <span class="page-num">2 / 2</span>
+        </footer>
+    </div>
+</div>
+
+<!-- =========================================================================
+     5. POLSKI (PL — pl.aresmaxima.com)
+     ========================================================================= -->
+<div id="lang-pl" class="lang-block" lang="pl" dir="ltr">
+    <!-- STRONA 1 / 2 -->
+    <div class="a4-sheet">
+        <div class="sheet-body">
+            <div class="sections-stack">
+                <header class="doc-header">
+                    <div class="header-title">
+                        <div class="guide-tag">PRZEWODNIK UŻYTKOWNIKA KROK PO KROKU • SKU AM-AEGIS-P2P-370</div>
+                        <h1>AEGIS <span>P2P v3.7</span></h1>
+                        <p class="subtitle">Skrócona Instrukcja Obsługi — Edycja Sprzętowej Pieczęci HSM</p>
+                    </div>
+                    <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima Logo" class="logo">
+                </header>
+
+                <div class="welcome-banner">
+                    <p>Witamy w <strong>AEGIS P2P</strong>. Ten przewodnik przeprowadzi Cię krok po kroku od samodzielnej instalacji aplikacji i sprzętowego zapieczętowania modułu bezpieczeństwa aż do pierwszej szyfrowanej rozmowy bez śladów na dysku.</p>
+                </div>
+
+                <section class="guide-card">
+                    <h2>1. Instalacja Aplikacji (Niezależność)</h2>
+                    <p>Ponieważ AEGIS P2P jest dystrybuowany poza scentralizowanymi sklepami (Google Play), instalujesz bezpośrednio podpisany plik <span class="highlight">.apk</span>, dzięki czemu żaden cyfrowy gigant nie kontroluje ani nie monitoruje Twojej komunikacji.</p>
+                    <ul>
+                        <li><strong>Pobieranie :</strong> Zapisz w telefonie oficjalny plik <code>.apk</code> dostarczony wraz z zamówieniem.</li>
+                        <li><strong>Uruchomienie :</strong> Otwórz pobrany plik i zezwól na instalację z tego źródła, jeśli system Android o to poprosi.</li>
+                        <li><strong>Otwarcie :</strong> Po zakończeniu instalacji uruchom bezpośrednio AEGIS P2P.</li>
+                    </ul>
+                    <div class="alert-box">
+                        <p><strong>Ostrzeżenie „Play Protect” :</strong> Android wyświetli komunikat informujący, że aplikacja pochodzi z zewnętrznego źródła. <strong>To normalne.</strong> Dotknij „Zainstaluj mimo to” — to dowód pełnej niezależności od zewnętrznej telemetrii.</p>
+                    </div>
+                </section>
+
+                <section class="guide-card">
+                    <h2>2. Pierwsze Uruchomienie : Sprzętowa Pieczęć HSM i Kody Dostępu</h2>
+                    <p>AEGIS <strong>nigdy</strong> nie poprosi o e-mail, numer SIM ani imię. Żaden serwer w chmurze nie bierze udziału w aktywacji: licencja jest generowana offline indywidualnie dla układu bezpieczeństwa (StrongBox / HSM) Twojego telefonu.</p>
+
+                    <h3>Krok A — Rejestracja Sprzętowa HSM (StrongBox) i Klucz Licencyjny</h3>
+                    <p>Przy pierwszym uruchomieniu koprocesor bezpieczeństwa generuje unikalną parę kluczy i wyświetla <span class="hsm-tag">SPRZĘTOWA PIECZĘĆ HSM (STRONGBOX)</span> :</p>
+                    <ul>
+                        <li>Dotknij <strong>„SKOPIUJ PIECZĘĆ REJESTRACJI HSM”</strong> i prześlij ten odcisk sprzętowy do Ares Maxima wraz z numerem zamówienia, aby otrzymać zapieczętowany klucz licencyjny.</li>
+                        <li>Po otrzymaniu <strong>Klucza Klienta</strong> wklej go w dedykowane pole. Bez ważnej licencji powiązanej z układem StrongBox sejf odmówi inicjalizacji (architektura <em>Fail-Closed</em>).</li>
+                    </ul>
+                    <div class="hsm-box">
+                        <p><strong>Suwerenność Sprzętowa :</strong> Licencja jest matematycznie zapieczętowana (Ed25519) odciskiem SHA-256 układu StrongBox i nie zadziała na żadnym innym urządzeniu. <strong>Nigdy nie odinstalowuj aplikacji</strong> (zawsze instaluj aktualizacje bezpośrednio na istniejącą wersję), aby zachować klucz sprzętowy telefonu.</p>
+                    </div>
+
+                    <div class="dual-grid">
+                        <div class="sub-panel">
+                            <div>
+                                <h3>Krok B — Główny Kod PIN</h3>
+                                <p>Wybierz silny kod (6+ znaków). Ten klucz wyprowadza lokalnie Twój <code>master_key</code> i otwiera prawdziwy panel główny.</p>
+                            </div>
+                            <div class="danger-box">
+                                <p><strong>Uwaga :</strong> W razie zapomnienia kodu dostęp zostaje bezpowrotnie utracony (brak zdalnego resetu).</p>
+                            </div>
+                        </div>
+                        <div class="sub-panel">
+                            <div>
+                                <h3>Krok C — Fałszywy PIN i Kill Switch</h3>
+                                <ul>
+                                    <li><strong>Fałszywy PIN (Decoy) :</strong> Drugi, odrębny kod otwierający fałszywy panel z niegroźnymi notatkami pod przymusem.</li>
+                                    <li><strong>Kod Paniki (0000 / 9999) :</strong> Nieodwracalne wyczyszczenie pamięci RAM i natychmiastowe zamknięcie aplikacji.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+        <footer class="sheet-footer">
+            <span>AEGIS P2P v3.7 • Skrócona Instrukcja Obsługi • AresMaxima LLC (USA) — COTS Software (EAR ECCN 5D992.c)</span>
+            <span class="page-num">1 / 2</span>
+        </footer>
+    </div>
+
+    <!-- STRONA 2 / 2 -->
+    <div class="a4-sheet">
+        <div class="sheet-body">
+            <div class="sections-stack">
+                <div class="p2-mini-header">
+                    <span>AEGIS P2P v3.7 — POŁĄCZENIA P2P, KOMUNIKACJA ZERO-ŚLADÓW I HIGIENA OPSEC</span>
+                    <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima" class="logo-sm">
+                </div>
+
+                <section class="guide-card">
+                    <h2>3. Dodawanie Kontaktu (Bez Centralnego Katalogu)</h2>
+                    <p>AEGIS działa bezpośrednio z telefonu na telefon (Peer-to-Peer), bez żadnego centralnego serwera przechowującego kontakty :</p>
+                    <div class="dual-grid">
+                        <div class="sub-panel">
+                            <h3>Twarzą w twarz (Najbezpieczniej)</h3>
+                            <ul>
+                                <li>W zakładce Sieć dotknij <strong>„Mój Kod QR”</strong>.</li>
+                                <li>Rozmówca skanuje przez <strong>„Skanuj QR”</strong> (lub <strong>Most Optyczny Air-Gap 0-RF 15 fps</strong> w Trybie Samolotowym — C92) z atestacją StrongBox X.509 (C91).</li>
+                            </ul>
+                        </div>
+                        <div class="sub-panel">
+                            <h3>Zdalnie (Osobne lokalizacje)</h3>
+                            <ul>
+                                <li>Dotknij <strong>„Kopiuj mój klucz”</strong> i przekaż efemeryczny klucz publiczny drugim kanałem (lub w wierszu steganograficznym).</li>
+                                <li>Wklej otrzymany klucz w polu odbiorcy i dotknij <strong>„Połącz z węzłem”</strong>.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="guide-card">
+                    <h2>4. Wysyłanie Wiadomości i Plików (Zero Śladów na Dysku)</h2>
+                    <p>Po połączeniu cała rozmowa jest szyfrowana end-to-end z ciągłą odpornością post-kwantową (<strong>SPQR ML-KEM-1024 + ML-DSA-87</strong> — C95) :</p>
+                    <ul>
+                        <li><strong>Wiadomości Tekstowe :</strong> Pisz i wysyłaj normalnie; żadne dane nie opuszczają telefonu bez zaszyfrowania w pamięci RAM.</li>
+                        <li><strong>Automatyczne Usuwanie EXIF :</strong> Usuwa wszystkie ukryte metadane (GPS, model smartfona, znaczniki czasu) ze zdjęć i filmów przed wysyłką.</li>
+                        <li><strong>Kamuflaż Matrycy Anti-PRNU :</strong> Modyfikuje unikalny szum matrycy aparatu, uniemożliwiając kryminalistyczne przypisanie zdjęcia do urządzenia.</li>
+                        <li><strong>Brak Zapisu na Dysku :</strong> Żaden plik tymczasowy ani pamięć podręczna nie trafia do pamięci flash; wszystko przetwarzane jest w locie w RAM.</li>
+                    </ul>
+                </section>
+
+                <div class="dual-grid">
+                    <section class="guide-card">
+                        <h2>5. Zmiana Sieci (Transport Switch)</h2>
+                        <p>Dostosuj metodę transportu do sytuacji operacyjnej :</p>
+                        <ul>
+                            <li><strong>Tor (Arti) i MASQUE+ECH (C96) :</strong> Pełna anonimowość przez Tor (<code>rustls+ring</code>), kapsuły HTTP/3 MASQUE anty-DPI i ruch Chaff 512B (C90).</li>
+                            <li><strong>Wi-Fi Direct :</strong> Wysoka prędkość na bliskim dystansie bez Internetu i zewnętrznych routerów.</li>
+                            <li><strong>BLE Mesh (Bluetooth) :</strong> Na sytuacje ekstremalne (tryb samolotowy, blackout sieci) pomiędzy węzłami.</li>
+                        </ul>
+                    </section>
+
+                    <section class="guide-card">
+                        <h2>6. Tryb Awaryjny i Dobre Praktyki</h2>
+                        <ul>
+                            <li><strong>Natychmiastowe Zniszczenie :</strong> Czerwona ikona w prawym górnym rogu czyści RAM, usuwa klucze i zamyka aplikację.</li>
+                            <li><strong>Aktualizacje nakładkowe :</strong> Zawsze instaluj aktualizacje na istniejącą aplikację, aby zachować Pieczęć StrongBox.</li>
+                            <li><strong>Hash i Brak Zrzutów :</strong> Zweryfikuj SHA-256 pliku APK. <code>FLAG_SECURE</code> blokuje zrzuty; nie fotografuj ekranu.</li>
+                        </ul>
+                    </section>
+                </div>
+            </div>
+
+            <div class="cta-container">
+                <div class="cta-info">
+                    <strong>Oficjalny Portal, Aktualizacje i Licencje HSM (Polski)</strong>
+                    <a href="https://pl.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="link-url" target="_blank" rel="noopener noreferrer">https://pl.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/</a>
+                </div>
+                <a href="https://pl.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="btn-cta" target="_blank" rel="noopener noreferrer">Odwiedź pl.aresmaxima.com →</a>
+            </div>
+        </div>
+        <footer class="sheet-footer">
+            <span>Copyright © 2026 AresMaxima LLC and its Licensors. All Rights Reserved. • <a href="https://pl.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" target="_blank" rel="noopener noreferrer">pl.aresmaxima.com</a></span>
+            <span class="page-num">2 / 2</span>
+        </footer>
+    </div>
+</div>
+
+<!-- =========================================================================
+     6. УКРАЇНСЬКА (UA — uk.aresmaxima.com)
+     ========================================================================= -->
+<div id="lang-uk" class="lang-block" lang="uk" dir="ltr">
+    <!-- СТОРІНКА 1 / 2 -->
+    <div class="a4-sheet">
+        <div class="sheet-body">
+            <div class="sections-stack">
+                <header class="doc-header">
+                    <div class="header-title">
+                        <div class="guide-tag">ПОКРОКОВИЙ ПОСІБНИК КОРИСТУВАЧА • АРТ. AM-AEGIS-P2P-370</div>
+                        <h1>AEGIS <span>P2P v3.7</span></h1>
+                        <p class="subtitle">Посібник зі Швидкого Старту — Версія Апаратної Печатки HSM</p>
+                    </div>
+                    <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima Logo" class="logo">
+                </header>
+
+                <div class="welcome-banner">
+                    <p>Ласкаво просимо до <strong>AEGIS P2P</strong>. Цей посібник крок за кроком проведе вас від автономного встановлення додатка та апаратного прив'язування чипа безпеки до першої захищеної розмови без жодних слідів на диску.</p>
+                </div>
+
+                <section class="guide-card">
+                    <h2>1. Встановлення Додатка (Незалежність)</h2>
+                    <p>Оскільки AEGIS P2P поширюється поза межами централізованих магазинів (Google Play), ви встановлюєте підписаний файл <span class="highlight">.apk</span> вручну, щоб жоден цифровий гігант не контролював ваше листування.</p>
+                    <ul>
+                        <li><strong>Завантаження :</strong> Збережіть на смартфон офіційний файл <code>.apk</code>, наданий разом із вашим замовленням.</li>
+                        <li><strong>Запуск :</strong> Відкрийте завантажений файл і надайте дозвіл на встановлення з цього джерела за запитом Android.</li>
+                        <li><strong>Відкриття :</strong> Після завершення встановлення запустіть безпосередньо AEGIS P2P.</li>
+                    </ul>
+                    <div class="alert-box">
+                        <p><strong>Попередження «Play Protect» :</strong> Android показує попередження під час встановлення програм поза Google Play. <strong>Це нормально.</strong> Натисніть «Все одно встановити» — це підтверджує повну незалежність від зовнішньої телеметрії.</p>
+                    </div>
+                </section>
+
+                <section class="guide-card">
+                    <h2>2. Перший Запуск : Апаратна Печатка HSM та Коди Доступу</h2>
+                    <p>AEGIS <strong>ніколи</strong> не запитує електронну пошту, номер SIM чи ім'я. Хмарні сервери активації відсутні: ваша ліцензія генерується офлайн індивідуально під фізичний чип безпеки (StrongBox / HSM) вашого смартфона.</p>
+
+                    <h3>Крок А — Апаратна Реєстрація HSM (StrongBox) та Ключ Ліцензії</h3>
+                    <p>Під час першого запуску співпроцесор безпеки генерує унікальну пару ключів і відображає <span class="hsm-tag">АПАРАТНА ПЕЧАТКА HSM (STRONGBOX)</span> :</p>
+                    <ul>
+                        <li>Натисніть <strong>«СКОПІЮВАТИ ПЕЧАТКУ РЕЄСТРАЦІЇ HSM»</strong> і передайте цей апаратний відбиток команді Ares Maxima разом із номером замовлення для отримання ключа ліцензії.</li>
+                        <li>Отримавши <strong>Ключ Клієнта</strong>, вставте його у відповідне поле. Без дійсної ліцензії, прив'язаної до чипа StrongBox, сховище не ініціалізується (архітектура <em>Fail-Closed</em>).</li>
+                    </ul>
+                    <div class="hsm-box">
+                        <p><strong>Апаратний Суверенітет :</strong> Ліцензія математично скріплена (Ed25519) із SHA-256 відбитком вашого чипа StrongBox і не працюватиме на жодному іншому пристрої. <strong>Ніколи не видаляйте додаток</strong> (завжди встановлюйте оновлення поверх існуючої версії), щоб зберегти апаратний ключ у телефоні.</p>
+                    </div>
+
+                    <div class="dual-grid">
+                        <div class="sub-panel">
+                            <div>
+                                <h3>Крок Б — Основний PIN-код</h3>
+                                <p>Оберіть надійний код (6+ символів). Цей ключ локально генерує ваш <code>master_key</code> і відкриває справжню панель керування.</p>
+                            </div>
+                            <div class="danger-box">
+                                <p><strong>Увага :</strong> Якщо ви забудете цей код, доступ буде втрачено назавжди (віддаленого скидання не існує).</p>
+                            </div>
+                        </div>
+                        <div class="sub-panel">
+                            <div>
+                                <h3>Крок В — Хибний PIN та Kill Switch</h3>
+                                <ul>
+                                    <li><strong>Хибний PIN (Decoy) :</strong> Другий окремий код, що відкриває фальшиву панель із безпечними нотатками під примусом.</li>
+                                    <li><strong>Код Паніки (0000 / 9999) :</strong> Безповоротне очищення оперативної пам'яті (RAM) і миттєве закриття додатка.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+        <footer class="sheet-footer">
+            <span>AEGIS P2P v3.7 • Посібник зі Швидкого Старту • AresMaxima LLC (USA) — COTS Software (EAR ECCN 5D992.c)</span>
+            <span class="page-num">1 / 2</span>
+        </footer>
+    </div>
+
+    <!-- СТОРІНКА 2 / 2 -->
+    <div class="a4-sheet">
+        <div class="sheet-body">
+            <div class="sections-stack">
+                <div class="p2-mini-header">
+                    <span>AEGIS P2P v3.7 — P2P-З'ЄДНАННЯ, ОБМІН БЕЗ СЛІДІВ ТА ПРАВИЛА OPSEC</span>
+                    <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima" class="logo-sm">
+                </div>
+
+                <section class="guide-card">
+                    <h2>3. Додавання Контакту (Без Центрального Каталогу)</h2>
+                    <p>AEGIS працює напряму від телефона до телефона (Peer-to-Peer) без центрального сервера контактів :</p>
+                    <div class="dual-grid">
+                        <div class="sub-panel">
+                            <h3>Особиста зустріч (Найбезпечніше)</h3>
+                            <ul>
+                                <li>На вкладці Мережа натисніть <strong>«Мій QR-код»</strong>.</li>
+                                <li>Співрозмовник сканує через <strong>«Сканувати QR»</strong> (або <strong>Оптичний Міст Air-Gap 0-RF 15 fps</strong> у Режимі Польоту — C92) з атестацією StrongBox X.509 (C91).</li>
+                            </ul>
+                        </div>
+                        <div class="sub-panel">
+                            <h3>Дистанційно (У різних місцях)</h3>
+                            <ul>
+                                <li>Натисніть <strong>«Копіювати ключ»</strong> і передайте ефемерний публічний ключ додатковим каналом (або у вірші стеганографії).</li>
+                                <li>Вставте отриманий ключ у поле отримувача та натисніть <strong>«З'єднати вузол»</strong>.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="guide-card">
+                    <h2>4. Надсилання Повідомлень і Файлів (Нуль Слідів на Диску)</h2>
+                    <p>Після підключення розмова захищена безперервним постквантовим шифруванням (<strong>SPQR ML-KEM-1024 + ML-DSA-87</strong> — C95) :</p>
+                    <ul>
+                        <li><strong>Текстові Повідомлення :</strong> Пишіть і надсилайте як зазвичай; жодні дані не залишають телефон незашифрованими в RAM.</li>
+                        <li><strong>Автоматичне Видалення EXIF :</strong> Повністю стирає приховані метадані (GPS-координати, модель смартфона, час зйомки) із фото та відео перед відправленням.</li>
+                        <li><strong>Камуфляж Матриці Anti-PRNU :</strong> Придушує унікальний шум сенсора камери, унеможливлюючи криміналістичну прив'язку знімка до пристрою.</li>
+                        <li><strong>Жодних Файлів на Диску :</strong> Тимчасові файли чи медіа-кеш ніколи не записуються у флеш-пам'ять; усе обробляється на льоту в оперативній пам'яті.</li>
+                    </ul>
+                </section>
+
+                <div class="dual-grid">
+                    <section class="guide-card">
+                        <h2>5. Перемикання Мережі (Transport Switch)</h2>
+                        <p>Змінюйте маршрут відповідно до тактичної обстановки :</p>
+                        <ul>
+                            <li><strong>Tor (Arti) та MASQUE+ECH (C96) :</strong> Анонімність через Tor (<code>rustls+ring</code>), капсули HTTP/3 MASQUE анти-DPI та трафік Chaff 512Б (C90).</li>
+                            <li><strong>Wi-Fi Direct :</strong> Висока швидкість поруч без Інтернету та сторонніх роутерів.</li>
+                            <li><strong>BLE Mesh (Bluetooth) :</strong> Для екстремальних умов (режим польоту, блекаут мережі) між вузлами.</li>
+                        </ul>
+                    </section>
+
+                    <section class="guide-card">
+                        <h2>6. Екстрене Очищення та Безпека</h2>
+                        <ul>
+                            <li><strong>Миттєве Знищення :</strong> Червона кнопка вгорі праворуч миттєво очищує RAM, стирає ключі та закриває додаток.</li>
+                            <li><strong>Оновлення поверх :</strong> Завжди встановлюйте оновлення поверх існуючого додатка для збереження Печатки StrongBox.</li>
+                            <li><strong>Хеш і Заборона Знімків :</strong> Перевіряйте SHA-256 файлу APK. <code>FLAG_SECURE</code> блокує скріншоти; не фотографуйте екран.</li>
+                        </ul>
+                    </section>
+                </div>
+            </div>
+
+            <div class="cta-container">
+                <div class="cta-info">
+                    <strong>Офіційний Портал, Оновлення та HSM-Ліцензії (Українська)</strong>
+                    <a href="https://uk.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="link-url" target="_blank" rel="noopener noreferrer">https://uk.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/</a>
+                </div>
+                <a href="https://uk.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="btn-cta" target="_blank" rel="noopener noreferrer">Перейти на uk.aresmaxima.com →</a>
+            </div>
+        </div>
+        <footer class="sheet-footer">
+            <span>Copyright © 2026 AresMaxima LLC and its Licensors. All Rights Reserved. • <a href="https://uk.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" target="_blank" rel="noopener noreferrer">uk.aresmaxima.com</a></span>
+            <span class="page-num">2 / 2</span>
+        </footer>
+    </div>
+</div>
+
+<!-- =========================================================================
+     7. العربية (AR - RTL — ar.aresmaxima.com)
+     ========================================================================= -->
+<div id="lang-ar" class="lang-block" lang="ar" dir="rtl">
+    <!-- الصفحة 1 / 2 -->
+    <div class="a4-sheet">
+        <div class="sheet-body">
+            <div class="sections-stack">
+                <header class="doc-header">
+                    <div class="header-title">
+                        <div class="guide-tag">دليل المستخدم خطوة بخطوة • المرجع AM-AEGIS-P2P-370</div>
+                        <h1>AEGIS <span>P2P v3.7</span></h1>
+                        <p class="subtitle">دليل البدء السريع — إصدار الختم المادي HSM</p>
+                    </div>
+                    <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima Logo" class="logo">
+                </header>
+
+                <div class="welcome-banner">
+                    <p>مرحباً بك في <strong>AEGIS P2P</strong>. يرافقك هذا الدليل خطوة بخطوة بدءاً من التثبيت المستقل للتطبيق والربط التشفيري لشريحة الأمان المادية وصولاً إلى محادثتك المشفرة الأولى دون أي أثر على القرص.</p>
+                </div>
+
+                <section class="guide-card">
+                    <h2>1. تثبيت التطبيق (الاستقلالية الكاملة)</h2>
+                    <p>نظراً لأن AEGIS P2P يُوزع خارج المتاجر المركزية (Google Play)، ستقوم بتثبيت ملف <span class="highlight">.apk</span> الموقع يدوياً لضمان عدم سيطرة أي شركة تقنية كبرى على اتصالاتك أو مراقبتها.</p>
+                    <ul>
+                        <li><strong>التحميل :</strong> احفظ في هاتفك ملف <code>.apk</code> الرسمي المرفق مع طلبك.</li>
+                        <li><strong>التشغيل :</strong> افتح الملف المحمّل واسمح بالتثبيت من هذا المصدر إذا طلب نظام أندرويد ذلك.</li>
+                        <li><strong>الفتح :</strong> بمجرد اكتمال التثبيت، شغّل تطبيق AEGIS P2P مباشرة.</li>
+                    </ul>
+                    <div class="alert-box">
+                        <p><strong>تحذير «Play Protect» :</strong> يعرض أندرويد تلقائياً تنبيهاً عند تثبيت تطبيق خارج المتجر. <strong>هذا أمر طبيعي.</strong> اضغط على «التثبيت على أي حال»: فهذا دليل استقلالية التطبيق وخلوه من أي تتبع خارجي.</p>
+                    </div>
+                </section>
+
+                <section class="guide-card">
+                    <h2>2. التشغيل الأول : الختم المادي HSM ورموز الوصول</h2>
+                    <p>لن يطلب منك AEGIS <strong>أبداً</strong> بريداً إلكترونياً أو رقم شريحة SIM أو اسماً. لا يتدخل أي خادم سحابي في التفعيل: يُصاغ ترخيصك دون اتصال بالإنترنت خصيصاً لشريحة الأمان المادية (StrongBox / HSM) داخل هاتفك.</p>
+
+                    <h3>الخطوة أ — تسجيل الشريحة المادية HSM (StrongBox) ومفتاح الترخيص</h3>
+                    <p>عند التشغيل الأول، يولد المعالج الأمني محلياً زوج مفاتيح مادي فريد ويعرض <span class="hsm-tag">الختم المادي HSM (STRONGBOX)</span> :</p>
+                    <ul>
+                        <li>اضغط على <strong>«نسخ ختم التسجيل HSM»</strong> وأرسل هذه البصمة المادية إلى Ares Maxima مع رقم طلبك لاستلام مفتاح الترخيص المختوم.</li>
+                        <li>بمجرد استلام <strong>مفتاح العميل</strong>، الصقه في الحقل المخصص. بدون ترخيص صالح مرتبط بشريحة StrongBox، ترفض الخزنة التهيئة (بنية <em>Fail-Closed</em>).</li>
+                    </ul>
+                    <div class="hsm-box">
+                        <p><strong>السيادة المادية :</strong> ترخيصك مختوم رياضياً (Ed25519) ببصمة SHA-256 لشريحة StrongBox في هاتفك ولن يعمل على أي جهاز آخر. <strong>لا تقم أبداً بإلغاء تثبيت التطبيق</strong> (حدّث دائماً فوق النسخة الحالية) للحفاظ على المفتاح المادي المخزن في الشريحة.</p>
+                    </div>
+
+                    <div class="dual-grid">
+                        <div class="sub-panel">
+                            <div>
+                                <h3>الخطوة ب — رمز PIN الرئيسي</h3>
+                                <p>اختر رمزاً قوياً (6 خانات على الأقل). يشتق هذا الرمز محلياً مفتاحك الرئيسي <code>master_key</code> ويفتح لوحة التحكم الحقيقية.</p>
+                            </div>
+                            <div class="danger-box">
+                                <p><strong>تحذير :</strong> في حال نسيان هذا الرمز، تُفقد البيانات نهائياً (لا توجد إمكانية لإعادة التعيين عن بُعد).</p>
+                            </div>
+                        </div>
+                        <div class="sub-panel">
+                            <div>
+                                <h3>الخطوة ج — رمز التمويه و Kill Switch</h3>
+                                <ul>
+                                    <li><strong>رمز التمويه (Decoy) :</strong> رمز ثانٍ منفصل يفتح لوحة تحكم وهمية بملاحظات عادية عند التعرض للإكراه.</li>
+                                    <li><strong>رمز الطوارئ (0000 / 9999) :</strong> تطهير فوري غير قابل للاسترجاع للذاكرة RAM وإغلاق لحظي للتطبيق.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+        <footer class="sheet-footer">
+            <span>AEGIS P2P v3.7 • دليل البدء السريع • AresMaxima LLC (USA) — COTS Software (EAR ECCN 5D992.c)</span>
+            <span class="page-num">1 / 2</span>
+        </footer>
+    </div>
+
+    <!-- الصفحة 2 / 2 -->
+    <div class="a4-sheet">
+        <div class="sheet-body">
+            <div class="sections-stack">
+                <div class="p2-mini-header">
+                    <span>AEGIS P2P v3.7 — الاتصال المباشر P2P، مراسلة صفر-أثر وقواعد الأمان</span>
+                    <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima" class="logo-sm">
+                </div>
+
+                <section class="guide-card">
+                    <h2>3. إضافة جهة اتصال (بدون دليل مركزي)</h2>
+                    <p>يعمل AEGIS مباشرة من هاتف إلى هاتف (نظير-إلى-نظير) دون أي خادم مركزي يخزن قائمة جهات اتصالك :</p>
+                    <div class="dual-grid">
+                        <div class="sub-panel">
+                            <h3>وجهاً لوجه (الطريقة الأكثر أماناً)</h3>
+                            <ul>
+                                <li>في تبويب الشبكة، اضغط على <strong>«رمز QR الخاص بي»</strong>.</li>
+                                <li>يمسح الطرف الآخر عبر <strong>«مسح رمز QR»</strong> (أو <strong>الجسر الضوئي المعزول 0-RF</strong> في وضع الطيران — C92) مع تصديق StrongBox X.509 المتبادل (C91).</li>
+                            </ul>
+                        </div>
+                        <div class="sub-panel">
+                            <h3>عن بُعد (في أماكن منفصلة)</h3>
+                            <ul>
+                                <li>اضغط على <strong>«نسخ مفتاحي»</strong> وأرسل مفتاحك العام المؤقت عبر قناة ثانوية (أو داخل قصيدة إخفاء مشفر).</li>
+                                <li>الصق المفتاح المستلم في حقل المستلم واضغط على <strong>«اتصال بالند»</strong>.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="guide-card">
+                    <h2>4. إرسال الرسائل والملفات (صفر أثر على القرص)</h2>
+                    <p>بمجرد الربط، تُشفّر جميع المحادثات من طرف إلى طرف بحماية ما بعد الكم المستمرة (<strong>SPQR ML-KEM-1024 + ML-DSA-87</strong> — C95) :</p>
+                    <ul>
+                        <li><strong>الرسائل النصية :</strong> اكتب وأرسل كالمعتاد؛ لا يخرج أي نص من هاتفك دون تشفير داخل الذاكرة العشوائية.</li>
+                        <li><strong>إزالة بيانات EXIF تلقائياً :</strong> يحذف كافة البيانات الوصفية المخفية (الموقع GPS، طراز الهاتف، التوقيت) من الصور والفيديو قبل الإرسال.</li>
+                        <li><strong>تمويه مستشعر الكاميرا Anti-PRNU :</strong> يشتت البصمة الضوئية الفريدة لمستشعر الكاميرا لمنع أي فحص جنائي من ربط الصورة بهاتفك.</li>
+                        <li><strong>صفر تخزين مكشوف :</strong> لا يُكتب أي ملف مؤقت على ذاكرة الفلاش؛ تُعالج جميع الوسائط لحظياً داخل ذاكرة RAM المتطايرة.</li>
+                    </ul>
+                </section>
+
+                <div class="dual-grid">
+                    <section class="guide-card">
+                        <h2>5. تبديل الشبكة (Transport Switch)</h2>
+                        <p>اختر مسار الاتصال حسب وضعك الميداني في أي لحظة :</p>
+                        <ul>
+                            <li><strong>Tor (Arti) وتمويه MASQUE+ECH (C96) :</strong> إخفاء كامل عبر Tor (<code>rustls+ring</code>) وكبسولات HTTP/3 MASQUE وحركة التمويه Chaff 512B (C90).</li>
+                            <li><strong>Wi-Fi Direct :</strong> سرعة فائقة للمسافات القريبة دون إنترنت أو أجهزة توجيه خارجية.</li>
+                            <li><strong>BLE Mesh (البلوتوث) :</strong> للظروف القصوى (وضع الطيران، انقطاع الإنترنت الشامل) من عقدة لأخرى.</li>
+                        </ul>
+                    </section>
+
+                    <section class="guide-card">
+                        <h2>6. زر الطوارئ وأفضل الممارسات</h2>
+                        <ul>
+                            <li><strong>التدمير الفوري :</strong> زر التحذير الأحمر أعلى الشاشة يطهر كامل RAM، ويتلف المفاتيح ويغلق التطبيق.</li>
+                            <li><strong>التحديث المباشر :</strong> ثبّت التحديثات دائماً فوق التطبيق الحالي للحفاظ على ختم StrongBox المادي.</li>
+                            <li><strong>البصمة ومنع التصوير :</strong> تحقق من بصمة SHA-256 لملف APK. يمنع <code>FLAG_SECURE</code> لقطات الشاشة؛ لا تصور الشاشة أبداً.</li>
+                        </ul>
+                    </section>
+                </div>
+            </div>
+
+            <div class="cta-container">
+                <div class="cta-info">
+                    <strong>البوابة الرسمية، التحديثات وتراخيص HSM المختومة (العربية)</strong>
+                    <a href="https://ar.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="link-url" target="_blank" rel="noopener noreferrer">https://ar.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/</a>
+                </div>
+                <a href="https://ar.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="btn-cta" target="_blank" rel="noopener noreferrer">زيارة ar.aresmaxima.com ←</a>
+            </div>
+        </div>
+        <footer class="sheet-footer">
+            <span>Copyright © 2026 AresMaxima LLC and its Licensors. All Rights Reserved. • <a href="https://ar.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" target="_blank" rel="noopener noreferrer">ar.aresmaxima.com</a></span>
+            <span class="page-num">2 / 2</span>
+        </footer>
+    </div>
+</div>
+
+</body>
+</html>

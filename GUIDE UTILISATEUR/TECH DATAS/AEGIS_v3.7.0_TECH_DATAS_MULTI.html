@@ -1,0 +1,2151 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AEGIS P2P v3.7 — Preuves Techniques &amp; Benchmark Concurrentiel</title>
+    <script>
+        var UI_TEXTS = {
+            fr: {
+                allBtn: "🌍 Toutes les langues (7)",
+                printBtn: "🖨️ Télécharger le PDF",
+                title: "AEGIS P2P v3.7 — Preuves Techniques & Benchmark Concurrentiel"
+            },
+            en: {
+                allBtn: "🌍 All Languages (7)",
+                printBtn: "🖨️ Download PDF",
+                title: "AEGIS P2P v3.7 — Technical Proofs & Competitive Benchmark"
+            },
+            es: {
+                allBtn: "🌍 Todos los idiomas (7)",
+                printBtn: "🖨️ Descargar PDF",
+                title: "AEGIS P2P v3.7 — Pruebas Técnicas y Benchmark Competitivo"
+            },
+            it: {
+                allBtn: "🌍 Tutte le lingue (7)",
+                printBtn: "🖨️ Scarica PDF",
+                title: "AEGIS P2P v3.7 — Prove Tecniche e Benchmark Competitivo"
+            },
+            pl: {
+                allBtn: "🌍 Wszystkie języki (7)",
+                printBtn: "🖨️ Pobierz PDF",
+                title: "AEGIS P2P v3.7 — Dowody Techniczne i Benchmark Konkurencyjny"
+            },
+            uk: {
+                allBtn: "🌍 Усі мови (7)",
+                printBtn: "🖨️ Завантажити PDF",
+                title: "AEGIS P2P v3.7 — Технічні Докази та Порівняльний Бенчмарк"
+            },
+            ar: {
+                allBtn: "🌍 جميع اللغات (7)",
+                printBtn: "🖨️ تحميل PDF",
+                title: "AEGIS P2P v3.7 — الإثباتات التقنية والمقارنة المعيارية"
+            }
+        };
+
+        var currentLang = 'fr';
+
+        window.filterLang = function(lang) {
+            var blocks = document.querySelectorAll('.lang-block');
+            var btns = document.querySelectorAll('.lang-btn');
+
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].classList.remove('active');
+            }
+            var activeBtn = document.getElementById('btn-' + lang);
+            if (activeBtn) activeBtn.classList.add('active');
+
+            if (lang !== 'all' && UI_TEXTS[lang]) {
+                currentLang = lang;
+                document.documentElement.lang = lang;
+                document.documentElement.dir = (lang === 'ar') ? 'rtl' : 'ltr';
+            } else {
+                document.documentElement.dir = 'ltr';
+            }
+
+            var ui = UI_TEXTS[currentLang] || UI_TEXTS.fr;
+            var allBtnEl = document.getElementById('btn-all');
+            var printBtnEl = document.getElementById('btn-print');
+            if (allBtnEl) allBtnEl.textContent = ui.allBtn;
+            if (printBtnEl) printBtnEl.textContent = ui.printBtn;
+            document.title = ui.title;
+
+            for (var j = 0; j < blocks.length; j++) {
+                if (lang === 'all' || blocks[j].id === 'lang-' + lang) {
+                    blocks[j].classList.add('active');
+                } else {
+                    blocks[j].classList.remove('active');
+                }
+            }
+        };
+
+        window.addEventListener('DOMContentLoaded', function() {
+            var navLang = (navigator.language || navigator.userLanguage || 'fr').slice(0, 2).toLowerCase();
+            if (UI_TEXTS[navLang]) {
+                filterLang(navLang);
+            } else {
+                filterLang('fr');
+            }
+        });
+    </script>
+    <style>
+        :root {
+            --primary: #FCBE0B;
+            --primary-dim: rgba(252, 190, 11, 0.14);
+            --bg-dark: #0d0d0e;
+            --sheet-bg: #121215;
+            --card-bg: #17171b;
+            --card-inner: #1d1d22;
+            --row-alt: #1a1a20;
+            --text-color: #e6e6ea;
+            --text-muted: #a2a2ac;
+            --border-color: #292930;
+            --hsm-green: #4ade80;
+            --hsm-green-dim: rgba(74, 222, 128, 0.12);
+        }
+
+        @page {
+            size: A4 portrait;
+            margin: 0mm;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-dark) !important;
+            color: var(--text-color) !important;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-size: 8.5pt;
+            line-height: 1.36;
+        }
+
+        /* JUSTIFICATION SYMÉTRIQUE STRICTE SANS CÉSURE DE MOTS */
+        p,
+        .note-box p,
+        .verdict p,
+        table.proof-table td:nth-child(3) {
+            text-align: justify !important;
+            text-justify: inter-word;
+            -webkit-hyphens: none !important;
+            hyphens: none !important;
+        }
+
+        .lang-block[dir="ltr"] p,
+        .lang-block[dir="ltr"] .note-box p,
+        .lang-block[dir="ltr"] .verdict p,
+        .lang-block[dir="ltr"] table.proof-table td:nth-child(3) {
+            text-align-last: left;
+        }
+
+        .lang-block[dir="rtl"] {
+            font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+        }
+
+        .lang-block[dir="rtl"] p,
+        .lang-block[dir="rtl"] .note-box p,
+        .lang-block[dir="rtl"] .verdict p,
+        .lang-block[dir="rtl"] table.proof-table td:nth-child(3) {
+            text-align-last: right;
+        }
+
+        /* BARRE D'OUTILS MULTILINGUE (ÉCRAN UNIQUEMENT) */
+        .toolbar-no-print {
+            width: 210mm;
+            max-width: 96%;
+            margin: 18px auto;
+            background: var(--sheet-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 11px 16px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            box-shadow: 0 6px 24px rgba(0, 0, 0, 0.65);
+            direction: ltr;
+        }
+
+        .toolbar-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .lang-btn {
+            background: #1d1d22;
+            color: var(--text-muted);
+            border: 1px solid var(--border-color);
+            padding: 6px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.84em;
+            font-weight: 700;
+            transition: all 0.15s ease;
+        }
+
+        .lang-btn:hover {
+            border-color: var(--primary);
+            color: #ffffff;
+        }
+
+        .lang-btn.active {
+            background: var(--primary);
+            color: #000000;
+            border-color: var(--primary);
+        }
+
+        .print-btn {
+            background: var(--hsm-green);
+            color: #000000;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.85em;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+
+        .lang-block {
+            display: none;
+        }
+
+        .lang-block.active {
+            display: block;
+        }
+
+        /* FEUILLE A4 EXACTE */
+        .a4-sheet {
+            width: 210mm;
+            min-height: 297mm;
+            margin: 0 auto 22px auto;
+            background: var(--sheet-bg) !important;
+            border: 1px solid var(--border-color);
+            border-top: 4px solid var(--primary);
+            padding: 10.5mm 12.5mm 8.5mm 12.5mm;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-shadow: 0 12px 38px rgba(0, 0, 0, 0.8);
+        }
+
+        .sheet-body {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .sections-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        /* EN-TÊTE PAGE 1 */
+        header.doc-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 9px;
+            gap: 18px;
+        }
+
+        .header-title {
+            flex: 1;
+        }
+
+        .tech-tag {
+            display: inline-block;
+            background: var(--hsm-green-dim) !important;
+            color: var(--hsm-green) !important;
+            border: 1px solid rgba(74, 222, 128, 0.4);
+            font-family: "Courier New", Courier, monospace;
+            font-size: 7.3pt;
+            font-weight: 700;
+            padding: 1.5px 7px;
+            border-radius: 3px;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        h1 {
+            color: #ffffff !important;
+            margin: 0 0 3px 0;
+            font-size: 15.2pt;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            text-align: left;
+        }
+
+        h1 span {
+            color: var(--primary) !important;
+        }
+
+        .lang-block[dir="rtl"] h1 {
+            text-align: right;
+        }
+
+        .subtitle {
+            color: var(--text-muted) !important;
+            font-size: 8.1pt;
+            margin: 0;
+            text-transform: uppercase;
+            font-weight: 700;
+            text-align: left !important;
+        }
+
+        .lang-block[dir="rtl"] .subtitle {
+            text-align: right !important;
+        }
+
+        .logo {
+            height: 44px;
+            width: auto;
+            max-width: 150px;
+            object-fit: contain;
+            flex-shrink: 0;
+        }
+
+        /* MINI-HEADER PAGE 2 */
+        .p2-mini-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 6px;
+            margin-bottom: 2px;
+        }
+
+        .p2-mini-header span {
+            font-family: "Courier New", Courier, monospace;
+            font-size: 7.7pt;
+            font-weight: 700;
+            color: var(--primary) !important;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .p2-mini-header .logo-sm {
+            height: 24px;
+            width: auto;
+        }
+
+        /* CARTES DE SECTIONS */
+        .section-card {
+            background: var(--card-bg) !important;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 12px 14px;
+        }
+
+        h2 {
+            color: var(--primary) !important;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 5px;
+            margin: 0 0 9px 0;
+            font-size: 9.6pt;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            text-align: center;
+        }
+
+        p {
+            margin: 0 0 9px 0;
+            font-size: 8.3pt;
+            color: var(--text-color) !important;
+        }
+
+        .note-box {
+            background: var(--card-inner) !important;
+            border: 1px solid var(--border-color);
+            border-left: 3.5px solid var(--primary);
+            border-right: 3.5px solid var(--primary);
+            border-radius: 5px;
+            padding: 8px 12px;
+            margin-bottom: 10px;
+        }
+
+        .note-box p {
+            margin: 0;
+            font-size: 8pt;
+            color: var(--text-muted) !important;
+        }
+
+        /* TABLEAU 1 : PREUVES TECHNIQUES (PAGE 1 — 4 COLONNES FIXES) */
+        table.proof-table {
+            width: 100%;
+            table-layout: fixed;
+            border-collapse: collapse;
+            font-size: 7.95pt;
+        }
+
+        table.proof-table th,
+        table.proof-table td {
+            border: 1px solid var(--border-color);
+            padding: 7.5px 8.5px;
+            vertical-align: middle;
+            line-height: 1.32;
+        }
+
+        table.proof-table th:nth-child(1),
+        table.proof-table td:nth-child(1) {
+            width: 19%;
+            text-align: left;
+        }
+
+        table.proof-table th:nth-child(2),
+        table.proof-table td:nth-child(2) {
+            width: 20%;
+            text-align: center !important;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 7.5pt;
+            color: #ffffff !important;
+        }
+
+        table.proof-table th:nth-child(3),
+        table.proof-table td:nth-child(3) {
+            width: 44%;
+        }
+
+        table.proof-table th:nth-child(4),
+        table.proof-table td:nth-child(4) {
+            width: 17%;
+            text-align: center !important;
+        }
+
+        .lang-block[dir="rtl"] table.proof-table th:nth-child(1),
+        .lang-block[dir="rtl"] table.proof-table td:nth-child(1) {
+            text-align: right;
+        }
+
+        /* TABLEAU 2 : BENCHMARK CONCURRENTIEL (PAGE 2 — 6 COLONNES FIXES SYMÉTRIQUES) */
+        table.bench-table {
+            width: 100%;
+            table-layout: fixed;
+            border-collapse: collapse;
+            font-size: 7.65pt;
+        }
+
+        table.bench-table th,
+        table.bench-table td {
+            border: 1px solid var(--border-color);
+            padding: 7px 6.5px;
+            vertical-align: middle;
+            line-height: 1.28;
+            word-wrap: break-word;
+        }
+
+        table.bench-table th:nth-child(1),
+        table.bench-table td:nth-child(1) {
+            width: 17%;
+            text-align: left;
+        }
+
+        table.bench-table th:nth-child(2),
+        table.bench-table td:nth-child(2) {
+            width: 23%;
+            text-align: center !important;
+        }
+
+        table.bench-table th:nth-child(3),
+        table.bench-table td:nth-child(3),
+        table.bench-table th:nth-child(4),
+        table.bench-table td:nth-child(4),
+        table.bench-table th:nth-child(5),
+        table.bench-table td:nth-child(5),
+        table.bench-table th:nth-child(6),
+        table.bench-table td:nth-child(6) {
+            width: 15%;
+            text-align: center !important;
+            color: var(--text-muted) !important;
+        }
+
+        .lang-block[dir="rtl"] table.bench-table th:nth-child(1),
+        .lang-block[dir="rtl"] table.bench-table td:nth-child(1) {
+            text-align: right;
+        }
+
+        table thead th {
+            background-color: #1d1d24 !important;
+            color: var(--primary) !important;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 7.4pt;
+            letter-spacing: 0.3px;
+        }
+
+        table.bench-table thead th.col-aegis {
+            background-color: rgba(252, 190, 11, 0.18) !important;
+            color: var(--primary) !important;
+            border-top: 2px solid var(--primary);
+        }
+
+        tbody tr:nth-child(even) td {
+            background-color: var(--row-alt) !important;
+        }
+
+        tbody tr.hsm-row td {
+            background-color: rgba(74, 222, 128, 0.08) !important;
+            border-color: rgba(74, 222, 128, 0.35);
+        }
+
+        td strong {
+            color: #ffffff !important;
+        }
+
+        td.aegis-col {
+            color: var(--hsm-green) !important;
+            font-weight: 700;
+            background-color: rgba(74, 222, 128, 0.06) !important;
+        }
+
+        .status-ok {
+            color: var(--hsm-green) !important;
+            font-weight: 700;
+            font-size: 7.5pt;
+        }
+
+        code {
+            font-family: "Courier New", Courier, monospace;
+            color: var(--primary) !important;
+            background: rgba(252, 190, 11, 0.09);
+            padding: 0 4px;
+            border-radius: 3px;
+            font-size: 0.93em;
+        }
+
+        /* BANDEAU SYNTHÈSE CRYPTOGRAPHIQUE (BAS DE PAGE 1) */
+        .crypto-strip {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .crypto-item {
+            background: #16181d !important;
+            border: 1px solid var(--border-color);
+            border-top: 2px solid var(--hsm-green);
+            border-radius: 5px;
+            padding: 9px 11px;
+            text-align: center;
+        }
+
+        .crypto-item strong {
+            display: block;
+            color: var(--hsm-green) !important;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 8.6pt;
+            margin-bottom: 2px;
+        }
+
+        .crypto-item span {
+            font-size: 7.4pt;
+            color: var(--text-muted) !important;
+        }
+
+        /* ENCADRÉ VERDICT SYMÉTRIQUE */
+        .verdict {
+            background: rgba(252, 190, 11, 0.1) !important;
+            border: 1px solid rgba(252, 190, 11, 0.32);
+            border-left: 4px solid var(--primary) !important;
+            border-right: 4px solid var(--primary) !important;
+            padding: 10px 14px;
+            border-radius: 6px;
+        }
+
+        .verdict p {
+            margin: 0;
+            font-weight: 700;
+            font-size: 8.2pt;
+            line-height: 1.38;
+            color: #ffffff !important;
+        }
+
+        /* BANNIÈRE CTA PAR LANGUE */
+        .cta-container {
+            margin-top: 6px;
+            padding: 11px 16px;
+            background: linear-gradient(135deg, #1a1a20 0%, #121915 100%) !important;
+            border: 1px solid rgba(74, 222, 128, 0.45);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .cta-info {
+            flex: 1;
+            text-align: left;
+        }
+
+        .lang-block[dir="rtl"] .cta-info {
+            text-align: right;
+        }
+
+        .cta-info strong {
+            display: block;
+            color: #ffffff !important;
+            font-size: 8.7pt;
+            margin-bottom: 2px;
+        }
+
+        .link-url {
+            color: var(--primary) !important;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 7.4pt;
+            text-decoration: none;
+        }
+
+        .btn-cta {
+            display: inline-block;
+            background-color: var(--primary) !important;
+            color: #000000 !important;
+            font-weight: 800;
+            text-decoration: none;
+            padding: 9px 15px;
+            border-radius: 5px;
+            text-transform: uppercase;
+            font-size: 7.9pt;
+            letter-spacing: 0.4px;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        /* PIED DE PAGE A4 */
+        .sheet-footer {
+            margin-top: 8px;
+            padding-top: 6px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 7.2pt;
+            color: var(--text-muted) !important;
+        }
+
+        .sheet-footer a {
+            color: var(--primary) !important;
+            text-decoration: none;
+        }
+
+        .page-num {
+            font-family: "Courier New", Courier, monospace;
+            font-weight: 700;
+            color: var(--primary) !important;
+        }
+
+        /* IMPRESSION PDF STRICTE : 2 PAGES A4 PARFAITES PAR LANGUE */
+        @media print {
+            html, body {
+                width: 210mm !important;
+                background-color: var(--sheet-bg) !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+
+            .toolbar-no-print {
+                display: none !important;
+            }
+
+            .a4-sheet {
+                width: 210mm !important;
+                height: 297mm !important;
+                min-height: 297mm !important;
+                max-height: 297mm !important;
+                margin: 0 !important;
+                padding: 10mm 12mm 8.5mm 12mm !important;
+                border: none !important;
+                border-top: 4px solid var(--primary) !important;
+                box-shadow: none !important;
+                page-break-after: always !important;
+                break-after: page !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                overflow: hidden !important;
+            }
+
+            .lang-block.active:last-of-type .a4-sheet:last-of-type {
+                page-break-after: auto !important;
+                break-after: auto !important;
+            }
+        }
+
+        /* RESPONSIVE MOBILE ÉCRAN UNIQUEMENT (JAMAIS EN PDF) */
+        @media screen and (max-width: 780px) {
+            .a4-sheet {
+                width: 96%;
+                min-height: auto;
+                padding: 18px 14px;
+            }
+            .crypto-strip {
+                grid-template-columns: 1fr;
+            }
+            header.doc-header, .cta-container {
+                flex-direction: column;
+                text-align: center;
+            }
+            .section-card {
+                overflow-x: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- BARRE D'OUTILS MULTILINGUE -->
+<div class="toolbar-no-print">
+    <div class="toolbar-links">
+        <button type="button" id="btn-all" class="lang-btn" onclick="filterLang('all')">🌍 Toutes les langues (7)</button>
+        <button type="button" id="btn-en" class="lang-btn" onclick="filterLang('en')">🇬🇧 EN</button>
+        <button type="button" id="btn-fr" class="lang-btn active" onclick="filterLang('fr')">🇫🇷 FR</button>
+        <button type="button" id="btn-es" class="lang-btn" onclick="filterLang('es')">🇪🇸 ES</button>
+        <button type="button" id="btn-it" class="lang-btn" onclick="filterLang('it')">🇮🇹 IT</button>
+        <button type="button" id="btn-pl" class="lang-btn" onclick="filterLang('pl')">🇵🇱 PL</button>
+        <button type="button" id="btn-uk" class="lang-btn" onclick="filterLang('uk')">🇺🇦 UA</button>
+        <button type="button" id="btn-ar" class="lang-btn" onclick="filterLang('ar')">🇸🇦 AR</button>
+    </div>
+    <button type="button" id="btn-print" class="print-btn" onclick="window.print()">🖨️ Télécharger le PDF</button>
+</div>
+
+<!-- =========================================================================
+     1. FRANÇAIS (FR — aresmaxima.com)
+     ========================================================================= -->
+<div id="lang-fr" class="lang-block active" lang="fr" dir="ltr">
+    <!-- PAGE 1 / 2 : PREUVES TECHNIQUES & SPÉCIFICATIONS -->
+    <div class="a4-sheet">
+        <div class="sheet-body">
+            <div class="sections-stack">
+                <header class="doc-header">
+                    <div class="header-title">
+                        <div class="tech-tag">FICHE DE SPÉCIFICATIONS TECHNIQUES &amp; BENCHMARK • RÉF. AM-AEGIS-P2P-370</div>
+                        <h1>AEGIS P2P — <span>Preuves Techniques &amp; Benchmark</span></h1>
+                        <p class="subtitle">Spécifications Cryptographiques, Vérification Formelle &amp; Scellement HSM v3.7 (COTS — ECCN 5D992.c)</p>
+                    </div>
+                    <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima Logo" class="logo">
+                </header>
+
+                <div class="section-card">
+                    <h2>1. Preuves Internes de Sécurité et de Fiabilité</h2>
+                    <p>AEGIS est bâti sur une philosophie d'ingénierie <strong>« Zero-Trust, Verify-Everything »</strong> (Zéro confiance, tout vérifier). Aucune propriété de sécurité n'est revendiquée sans un test automatisé reproductible ou une preuve mathématique formelle correspondante dans notre pipeline CI/CD (GitHub Actions, 14/14 jobs validés au vert + sceau SLSA Provenance).</p>
+                    <table class="proof-table">
+                        <thead>
+                            <tr>
+                                <th>Domaine de Preuve</th>
+                                <th>Outil / Méthode</th>
+                                <th>Ce que cela prouve mathématiquement</th>
+                                <th>Statut</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Sûreté Mémoire</strong></td>
+                                <td>Rust / Miri</td>
+                                <td>Détection exhaustive des comportements indéfinis (UB). Élimine les dépassements de tampon, les double-libérations (use-after-free) et les data races concurrentes.</td>
+                                <td class="status-ok">✅ 5/5 Validés</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Vérification Formelle</strong></td>
+                                <td>AWS Kani</td>
+                                <td>Preuve mathématique formelle de l'absence d'erreurs d'exécution (panics, overflows arithmétiques) dans les primitives critiques (SPQR ML-KEM-1024, FIPS 204 ML-DSA-87, Ed25519).</td>
+                                <td class="status-ok">✅ Prouvé</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Zéro Fuite Mémoire</strong></td>
+                                <td>Valgrind / Linux mmap</td>
+                                <td>Garantit zéro fuite mémoire résiduelle pendant les opérations cryptographiques intensives et les allocations verrouillées en RAM.</td>
+                                <td class="status-ok">✅ Validé</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Attestation Matérielle</strong></td>
+                                <td>StrongBox P2P X.509 (C91)</td>
+                                <td>Valide la racine de confiance matérielle du smartphone. Déclenche une fermeture sécurisée (Panic Purge) si la chaîne d'intégrité Android est altérée.</td>
+                                <td class="status-ok">✅ Intégré</td>
+                            </tr>
+                            <tr class="hsm-row">
+                                <td><strong>Scellement HSM (C89)</strong></td>
+                                <td>StrongBox ECDSA + Ed25519</td>
+                                <td>Verrouille hors-ligne chaque licence à l'empreinte SHA-256 de la clé publique matérielle StrongBox du terminal (<code>aegis_verify_license_key_bound</code>). Anti-clonage absolu.</td>
+                                <td class="status-ok">✅ Scellé v3.7</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Sécurité FFI &amp; Linker</strong></td>
+                                <td>JNI + Bit-for-Bit + SLSA</td>
+                                <td>Contrôle automatisé que l'intégralité des symboles natifs C/Rust (ex: <code>aegis_panic_purge</code>) est exportée sans corruption vers la couche Kotlin/Dart.</td>
+                                <td class="status-ok">✅ 14/14 + SLSA</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Zéro-Disque Strict</strong></td>
+                                <td>RAM + /proc/self/mem</td>
+                                <td>Les clés cryptographiques et les contenus déchiffrés ne touchent jamais la mémoire flash. Le traitement opère dans un espace mémoire Rust isolé.</td>
+                                <td class="status-ok">✅ Prouvé</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="crypto-strip">
+                <div class="crypto-item">
+                    <strong>SPQR ML-KEM-1024 + X25519</strong>
+                    <span>Accord hybride post-quantique NIST FIPS 203 (256 bits)</span>
+                </div>
+                <div class="crypto-item">
+                    <strong>CHACHA20-POLY1305 / AES-GCM</strong>
+                    <span>Chiffrement authentifié AEAD 256 bits en transit &amp; RAM</span>
+                </div>
+                <div class="crypto-item">
+                    <strong>ML-DSA-87 + ED25519 + HSM</strong>
+                    <span>Identité P2P éphémère &amp; scellement matériel StrongBox</span>
+                </div>
+            </div>
+        </div>
+        <footer class="sheet-footer">
+            <span>AEGIS P2P v3.7 • Preuves Techniques &amp; Benchmark • AresMaxima LLC (USA) — COTS Software (EAR ECCN 5D992.c)</span>
+            <span class="page-num">1 / 2</span>
+        </footer>
+    </div>
+
+    <!-- PAGE 2 / 2 : BENCHMARK CONCURRENTIEL & VERDICT -->
+    <div class="a4-sheet">
+        <div class="sheet-body">
+            <div class="sections-stack">
+                <div class="p2-mini-header">
+                    <span>AEGIS P2P v3.7 — COMPARATIF MULTI-ACTIFS : AEGIS FACE AUX STANDARDS DU MARCHÉ</span>
+                    <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima" class="logo-sm">
+                </div>
+
+                <div class="section-card">
+                    <h2>2. Benchmark : AEGIS P2P vs. Leaders du Marché</h2>
+                    <div class="note-box">
+                        <p><strong>Positionnement COTS (ECCN 5D992.c) :</strong> AEGIS P2P s'adresse aux modèles de menace élevés (comités exécutifs, protection du secret industriel, avocats, journalistes d'investigation, opérateurs critiques) exigeant une souveraineté cryptographique et physique sans compromis.</p>
+                    </div>
+                    <table class="bench-table">
+                        <thead>
+                            <tr>
+                                <th>Critère Technique</th>
+                                <th class="col-aegis">AEGIS P2P v3.7</th>
+                                <th>Signal</th>
+                                <th>Session</th>
+                                <th>Telegram</th>
+                                <th>Wickr (AWS)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Standard de Chiffrement</strong></td>
+                                <td class="aegis-col">SPQR Continu ML-KEM-1024 + ML-DSA-87 (Niv. 5)</td>
+                                <td>Signal Protocol (PQ hybride 768)</td>
+                                <td>Signal Protocol classique</td>
+                                <td>MTProto (Cloud par défaut)</td>
+                                <td>AES-256 / ECDH classique</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Attestation &amp; Scellement HSM</strong></td>
+                                <td class="aegis-col">Mutuelle P2P X.509 StrongBox + Licence HSM + NFC.</td>
+                                <td>Aucune</td>
+                                <td>Aucune</td>
+                                <td>Aucune</td>
+                                <td>Optionnelle</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Anonymat &amp; Résilience Réseau</strong></td>
+                                <td class="aegis-col">Tor + HTTP/3 MASQUE+ECH + Air-Gap Optique QR + Mesh</td>
+                                <td>Serveurs centraux (SIM requise)</td>
+                                <td>Routage Oignon (Internet requis)</td>
+                                <td>Serveurs Cloud centralisés</td>
+                                <td>Serveurs Cloud AWS centralisés</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Posture Anti-Forensique</strong></td>
+                                <td class="aegis-col">Zéro-Disque RAM + Chaff 512B + Dead-Drop + Anti-PRNU</td>
+                                <td>Base SQLite locale sur flash</td>
+                                <td>Base SQLite locale sur flash</td>
+                                <td>Stockage Cloud + cache local</td>
+                                <td>Base de données locale disque</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Protocole Panic / Leurre</strong></td>
+                                <td class="aegis-col">Oui (PIN Leurre, Kill Switch RAM, inactivité 1 min)</td>
+                                <td>Non</td>
+                                <td>Non</td>
+                                <td>Non</td>
+                                <td>Non</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Auditabilité &amp; Vérification</strong></td>
+                                <td class="aegis-col">Builds Bit-à-Bit + Sceau SLSA + Preuves Kani/Miri (14/14)</td>
+                                <td>Open Source</td>
+                                <td>Open Source</td>
+                                <td>Client seul (Serveur fermé)</td>
+                                <td>Fermé (Sans preuve formelle)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Modèle d'Identité</strong></td>
+                                <td class="aegis-col">Clé Cryptographique Éphémère (Zéro SIM / e-mail)</td>
+                                <td>Numéro de téléphone SIM</td>
+                                <td>Identifiant aléatoire</td>
+                                <td>Numéro de téléphone SIM</td>
+                                <td>E-mail / Compte entreprise</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="verdict">
+                    <p>Verdict Technique : AEGIS P2P v3.7 est l'unique solution logicielle commerciale sur étagère (COTS) réunissant simultanément l'encapsulation Post-Quantique maximale (ML-KEM-1024), l'Attestation &amp; le Scellement Matériel StrongBox (HSM), et l'architecture anti-forensique Zéro-Disque au sein d'un maillage P2P capable d'opérer sans serveur et hors-réseau (Tier-1 Souverain).</p>
+                </div>
+            </div>
+
+            <div class="cta-container">
+                <div class="cta-info">
+                    <strong>Portail Officiel, Documentation &amp; Licences Scellées HSM (Français)</strong>
+                    <a href="https://aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="link-url" target="_blank" rel="noopener noreferrer">https://aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/</a>
+                </div>
+                <a href="https://aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="btn-cta" target="_blank" rel="noopener noreferrer">Commander sur aresmaxima.com →</a>
+            </div>
+        </div>
+        <footer class="sheet-footer">
+            <span>Copyright © 2026 AresMaxima LLC and its Licensors. All Rights Reserved. • <a href="https://aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" target="_blank" rel="noopener noreferrer">aresmaxima.com</a></span>
+            <span class="page-num">2 / 2</span>
+        </footer>
+    </div>
+</div>
+
+<!-- =========================================================================
+     2. ENGLISH (EN — en.aresmaxima.com)
+     ========================================================================= -->
+<div id="lang-en" class="lang-block" lang="en" dir="ltr">
+    <!-- PAGE 1 / 2 -->
+    <div class="a4-sheet">
+        <div class="sheet-body">
+            <div class="sections-stack">
+                <header class="doc-header">
+                    <div class="header-title">
+                        <div class="tech-tag">TECHNICAL SPECIFICATIONS &amp; BENCHMARK • SKU AM-AEGIS-P2P-370</div>
+                        <h1>AEGIS P2P — <span>Technical Proofs &amp; Benchmark</span></h1>
+                        <p class="subtitle">Cryptographic Specifications, Formal Verification &amp; HSM Hardware Binding v3.7 (COTS — ECCN 5D992.c)</p>
+                    </div>
+                    <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima Logo" class="logo">
+                </header>
+
+                <div class="section-card">
+                    <h2>1. Internal Security &amp; Reliability Proofs</h2>
+                    <p>AEGIS is engineered around a strict <strong>"Zero-Trust, Verify-Everything"</strong> philosophy. No security claim is asserted without a corresponding reproducible automated test or formal mathematical proof in our CI/CD pipeline (GitHub Actions, 14/14 green jobs + SLSA Provenance seal).</p>
+                    <table class="proof-table">
+                        <thead>
+                            <tr>
+                                <th>Proof Domain</th>
+                                <th>Tool / Method</th>
+                                <th>What It Mathematically Proves</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Memory Safety</strong></td>
+                                <td>Rust / Miri</td>
+                                <td>Exhaustive detection of Undefined Behavior (UB). Eliminates buffer overflows, use-after-free vulnerabilities, and concurrent data races.</td>
+                                <td class="status-ok">✅ 5/5 Verified</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Formal Verification</strong></td>
+                                <td>AWS Kani</td>
+                                <td>Mathematical proof of zero runtime panics or arithmetic overflows across critical cryptographic primitives (SPQR ML-KEM-1024, FIPS 204 ML-DSA-87, Ed25519).</td>
+                                <td class="status-ok">✅ Proven</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Zero Memory Leaks</strong></td>
+                                <td>Valgrind / Linux mmap</td>
+                                <td>Guarantees zero residual memory leaks during high-load cryptographic operations and locked volatile RAM allocations.</td>
+                                <td class="status-ok">✅ Verified</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Hardware Attestation</strong></td>
+                                <td>StrongBox P2P X.509 (C91)</td>
+                                <td>Validates the handset's hardware root of trust. Fails closed (Panic Purge) if the Android hardware attestation chain is compromised.</td>
+                                <td class="status-ok">✅ Integrated</td>
+                            </tr>
+                            <tr class="hsm-row">
+                                <td><strong>HSM Binding (C89)</strong></td>
+                                <td>StrongBox ECDSA + Ed25519</td>
+                                <td>Cryptographically binds each license offline to the SHA-256 fingerprint of the handset's StrongBox hardware public key (<code>aegis_verify_license_key_bound</code>).</td>
+                                <td class="status-ok">✅ Sealed v3.7</td>
+                            </tr>
+                            <tr>
+                                <td><strong>FFI &amp; Linker Safety</strong></td>
+                                <td>JNI + Bit-for-Bit + SLSA</td>
+                                <td>Automated verification that every native C/Rust symbol (e.g., <code>aegis_panic_purge</code>) is cleanly exported to the Kotlin/Dart runtime layer.</td>
+                                <td class="status-ok">✅ 14/14 + SLSA</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Strict Zero-Disk</strong></td>
+                                <td>RAM + /proc/self/mem</td>
+                                <td>Cryptographic keys and decrypted payloads never touch flash storage. Unlocking executes inside an isolated Rust memory space.</td>
+                                <td class="status-ok">✅ Proven</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="crypto-strip">
+                <div class="crypto-item">
+                    <strong>SPQR ML-KEM-1024 + X25519</strong>
+                    <span>Hybrid NIST FIPS 203 post-quantum key agreement (256-bit)</span>
+                </div>
+                <div class="crypto-item">
+                    <strong>CHACHA20-POLY1305 / AES-GCM</strong>
+                    <span>256-bit AEAD authenticated encryption in transit &amp; RAM</span>
+                </div>
+                <div class="crypto-item">
+                    <strong>ML-DSA-87 + ED25519 + HSM</strong>
+                    <span>Ephemeral P2P identity &amp; StrongBox hardware binding</span>
+                </div>
+            </div>
+        </div>
+        <footer class="sheet-footer">
+            <span>AEGIS P2P v3.7 • Technical Proofs &amp; Benchmark • AresMaxima LLC (USA) — COTS Software (EAR ECCN 5D992.c)</span>
+            <span class="page-num">1 / 2</span>
+        </footer>
+    </div>
+
+    <!-- PAGE 2 / 2 -->
+    <div class="a4-sheet">
+        <div class="sheet-body">
+            <div class="sections-stack">
+                <div class="p2-mini-header">
+                    <span>AEGIS P2P v3.7 — MULTI-VECTOR BENCHMARK: AEGIS VS. INDUSTRY MESSENGERS</span>
+                    <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima" class="logo-sm">
+                </div>
+
+                <div class="section-card">
+                    <h2>2. Benchmark: AEGIS P2P vs. Market Leaders</h2>
+                    <div class="note-box">
+                        <p><strong>COTS Positioning (ECCN 5D992.c):</strong> AEGIS P2P targets high-exposure threat models (executive boards, trade-secret protection, legal counsel, investigative journalists, critical infrastructure) demanding uncompromising cryptographic and physical sovereignty.</p>
+                    </div>
+                    <table class="bench-table">
+                        <thead>
+                            <tr>
+                                <th>Technical Criterion</th>
+                                <th class="col-aegis">AEGIS P2P v3.7</th>
+                                <th>Signal</th>
+                                <th>Session</th>
+                                <th>Telegram</th>
+                                <th>Wickr (AWS)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Encryption Standard</strong></td>
+                                <td class="aegis-col">SPQR Continuo ML-KEM-1024 + ML-DSA-87 (Cat. 5)</td>
+                                <td>Signal Protocol (Hybrid PQ 768)</td>
+                                <td>Classical Signal Protocol</td>
+                                <td>MTProto (Cloud Default)</td>
+                                <td>Classical AES-256 / ECDH</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Hardware Attestation &amp; HSM</strong></td>
+                                <td class="aegis-col">Mutual P2P X.509 StrongBox + HSM License + NFC.</td>
+                                <td>None</td>
+                                <td>None</td>
+                                <td>None</td>
+                                <td>Optional</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Network Anonymity &amp; Mesh</strong></td>
+                                <td class="aegis-col">Tor + HTTP/3 MASQUE+ECH + 0-RF Optical QR + BLE Mesh</td>
+                                <td>Centralized Servers (SIM req.)</td>
+                                <td>Onion Routing (Internet req.)</td>
+                                <td>Centralized Cloud Servers</td>
+                                <td>Centralized AWS Cloud</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Anti-Forensic Posture</strong></td>
+                                <td class="aegis-col">Zero-Disk RAM + 512B Chaff + Dead-Drops + Anti-PRNU</td>
+                                <td>Local SQLite DB on Flash</td>
+                                <td>Local SQLite DB on Flash</td>
+                                <td>Cloud Storage + Local Cache</td>
+                                <td>Local Disk Database</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Panic / Duress Protocol</strong></td>
+                                <td class="aegis-col">Yes (Decoy PIN, Instant RAM Kill Switch, 1-min auto-purge)</td>
+                                <td>No</td>
+                                <td>No</td>
+                                <td>No</td>
+                                <td>No</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Auditability &amp; Proofs</strong></td>
+                                <td class="aegis-col">Bit-for-Bit Builds + SLSA Seal + Kani/Miri (14/14)</td>
+                                <td>Open Source</td>
+                                <td>Open Source</td>
+                                <td>Client Only (Closed Server)</td>
+                                <td>Closed (No formal proofs)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Identity Model</strong></td>
+                                <td class="aegis-col">Ephemeral Cryptographic Key (Zero SIM / email)</td>
+                                <td>SIM Phone Number</td>
+                                <td>Random Identifier</td>
+                                <td>SIM Phone Number</td>
+                                <td>Corporate Email / Account</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="verdict">
+                    <p>Technical Verdict: AEGIS P2P v3.7 is the sole Commercial Off-The-Shelf (COTS) software solution uniting maximum Category-5 Post-Quantum key encapsulation (ML-KEM-1024), StrongBox Hardware Attestation &amp; HSM License Binding, and Zero-Disk RAM anti-forensics inside a serverless, off-grid capable P2P mesh (Tier-1 Sovereign Grade).</p>
+                </div>
+            </div>
+
+            <div class="cta-container">
+                <div class="cta-info">
+                    <strong>Official Portal, Documentation &amp; HSM-Bound Licensing (English)</strong>
+                    <a href="https://en.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="link-url" target="_blank" rel="noopener noreferrer">https://en.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/</a>
+                </div>
+                <a href="https://en.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="btn-cta" target="_blank" rel="noopener noreferrer">Acquire at en.aresmaxima.com →</a>
+            </div>
+        </div>
+        <footer class="sheet-footer">
+            <span>Copyright © 2026 AresMaxima LLC and its Licensors. All Rights Reserved. • <a href="https://en.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" target="_blank" rel="noopener noreferrer">en.aresmaxima.com</a></span>
+            <span class="page-num">2 / 2</span>
+        </footer>
+    </div>
+</div>
+
+<!-- =========================================================================
+     3. ESPAÑOL (ES — es.aresmaxima.com)
+     ========================================================================= -->
+<div id="lang-es" class="lang-block" lang="es" dir="ltr">
+    <!-- PÁGINA 1 / 2 -->
+    <div class="a4-sheet">
+        <div class="sheet-body">
+            <div class="sections-stack">
+                <header class="doc-header">
+                    <div class="header-title">
+                        <div class="tech-tag">ESPECIFICACIONES TÉCNICAS Y BENCHMARK • REF. AM-AEGIS-P2P-370</div>
+                        <h1>AEGIS P2P — <span>Pruebas Técnicas y Benchmark</span></h1>
+                        <p class="subtitle">Especificaciones Criptográficas, Verificación Formal y Sellado HSM v3.7 (COTS — ECCN 5D992.c)</p>
+                    </div>
+                    <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima Logo" class="logo">
+                </header>
+
+                <div class="section-card">
+                    <h2>1. Pruebas Internas de Seguridad y Fiabilidad</h2>
+                    <p>AEGIS está construido sobre una filosofía estricta <strong>«Zero-Trust, Verify-Everything»</strong> (Confianza cero, verificarlo todo). Ninguna propiedad de seguridad se afirma sin una prueba automatizada reproducible o una demostración matemática formal en nuestro pipeline CI/CD (GitHub Actions, 14/14 en verde + sello SLSA Provenance).</p>
+                    <table class="proof-table">
+                        <thead>
+                            <tr>
+                                <th>Dominio de Prueba</th>
+                                <th>Herramienta / Método</th>
+                                <th>Lo que Demuestra Matemáticamente</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Seguridad de Memoria</strong></td>
+                                <td>Rust / Miri</td>
+                                <td>Detección exhaustiva de comportamientos indefinidos (UB). Previene desbordamientos de búfer, use-after-free y condiciones de carrera.</td>
+                                <td class="status-ok">✅ 5/5 Validados</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Verificación Formal</strong></td>
+                                <td>AWS Kani</td>
+                                <td>Prueba matemática formal de ausencia de errores en ejecución (panics, overflows) en primitivas críticas (SPQR ML-KEM-1024, FIPS 204 ML-DSA-87, Ed25519).</td>
+                                <td class="status-ok">✅ Demostrado</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Cero Fugas de Memoria</strong></td>
+                                <td>Valgrind / Linux mmap</td>
+                                <td>Garantiza cero fugas residuales de memoria durante operaciones criptográficas intensivas y asignaciones protegidas en RAM.</td>
+                                <td class="status-ok">✅ Validado</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Atestación de Hardware</strong></td>
+                                <td>StrongBox P2P X.509 (C91)</td>
+                                <td>Valida la raíz de confianza física del teléfono. Falla en modo cerrado (Panic Purge) si la cadena de integridad Android está alterada.</td>
+                                <td class="status-ok">✅ Integrado</td>
+                            </tr>
+                            <tr class="hsm-row">
+                                <td><strong>Sellado HSM (C89)</strong></td>
+                                <td>StrongBox ECDSA + Ed25519</td>
+                                <td>Vincula fuera de línea cada licencia a la huella SHA-256 de la clave pública física StrongBox del terminal (<code>aegis_verify_license_key_bound</code>). Anticlonación total.</td>
+                                <td class="status-ok">✅ Sellado v3.7</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Seguridad FFI y Linker</strong></td>
+                                <td>JNI + Bit-for-Bit + SLSA</td>
+                                <td>Verificación automatizada de que todos los símbolos nativos C/Rust (ej: <code>aegis_panic_purge</code>) se exportan limpiamente hacia Kotlin/Dart.</td>
+                                <td class="status-ok">✅ 14/14 + SLSA</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Cero-Disco Estricto</strong></td>
+                                <td>RAM + /proc/self/mem</td>
+                                <td>Las claves criptográficas y los datos en texto plano nunca tocan la memoria flash. El desbloqueo opera en un espacio Rust aislado.</td>
+                                <td class="status-ok">✅ Probado</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="crypto-strip">
+                <div class="crypto-item">
+                    <strong>SPQR ML-KEM-1024 + X25519</strong>
+                    <span>Acuerdo híbrido post-cuántico NIST FIPS 203 (256 bits)</span>
+                </div>
+                <div class="crypto-item">
+                    <strong>CHACHA20-POLY1305 / AES-GCM</strong>
+                    <span>Cifrado autenticado AEAD 256 bits en tránsito y RAM</span>
+                </div>
+                <div class="crypto-item">
+                    <strong>ML-DSA-87 + ED25519 + HSM</strong>
+                    <span>Identidad P2P efímera y sellado físico StrongBox</span>
+                </div>
+            </div>
+        </div>
+        <footer class="sheet-footer">
+            <span>AEGIS P2P v3.7 • Pruebas Técnicas y Benchmark • AresMaxima LLC (EE. UU.) — COTS Software (EAR ECCN 5D992.c)</span>
+            <span class="page-num">1 / 2</span>
+        </footer>
+    </div>
+
+    <!-- PÁGINA 2 / 2 -->
+    <div class="a4-sheet">
+        <div class="sheet-body">
+            <div class="sections-stack">
+                <div class="p2-mini-header">
+                    <span>AEGIS P2P v3.7 — COMPARATIVA MULTIVECTORIAL : AEGIS FRENTE A LÍDERES DEL MERCADO</span>
+                    <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima" class="logo-sm">
+                </div>
+
+                <div class="section-card">
+                    <h2>2. Benchmark : AEGIS P2P vs. Líderes del Mercado</h2>
+                    <div class="note-box">
+                        <p><strong>Posicionamiento COTS (ECCN 5D992.c) :</strong> AEGIS P2P apunta a modelos de amenaza elevados (alta dirección, secreto industrial, despachos jurídicos, periodistas de investigación, infraestructuras críticas) que exigen soberanía criptográfica y física absoluta.</p>
+                    </div>
+                    <table class="bench-table">
+                        <thead>
+                            <tr>
+                                <th>Criterio Técnico</th>
+                                <th class="col-aegis">AEGIS P2P v3.7</th>
+                                <th>Signal</th>
+                                <th>Session</th>
+                                <th>Telegram</th>
+                                <th>Wickr (AWS)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Estándar de Cifrado</strong></td>
+                                <td class="aegis-col">SPQR Continuo ML-KEM-1024 + ML-DSA-87 (Cat. 5)</td>
+                                <td>Signal Protocol (PQ híbrido 768)</td>
+                                <td>Signal Protocol clásico</td>
+                                <td>MTProto (Nube por defecto)</td>
+                                <td>AES-256 / ECDH clásico</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Atestación y Sellado HSM</strong></td>
+                                <td class="aegis-col">Mutua P2P X.509 StrongBox + Licencia HSM + NFC.</td>
+                                <td>Ninguna</td>
+                                <td>Ninguna</td>
+                                <td>Ninguna</td>
+                                <td>Opcional</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Anonimato y Red Mesh</strong></td>
+                                <td class="aegis-col">Tor + HTTP/3 MASQUE+ECH + Air-Gap Ottico QR + Mesh</td>
+                                <td>Servidores centrales (SIM req.)</td>
+                                <td>Ruteo Cebolla (Internet req.)</td>
+                                <td>Nube centralizada</td>
+                                <td>Nube centralizada AWS</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Postura Anti-Forense</strong></td>
+                                <td class="aegis-col">Cero-Disco RAM + Chaff 512B + Dead-Drop + Anti-PRNU</td>
+                                <td>BD SQLite local en flash</td>
+                                <td>BD SQLite local en flash</td>
+                                <td>Nube + caché local en disco</td>
+                                <td>BD local en disco</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Protocolo Pánico / Señuelo</strong></td>
+                                <td class="aegis-col">Sí (PIN Señuelo, Kill Switch RAM, purga auto 1 min)</td>
+                                <td>No</td>
+                                <td>No</td>
+                                <td>No</td>
+                                <td>No</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Auditabilidad y Pruebas</strong></td>
+                                <td class="aegis-col">Builds Bit-a-Bit + Sello SLSA + Kani/Miri (14/14)</td>
+                                <td>Open Source</td>
+                                <td>Open Source</td>
+                                <td>Solo cliente (Servidor cerrado)</td>
+                                <td>Cerrado (Sin prueba formal)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Modelo de Identidad</strong></td>
+                                <td class="aegis-col">Clave Criptográfica Efímera (Cero SIM / email)</td>
+                                <td>Número telefónico SIM</td>
+                                <td>ID aleatorio</td>
+                                <td>Número telefónico SIM</td>
+                                <td>Email / Cuenta corporativa</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="verdict">
+                    <p>Veredicto Técnico : AEGIS P2P v3.7 es la única solución comercial estándar (COTS) que reúne simultáneamente encapsulación Post-Cuántica máxima (ML-KEM-1024), Atestación y Sellado Físico StrongBox (HSM) y arquitectura antiforense Cero-Disco dentro de una malla P2P sin servidor capaz de operar fuera de red (Grado Soberano Tier-1).</p>
+                </div>
+            </div>
+
+            <div class="cta-container">
+                <div class="cta-info">
+                    <strong>Portal Oficial, Documentación y Licencias Selladas HSM (Español)</strong>
+                    <a href="https://es.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="link-url" target="_blank" rel="noopener noreferrer">https://es.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/</a>
+                </div>
+                <a href="https://es.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="btn-cta" target="_blank" rel="noopener noreferrer">Adquirir en es.aresmaxima.com →</a>
+            </div>
+        </div>
+        <footer class="sheet-footer">
+            <span>Copyright © 2026 AresMaxima LLC and its Licensors. All Rights Reserved. • <a href="https://es.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" target="_blank" rel="noopener noreferrer">es.aresmaxima.com</a></span>
+            <span class="page-num">2 / 2</span>
+        </footer>
+    </div>
+</div>
+
+<!-- =========================================================================
+     4. ITALIANO (IT — it.aresmaxima.com)
+     ========================================================================= -->
+<div id="lang-it" class="lang-block" lang="it" dir="ltr">
+    <!-- PAGINA 1 / 2 -->
+    <div class="a4-sheet">
+        <div class="sheet-body">
+            <div class="sections-stack">
+                <header class="doc-header">
+                    <div class="header-title">
+                        <div class="tech-tag">SPECIFICHE TECNICHE &amp; BENCHMARK • RIF. AM-AEGIS-P2P-370</div>
+                        <h1>AEGIS P2P — <span>Prove Tecniche &amp; Benchmark</span></h1>
+                        <p class="subtitle">Specifiche Crittografiche, Verifica Formale &amp; Sigillo HSM v3.7 (COTS — ECCN 5D992.c)</p>
+                    </div>
+                    <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima Logo" class="logo">
+                </header>
+
+                <div class="section-card">
+                    <h2>1. Prove Interne di Sicurezza e Affidabilità</h2>
+                    <p>AEGIS è progettato secondo una rigorosa filosofia <strong>«Zero-Trust, Verify-Everything»</strong> (Zero fiducia, verifica tutto). Nessuna proprietà di sicurezza viene dichiarata senza un test automatizzato riproducibile o una prova matematica formale nella pipeline CI/CD (GitHub Actions, 14/14 job verdi + sigillo SLSA Provenance).</p>
+                    <table class="proof-table">
+                        <thead>
+                            <tr>
+                                <th>Ambito di Prova</th>
+                                <th>Strumento / Metodo</th>
+                                <th>Cosa Dimostra Matematicamente</th>
+                                <th>Stato</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Sicurezza Memoria</strong></td>
+                                <td>Rust / Miri</td>
+                                <td>Rilevamento esaustivo dei comportamenti indefiniti (UB). Previene buffer overflow, use-after-free e data race concorrenti.</td>
+                                <td class="status-ok">✅ 5/5 Validati</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Verifica Formale</strong></td>
+                                <td>AWS Kani</td>
+                                <td>Prova matematica formale dell'assenza di errori runtime (panic, overflow aritmetici) nelle primitive critiche (SPQR ML-KEM-1024, FIPS 204 ML-DSA-87, Ed25519).</td>
+                                <td class="status-ok">✅ Dimostrato</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Zero Memory Leak</strong></td>
+                                <td>Valgrind / Linux mmap</td>
+                                <td>Garantisce zero perdite residue di memoria durante le operazioni crittografiche intensive e le allocazioni protette in RAM.</td>
+                                <td class="status-ok">✅ Validato</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Attestazione Hardware</strong></td>
+                                <td>StrongBox P2P X.509 (C91)</td>
+                                <td>Convalida la radice di fiducia hardware dello smartphone. Chiude in sicurezza (Panic Purge) se la catena di attestazione Android è compromessa.</td>
+                                <td class="status-ok">✅ Integrato</td>
+                            </tr>
+                            <tr class="hsm-row">
+                                <td><strong>Sigillo HSM (C89)</strong></td>
+                                <td>StrongBox ECDSA + Ed25519</td>
+                                <td>Vincola offline ogni licenza all'impronta SHA-256 della chiave pubblica hardware StrongBox del terminale (<code>aegis_verify_license_key_bound</code>). Anti-clonazione totale.</td>
+                                <td class="status-ok">✅ Sigillato v3.7</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Sicurezza FFI &amp; Linker</strong></td>
+                                <td>JNI + Bit-for-Bit + SLSA</td>
+                                <td>Verifica automatizzata che tutti i simboli nativi C/Rust (es: <code>aegis_panic_purge</code>) siano esportati correttamente verso Kotlin/Dart.</td>
+                                <td class="status-ok">✅ 14/14 + SLSA</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Zero-Disk Rigoroso</strong></td>
+                                <td>RAM + /proc/self/mem</td>
+                                <td>Le chiavi crittografiche e i dati in chiaro non toccano mai la memoria flash. Lo sblocco opera in uno spazio di memoria Rust isolato.</td>
+                                <td class="status-ok">✅ Provato</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="crypto-strip">
+                <div class="crypto-item">
+                    <strong>SPQR ML-KEM-1024 + X25519</strong>
+                    <span>Accordo ibrido post-quantistico NIST FIPS 203 (256 bit)</span>
+                </div>
+                <div class="crypto-item">
+                    <strong>CHACHA20-POLY1305 / AES-GCM</strong>
+                    <span>Crittografia autenticata AEAD 256 bit in transito &amp; RAM</span>
+                </div>
+                <div class="crypto-item">
+                    <strong>ML-DSA-87 + ED25519 + HSM</strong>
+                    <span>Identità P2P effimera &amp; sigillo hardware StrongBox</span>
+                </div>
+            </div>
+        </div>
+        <footer class="sheet-footer">
+            <span>AEGIS P2P v3.7 • Prove Tecniche &amp; Benchmark • AresMaxima LLC (USA) — COTS Software (EAR ECCN 5D992.c)</span>
+            <span class="page-num">1 / 2</span>
+        </footer>
+    </div>
+
+    <!-- PAGINA 2 / 2 -->
+    <div class="a4-sheet">
+        <div class="sheet-body">
+            <div class="sections-stack">
+                <div class="p2-mini-header">
+                    <span>AEGIS P2P v3.7 — CONFRONTO MULTIVETTORIALE : AEGIS CONTRO I LEADER DI MERCATO</span>
+                    <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima" class="logo-sm">
+                </div>
+
+                <div class="section-card">
+                    <h2>2. Benchmark : AEGIS P2P vs. Leader di Mercato</h2>
+                    <div class="note-box">
+                        <p><strong>Posizionamento COTS (ECCN 5D992.c) :</strong> AEGIS P2P si rivolge a modelli di minaccia elevati (consigli di amministrazione, segreto industriale, studi legali, giornalisti investigativi, infrastrutture critiche) che esigono sovranità crittografica e fisica assoluta.</p>
+                    </div>
+                    <table class="bench-table">
+                        <thead>
+                            <tr>
+                                <th>Criterio Tecnico</th>
+                                <th class="col-aegis">AEGIS P2P v3.7</th>
+                                <th>Signal</th>
+                                <th>Session</th>
+                                <th>Telegram</th>
+                                <th>Wickr (AWS)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Standard Crittografico</strong></td>
+                                <td class="aegis-col">SPQR Continuo ML-KEM-1024 + ML-DSA-87 (Cat. 5)</td>
+                                <td>Signal Protocol (PQ ibrido 768)</td>
+                                <td>Signal Protocol classico</td>
+                                <td>MTProto (Cloud predefinito)</td>
+                                <td>AES-256 / ECDH classico</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Attestazione &amp; Sigillo HSM</strong></td>
+                                <td class="aegis-col">Mutua P2P X.509 StrongBox + Licenza HSM + NFC.</td>
+                                <td>Nessuna</td>
+                                <td>Nessuna</td>
+                                <td>Nessuna</td>
+                                <td>Opzionale</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Anonimato &amp; Rete Mesh</strong></td>
+                                <td class="aegis-col">Tor + HTTP/3 MASQUE+ECH + Air-Gap Ottico QR + Mesh</td>
+                                <td>Server centrali (SIM richiesta)</td>
+                                <td>Onion Routing (Internet rich.)</td>
+                                <td>Cloud centralizzato</td>
+                                <td>Cloud centralizzato AWS</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Postura Anti-Forense</strong></td>
+                                <td class="aegis-col">Zero-Disk RAM + Chaff 512B + Dead-Drop + Anti-PRNU</td>
+                                <td>DB SQLite locale su flash</td>
+                                <td>DB SQLite locale su flash</td>
+                                <td>Cloud + cache locale disco</td>
+                                <td>Database locale su disco</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Protocollo Panico / Esca</strong></td>
+                                <td class="aegis-col">Sì (PIN Esca, Kill Switch RAM, auto-purga 1 min)</td>
+                                <td>No</td>
+                                <td>No</td>
+                                <td>No</td>
+                                <td>No</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Verificabilità &amp; Build</strong></td>
+                                <td class="aegis-col">Build Bit-a-Bit + Sigillo SLSA + Kani/Miri (14/14)</td>
+                                <td>Open Source</td>
+                                <td>Open Source</td>
+                                <td>Solo client (Server chiuso)</td>
+                                <td>Chiuso (Senza prove formali)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Modello di Identità</strong></td>
+                                <td class="aegis-col">Chiave Crittografica Effimera (Zero SIM / email)</td>
+                                <td>Numero telefonico SIM</td>
+                                <td>ID casuale</td>
+                                <td>Numero telefonico SIM</td>
+                                <td>Email / Account aziendale</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="verdict">
+                    <p>Verdetto Tecnico : AEGIS P2P v3.7 è l'unica soluzione software commerciale standard (COTS) che unisce simultaneamente incapsulamento Post-Quantistico massimo (ML-KEM-1024), Attestazione e Sigillo Hardware StrongBox (HSM) e anti-forense Zero-Disk in una rete mesh P2P decentralizzata operativa anche senza Internet (Grado Sovrano Tier-1).</p>
+                </div>
+            </div>
+
+            <div class="cta-container">
+                <div class="cta-info">
+                    <strong>Portale Ufficiale, Documentazione &amp; Licenze Sigillate HSM (Italiano)</strong>
+                    <a href="https://it.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="link-url" target="_blank" rel="noopener noreferrer">https://it.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/</a>
+                </div>
+                <a href="https://it.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="btn-cta" target="_blank" rel="noopener noreferrer">Acquista su it.aresmaxima.com →</a>
+            </div>
+        </div>
+        <footer class="sheet-footer">
+            <span>Copyright © 2026 AresMaxima LLC and its Licensors. All Rights Reserved. • <a href="https://it.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" target="_blank" rel="noopener noreferrer">it.aresmaxima.com</a></span>
+            <span class="page-num">2 / 2</span>
+        </footer>
+    </div>
+</div>
+
+<!-- =========================================================================
+     5. POLSKI (PL — pl.aresmaxima.com)
+     ========================================================================= -->
+<div id="lang-pl" class="lang-block" lang="pl" dir="ltr">
+    <!-- STRONA 1 / 2 -->
+    <div class="a4-sheet">
+        <div class="sheet-body">
+            <div class="sections-stack">
+                <header class="doc-header">
+                    <div class="header-title">
+                        <div class="tech-tag">SPECYFIKACJA TECHNICZNA I BENCHMARK • SKU AM-AEGIS-P2P-370</div>
+                        <h1>AEGIS P2P — <span>Dowody Techniczne i Benchmark</span></h1>
+                        <p class="subtitle">Specyfikacje Kryptograficzne, Weryfikacja Formalna i Pieczęć HSM v3.7 (COTS — ECCN 5D992.c)</p>
+                    </div>
+                    <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima Logo" class="logo">
+                </header>
+
+                <div class="section-card">
+                    <h2>1. Wewnętrzne Dowody Bezpieczeństwa i Niezawodności</h2>
+                    <p>AEGIS został zbudowany w oparciu o rygorystyczną filozofię <strong>„Zero-Trust, Verify-Everything”</strong> (Zero zaufania, weryfikuj wszystko). Żadna gwarancja bezpieczeństwa nie jest deklarowana bez powtarzalnego testu automatycznego lub formalnego dowodu matematycznego w potoku CI/CD (GitHub Actions, 14/14 na zielono + pieczęć SLSA Provenance).</p>
+                    <table class="proof-table">
+                        <thead>
+                            <tr>
+                                <th>Obszar Dowodu</th>
+                                <th>Narzędzie / Metoda</th>
+                                <th>Co To Udowadnia Matematycznie</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Bezpieczeństwo Pamięci</strong></td>
+                                <td>Rust / Miri</td>
+                                <td>Wyczerpujące wykrywanie niezdefiniowanych zachowań (UB). Eliminuje przepełnienia bufora, błędy use-after-free oraz wyścigi danych.</td>
+                                <td class="status-ok">✅ 5/5 Zaliczonych</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Weryfikacja Formalna</strong></td>
+                                <td>AWS Kani</td>
+                                <td>Matematyczny dowód braku błędów wykonania (panics, przepełnienia) w krytycznych prymitywach (SPQR ML-KEM-1024, FIPS 204 ML-DSA-87, Ed25519).</td>
+                                <td class="status-ok">✅ Udowodniono</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Zero Wycieków Pamięci</strong></td>
+                                <td>Valgrind / Linux mmap</td>
+                                <td>Gwarantuje zero wycieków pamięci podczas intensywnych operacji kryptograficznych i chronionych alokacji w pamięci RAM.</td>
+                                <td class="status-ok">✅ Zweryfikowano</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Atestacja Sprzętowa</strong></td>
+                                <td>StrongBox P2P X.509 (C91)</td>
+                                <td>Waliduje sprzętowy korzeń zaufania smartfona. Kończy działanie w trybie zamkniętym (Panic Purge) w razie naruszenia łańcucha Android.</td>
+                                <td class="status-ok">✅ Zintegrowano</td>
+                            </tr>
+                            <tr class="hsm-row">
+                                <td><strong>Pieczęć HSM (C89)</strong></td>
+                                <td>StrongBox ECDSA + Ed25519</td>
+                                <td>Wiąże offline każdą licencję z odciskiem SHA-256 sprzętowego klucza publicznego StrongBox urządzenia (<code>aegis_verify_license_key_bound</code>). Pełna ochrona anty-klonowa.</td>
+                                <td class="status-ok">✅ Pieczęć v3.7</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Bezpieczeństwo FFI</strong></td>
+                                <td>JNI + Bit-for-Bit + SLSA</td>
+                                <td>Automatyczna weryfikacja poprawnego eksportu wszystkich natywnych symboli C/Rust (np. <code>aegis_panic_purge</code>) do warstwy Kotlin/Dart.</td>
+                                <td class="status-ok">✅ 14/14 + SLSA</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Ścisły Zero-Disk</strong></td>
+                                <td>RAM + /proc/self/mem</td>
+                                <td>Klucze kryptograficzne i odszyfrowane dane nigdy nie dotykają pamięci flash. Odblokowanie działa w izolowanej przestrzeni Rust.</td>
+                                <td class="status-ok">✅ Udowodniono</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="crypto-strip">
+                <div class="crypto-item">
+                    <strong>SPQR ML-KEM-1024 + X25519</strong>
+                    <span>Hybrydowe uzgadnianie kluczy post-kwantowych NIST FIPS 203</span>
+                </div>
+                <div class="crypto-item">
+                    <strong>CHACHA20-POLY1305 / AES-GCM</strong>
+                    <span>Szyfrowanie uwierzytelnione AEAD 256 bitów w sieci i RAM</span>
+                </div>
+                <div class="crypto-item">
+                    <strong>ML-DSA-87 + ED25519 + HSM</strong>
+                    <span>Efemeryczna tożsamość P2P i sprzętowa pieczęć StrongBox</span>
+                </div>
+            </div>
+        </div>
+        <footer class="sheet-footer">
+            <span>AEGIS P2P v3.7 • Dowody Techniczne i Benchmark • AresMaxima LLC (USA) — COTS Software (EAR ECCN 5D992.c)</span>
+            <span class="page-num">1 / 2</span>
+        </footer>
+    </div>
+
+    <!-- STRONA 2 / 2 -->
+    <div class="a4-sheet">
+        <div class="sheet-body">
+            <div class="sections-stack">
+                <div class="p2-mini-header">
+                    <span>AEGIS P2P v3.7 — WIELOWYMIAROWY BENCHMARK : AEGIS KONTRA LIDERZY RYNKU</span>
+                    <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima" class="logo-sm">
+                </div>
+
+                <div class="section-card">
+                    <h2>2. Benchmark : AEGIS P2P kontra Liderzy Rynku</h2>
+                    <div class="note-box">
+                        <p><strong>Pozycjonowanie COTS (ECCN 5D992.c) :</strong> AEGIS P2P jest przeznaczony dla modeli wysokiego zagrożenia prywatności (zarządy spółek, tajemnica przedsiębiorstwa, kancelarie prawne, dziennikarze śledczy, infrastruktura krytyczna) wymagających bezkompromisowej suwerenności.</p>
+                    </div>
+                    <table class="bench-table">
+                        <thead>
+                            <tr>
+                                <th>Kryterium Techniczne</th>
+                                <th class="col-aegis">AEGIS P2P v3.7</th>
+                                <th>Signal</th>
+                                <th>Session</th>
+                                <th>Telegram</th>
+                                <th>Wickr (AWS)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Standard Szyfrowania</strong></td>
+                                <td class="aegis-col">Ciągły SPQR ML-KEM-1024 + ML-DSA-87 (Kat. 5)</td>
+                                <td>Signal Protocol (Hybrydowe PQ 768)</td>
+                                <td>Klasyczny Signal Protocol</td>
+                                <td>MTProto (Chmura domyślnie)</td>
+                                <td>Klasyczny AES-256 / ECDH</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Atestacja i Pieczęć HSM</strong></td>
+                                <td class="aegis-col">Wzajemna P2P X.509 StrongBox + Licencja HSM + NFC.</td>
+                                <td>Brak</td>
+                                <td>Brak</td>
+                                <td>Brak</td>
+                                <td>Opcjonalna</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Anonimowość i Sieć Mesh</strong></td>
+                                <td class="aegis-col">Tor + HTTP/3 MASQUE+ECH + Optyczny QR 0-RF + Mesh</td>
+                                <td>Serwery centralne (Wymagana SIM)</td>
+                                <td>Onion Routing (Wymagany Internet)</td>
+                                <td>Scentralizowana chmura</td>
+                                <td>Scentralizowana chmura AWS</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Ochrona Antykryminalistyczna</strong></td>
+                                <td class="aegis-col">Zero-Disk RAM + Chaff 512B + Dead-Drop + Anti-PRNU</td>
+                                <td>Lokalna baza SQLite na flash</td>
+                                <td>Lokalna baza SQLite na flash</td>
+                                <td>Chmura + lokalny cache</td>
+                                <td>Lokalna baza danych na dysku</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Protokół Paniki / Przymusu</strong></td>
+                                <td class="aegis-col">Tak (Fałszywy PIN, Kill Switch RAM, auto-czyszczenie 1 min)</td>
+                                <td>Nie</td>
+                                <td>Nie</td>
+                                <td>Nie</td>
+                                <td>Nie</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Audytowalność i Kompilacje</strong></td>
+                                <td class="aegis-col">Buildy Bit-po-Bicie + Pieczęć SLSA + Kani/Miri (14/14)</td>
+                                <td>Open Source</td>
+                                <td>Open Source</td>
+                                <td>Tylko klient (Zamknięty serwer)</td>
+                                <td>Zamknięty (Brak dowodów form.)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Model Tożsamości</strong></td>
+                                <td class="aegis-col">Efemeryczny Klucz Kryptograficzny (Zero SIM / e-maila)</td>
+                                <td>Numer telefonu SIM</td>
+                                <td>Losowy identyfikator</td>
+                                <td>Numer telefonu SIM</td>
+                                <td>E-mail / Konto firmowe</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="verdict">
+                    <p>Werdykt Techniczny : AEGIS P2P v3.7 to jedyne komercyjne oprogramowanie standardowe (COTS) łączące jednocześnie maksymalną odporność Post-Kwantową (ML-KEM-1024), Sprzętową Atestację i Pieczęć Licencyjną StrongBox (HSM) oraz antykryminalistykę Zero-Disk w bezserwerowej sieci kratowej P2P zdolnej do pracy bez Internetu (Klasa Suwerenna Tier-1).</p>
+                </div>
+            </div>
+
+            <div class="cta-container">
+                <div class="cta-info">
+                    <strong>Oficjalny Portal, Dokumentacja i Licencje HSM (Polski)</strong>
+                    <a href="https://pl.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="link-url" target="_blank" rel="noopener noreferrer">https://pl.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/</a>
+                </div>
+                <a href="https://pl.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="btn-cta" target="_blank" rel="noopener noreferrer">Zamów na pl.aresmaxima.com →</a>
+            </div>
+        </div>
+        <footer class="sheet-footer">
+            <span>Copyright © 2026 AresMaxima LLC and its Licensors. All Rights Reserved. • <a href="https://pl.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" target="_blank" rel="noopener noreferrer">pl.aresmaxima.com</a></span>
+            <span class="page-num">2 / 2</span>
+        </footer>
+    </div>
+</div>
+
+<!-- =========================================================================
+     6. УКРАЇНСЬКА (UA — uk.aresmaxima.com)
+     ========================================================================= -->
+<div id="lang-uk" class="lang-block" lang="uk" dir="ltr">
+    <!-- СТОРІНКА 1 / 2 -->
+    <div class="a4-sheet">
+        <div class="sheet-body">
+            <div class="sections-stack">
+                <header class="doc-header">
+                    <div class="header-title">
+                        <div class="tech-tag">ТЕХНІЧНІ СПЕЦИФІКАЦІЇ ТА БЕНЧМАРК • АРТ. AM-AEGIS-P2P-370</div>
+                        <h1>AEGIS P2P — <span>Технічні Докази та Бенчмарк</span></h1>
+                        <p class="subtitle">Криптографічні Специфікації, Формальна Верифікація та Прив'язка HSM v3.7 (COTS — ECCN 5D992.c)</p>
+                    </div>
+                    <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima Logo" class="logo">
+                </header>
+
+                <div class="section-card">
+                    <h2>1. Внутрішні Докази Безпеки та Надійності</h2>
+                    <p>AEGIS побудовано на суворій інженерній філософії <strong>«Zero-Trust, Verify-Everything»</strong> (Нульова довіра, перевіряй усе). Жодна властивість безпеки не заявляється без відтворюваного автоматизованого тесту або формального математичного доказу в нашому конвеєрі CI/CD (GitHub Actions, 14/14 зелені + печатка SLSA Provenance).</p>
+                    <table class="proof-table">
+                        <thead>
+                            <tr>
+                                <th>Сфера Доказу</th>
+                                <th>Інструмент / Метод</th>
+                                <th>Що Це Доводить Математично</th>
+                                <th>Статус</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Безпека Пам'яті</strong></td>
+                                <td>Rust / Miri</td>
+                                <td>Вичерпне виявлення невизначеної поведінки (UB). Унеможливлює переповнення буфера, use-after-free та стани гонитви потоків.</td>
+                                <td class="status-ok">✅ 5/5 Пройдено</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Формальна Верифікація</strong></td>
+                                <td>AWS Kani</td>
+                                <td>Математичний доказ відсутності збоїв виконання (panics, переповнень) у критичних примітивах (SPQR ML-KEM-1024, FIPS 204 ML-DSA-87, Ed25519).</td>
+                                <td class="status-ok">✅ Доведено</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Нуль Витоків Пам'яті</strong></td>
+                                <td>Valgrind / Linux mmap</td>
+                                <td>Гарантує повну відсутність витоків пам'яті під час інтенсивних криптооперацій та захищених алокацій у RAM.</td>
+                                <td class="status-ok">✅ Підтверджено</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Апаратна Атестація</strong></td>
+                                <td>StrongBox P2P X.509 (C91)</td>
+                                <td>Перевіряє апаратний корінь довіри смартфона. Миттєво блокується з очищенням (Panic Purge) у разі компрометації ланцюга Android.</td>
+                                <td class="status-ok">✅ Інтегровано</td>
+                            </tr>
+                            <tr class="hsm-row">
+                                <td><strong>Прив'язка HSM (C89)</strong></td>
+                                <td>StrongBox ECDSA + Ed25519</td>
+                                <td>Офлайн прив'язує кожну ліцензію до SHA-256 відбитка апаратного публічного ключа StrongBox пристрою (<code>aegis_verify_license_key_bound</code>). Захист від клонування.</td>
+                                <td class="status-ok">✅ Скріплено v3.7</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Безпека FFI та Лінкера</strong></td>
+                                <td>JNI + Bit-for-Bit + SLSA</td>
+                                <td>Автоматизована перевірка коректного експорту всіх нативних символів C/Rust (напр., <code>aegis_panic_purge</code>) до рівня Kotlin/Dart.</td>
+                                <td class="status-ok">✅ 14/14 + SLSA</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Суворий Zero-Disk</strong></td>
+                                <td>RAM + /proc/self/mem</td>
+                                <td>Криптографічні ключі та відкриті дані ніколи не торкаються флеш-пам'яті. Розблокування працює в ізольованому просторі Rust.</td>
+                                <td class="status-ok">✅ Доведено</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="crypto-strip">
+                <div class="crypto-item">
+                    <strong>SPQR ML-KEM-1024 + X25519</strong>
+                    <span>Гібридне постквантове узгодження ключів NIST FIPS 203</span>
+                </div>
+                <div class="crypto-item">
+                    <strong>CHACHA20-POLY1305 / AES-GCM</strong>
+                    <span>Автентифіковане шифрування AEAD 256 біт у мережі та RAM</span>
+                </div>
+                <div class="crypto-item">
+                    <strong>ML-DSA-87 + ED25519 + HSM</strong>
+                    <span>Ефемерна P2P-ідентичність та апаратна печатка StrongBox</span>
+                </div>
+            </div>
+        </div>
+        <footer class="sheet-footer">
+            <span>AEGIS P2P v3.7 • Технічні Докази та Бенчмарк • AresMaxima LLC (USA) — COTS Software (EAR ECCN 5D992.c)</span>
+            <span class="page-num">1 / 2</span>
+        </footer>
+    </div>
+
+    <!-- СТОРІНКА 2 / 2 -->
+    <div class="a4-sheet">
+        <div class="sheet-body">
+            <div class="sections-stack">
+                <div class="p2-mini-header">
+                    <span>AEGIS P2P v3.7 — БАГАТОВЕКТОРНИЙ БЕНЧМАРК : AEGIS ПРОТИ ЛІДЕРІВ РИНКУ</span>
+                    <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima" class="logo-sm">
+                </div>
+
+                <div class="section-card">
+                    <h2>2. Бенчмарк : AEGIS P2P проти Лідерів Ринку</h2>
+                    <div class="note-box">
+                        <p><strong>Позиціонування COTS (ECCN 5D992.c) :</strong> AEGIS P2P створено для моделей високих загроз конфіденційності (топ-менеджмент, захист комерційної таємниці, адвокати, журналісти-розслідувачі, критична інфраструктура), де потрібен абсолютний суверенітет.</p>
+                    </div>
+                    <table class="bench-table">
+                        <thead>
+                            <tr>
+                                <th>Технічний Критерій</th>
+                                <th class="col-aegis">AEGIS P2P v3.7</th>
+                                <th>Signal</th>
+                                <th>Session</th>
+                                <th>Telegram</th>
+                                <th>Wickr (AWS)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Стандарт Шифрування</strong></td>
+                                <td class="aegis-col">Безперервний SPQR ML-KEM-1024 + ML-DSA-87 (Рів. 5)</td>
+                                <td>Signal Protocol (Гібридний PQ 768)</td>
+                                <td>Класичний Signal Protocol</td>
+                                <td>MTProto (Хмара за замовч.)</td>
+                                <td>Класичний AES-256 / ECDH</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Атестація та Печатка HSM</strong></td>
+                                <td class="aegis-col">Взаємна P2P X.509 StrongBox + Ліцензія HSM + NFC.</td>
+                                <td>Відсутня</td>
+                                <td>Відсутня</td>
+                                <td>Відсутня</td>
+                                <td>Опціональна</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Анонімність та Mesh-Мережа</strong></td>
+                                <td class="aegis-col">Tor + HTTP/3 MASQUE+ECH + Оптичний QR 0-RF + Mesh</td>
+                                <td>Центральні сервери (Потрібна SIM)</td>
+                                <td>Onion Routing (Потрібен Інтернет)</td>
+                                <td>Централізована хмара</td>
+                                <td>Централізована хмара AWS</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Антикриміналістичний Захист</strong></td>
+                                <td class="aegis-col">Zero-Disk RAM + Chaff 512Б + Dead-Drop + Anti-PRNU</td>
+                                <td>Локальна БД SQLite на флеш</td>
+                                <td>Локальна БД SQLite на флеш</td>
+                                <td>Хмара + локальний кеш</td>
+                                <td>Локальна БД на диску</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Протокол Паніки / Примусу</strong></td>
+                                <td class="aegis-col">Так (Хибний PIN, Kill Switch RAM, автоочищення 1 хв)</td>
+                                <td>Ні</td>
+                                <td>Ні</td>
+                                <td>Ні</td>
+                                <td>Ні</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Аудитованість та Збірки</strong></td>
+                                <td class="aegis-col">Збірки Біт-у-Біт + Печатка SLSA + Kani/Miri (14/14)</td>
+                                <td>Open Source</td>
+                                <td>Open Source</td>
+                                <td>Лише клієнт (Закритий сервер)</td>
+                                <td>Закритий (Без форм. доказів)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Модель Ідентичності</strong></td>
+                                <td class="aegis-col">Ефемерний Криптографічний Ключ (Нуль SIM / пошти)</td>
+                                <td>Номер телефону SIM</td>
+                                <td>Випадковий ідентифікатор</td>
+                                <td>Номер телефону SIM</td>
+                                <td>Корпоративний Email / Акаунт</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="verdict">
+                    <p>Технічний Вердикт : AEGIS P2P v3.7 — єдине стандартне комерційне програмне рішення (COTS), що одночасно поєднує максимальну Постквантову стійкість (ML-KEM-1024), Апаратну Атестацію та Прив'язку Ліцензії StrongBox (HSM), а також антикриміналістику Zero-Disk у децентралізованій P2P-мережі, здатній працювати без серверів і без Інтернету (Суверенний Клас Tier-1).</p>
+                </div>
+            </div>
+
+            <div class="cta-container">
+                <div class="cta-info">
+                    <strong>Офіційний Портал, Документація та HSM-Ліцензії (Українська)</strong>
+                    <a href="https://uk.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="link-url" target="_blank" rel="noopener noreferrer">https://uk.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/</a>
+                </div>
+                <a href="https://uk.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="btn-cta" target="_blank" rel="noopener noreferrer">Замовити на uk.aresmaxima.com →</a>
+            </div>
+        </div>
+        <footer class="sheet-footer">
+            <span>Copyright © 2026 AresMaxima LLC and its Licensors. All Rights Reserved. • <a href="https://uk.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" target="_blank" rel="noopener noreferrer">uk.aresmaxima.com</a></span>
+            <span class="page-num">2 / 2</span>
+        </footer>
+    </div>
+</div>
+
+<!-- =========================================================================
+     7. العربية (AR - RTL — ar.aresmaxima.com)
+     ========================================================================= -->
+<div id="lang-ar" class="lang-block" lang="ar" dir="rtl">
+    <!-- الصفحة 1 / 2 -->
+    <div class="a4-sheet">
+        <div class="sheet-body">
+            <div class="sections-stack">
+                <header class="doc-header">
+                    <div class="header-title">
+                        <div class="tech-tag">المواصفات التقنية والمقارنة المعيارية • المرجع AM-AEGIS-P2P-370</div>
+                        <h1>AEGIS P2P — <span>الإثباتات التقنية والمقارنة المعيارية</span></h1>
+                        <p class="subtitle">المواصفات التشفيرية، التحقق الرياضي الرسمي والختم المادي HSM الإصدار v3.7 (COTS — ECCN 5D992.c)</p>
+                    </div>
+                    <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima Logo" class="logo">
+                </header>
+
+                <div class="section-card">
+                    <h2>1. الإثباتات الداخلية للأمان والموثوقية</h2>
+                    <p>صُمم AEGIS وفق فلسفة هندسية صارمة <strong>«انعدام الثقة والتحقق من كل شيء» (Zero-Trust, Verify-Everything)</strong>. لا يُعلن عن أي ميزة أمنية دون اختبار آلي قابل للتكرار أو برهان رياضي رسمي مقابل في خط التكامل المستمر CI/CD الخاص بنا (GitHub Actions، 14/14 باللون الأخضر مع ختم SLSA Provenance).</p>
+                    <table class="proof-table">
+                        <thead>
+                            <tr>
+                                <th>مجال الإثبات</th>
+                                <th>الأداة / المنهجية</th>
+                                <th>ما يثبته هذا الفحص رياضياً</th>
+                                <th>الحالة</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>سلامة الذاكرة</strong></td>
+                                <td>Rust / Miri</td>
+                                <td>كشف شامل للسلوكيات غير المعرفة (UB). يمنع طفح المخزن المؤقت، والاستخدام بعد التحرير (Use-After-Free)، وتضارب البيانات المتزامن.</td>
+                                <td class="status-ok">✅ 5/5 مؤكدة</td>
+                            </tr>
+                            <tr>
+                                <td><strong>التحقق الرياضي الرسمي</strong></td>
+                                <td>AWS Kani</td>
+                                <td>برهان رياضي قاطع على خلو الخوارزميات التشفيرية الحرجة (SPQR ML-KEM-1024، ML-DSA-87، Ed25519) من أخطاء التشغيل أو الطفح الحسابي.</td>
+                                <td class="status-ok">✅ مُثبت</td>
+                            </tr>
+                            <tr>
+                                <td><strong>منع تسرب الذاكرة</strong></td>
+                                <td>Valgrind / Linux mmap</td>
+                                <td>يضمن صفر تسرب لبقايا الذاكرة أثناء العمليات التشفيرية المكثفة والتخصيصات المعزولة داخل ذاكرة RAM.</td>
+                                <td class="status-ok">✅ مؤكد</td>
+                            </tr>
+                            <tr>
+                                <td><strong>التصديق المادي للشريحة</strong></td>
+                                <td>StrongBox P2P X.509 (C91)</td>
+                                <td>يتحقق من جذر الثقة المادي للهاتف. يغلق النظام فوراً مع تصفير الذاكرة (Panic Purge) عند اكتشاف أي تلاعب بسلسلة تصديق أندرويد.</td>
+                                <td class="status-ok">✅ مدمج</td>
+                            </tr>
+                            <tr class="hsm-row">
+                                <td><strong>الختم المادي HSM (C89)</strong></td>
+                                <td>StrongBox ECDSA + Ed25519</td>
+                                <td>يربط دون اتصال كل ترخيص ببصمة SHA-256 للمفتاح العام المادي لشريحة StrongBox في الهاتف (<code>aegis_verify_license_key_bound</code>). منع مطلق للاستنساخ.</td>
+                                <td class="status-ok">✅ مختوم v3.7</td>
+                            </tr>
+                            <tr>
+                                <td><strong>أمان الروابط الأصلية FFI</strong></td>
+                                <td>JNI + Bit-for-Bit + SLSA</td>
+                                <td>تحقق آلي من تصدير كافة الرموز الأصلية C/Rust (مثل <code>aegis_panic_purge</code>) بسلامة تامة إلى طبقة التشغيل Kotlin/Dart.</td>
+                                <td class="status-ok">✅ 14/14 + SLSA</td>
+                            </tr>
+                            <tr>
+                                <td><strong>بنية صفر-قرص الصارمة</strong></td>
+                                <td>RAM + /proc/self/mem</td>
+                                <td>المفاتيح التشفيرية والبيانات المكشوفة لا تلامس ذاكرة الفلاش أبداً. يتم فك القفل داخل مساحة ذاكرة Rust معزولة.</td>
+                                <td class="status-ok">✅ مُثبت</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="crypto-strip">
+                <div class="crypto-item">
+                    <strong>SPQR ML-KEM-1024 + X25519</strong>
+                    <span>توافق مفاتيح هجين ما بعد الكم بمعيار NIST FIPS 203</span>
+                </div>
+                <div class="crypto-item">
+                    <strong>CHACHA20-POLY1305 / AES-GCM</strong>
+                    <span>تشفير موثق AEAD بقوة 256 بت أثناء النقل وداخل RAM</span>
+                </div>
+                <div class="crypto-item">
+                    <strong>ML-DSA-87 + ED25519 + HSM</strong>
+                    <span>هوية نظير-إلى-نظير مؤقتة وختم مادي بشريحة StrongBox</span>
+                </div>
+            </div>
+        </div>
+        <footer class="sheet-footer">
+            <span>AEGIS P2P v3.7 • الإثباتات التقنية والمقارنة المعيارية • AresMaxima LLC (USA) — COTS Software (EAR ECCN 5D992.c)</span>
+            <span class="page-num">1 / 2</span>
+        </footer>
+    </div>
+
+    <!-- الصفحة 2 / 2 -->
+    <div class="a4-sheet">
+        <div class="sheet-body">
+            <div class="sections-stack">
+                <div class="p2-mini-header">
+                    <span>AEGIS P2P v3.7 — المقارنة المعيارية الشاملة : AEGIS مقابل تطبيقات السوق الرائدة</span>
+                    <img src="https://aresmaxima.com/wp-content/uploads/vector-03-1.svg" alt="Ares Maxima" class="logo-sm">
+                </div>
+
+                <div class="section-card">
+                    <h2>2. المقارنة المعيارية : AEGIS P2P مقابل قادة السوق</h2>
+                    <div class="note-box">
+                        <p><strong>التصنيف التجاري القياسي COTS (ECCN 5D992.c) :</strong> يستهدف AEGIS P2P نماذج التهديد العالية للخصوصية (الإدارات التنفيذية، حماية الأسرار الصناعية، مكاتب المحاماة، الصحفيون الاستقصائيون، البنى التحتية الحيوية) التي تتطلب سيادة تشفيرية ومادية مطلقة.</p>
+                    </div>
+                    <table class="bench-table">
+                        <thead>
+                            <tr>
+                                <th>المعيار التقني</th>
+                                <th class="col-aegis">AEGIS P2P v3.7</th>
+                                <th>Signal</th>
+                                <th>Session</th>
+                                <th>Telegram</th>
+                                <th>Wickr (AWS)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>معيار التشفير</strong></td>
+                                <td class="aegis-col">تدوير SPQR مستمر ML-KEM-1024 + ML-DSA-87 (مستوى 5)</td>
+                                <td>Signal Protocol (هجين PQ 768)</td>
+                                <td>بروتوكول Signal تقليدي</td>
+                                <td>MTProto (سحابي افتراضياً)</td>
+                                <td>AES-256 / ECDH تقليدي</td>
+                            </tr>
+                            <tr>
+                                <td><strong>التصديق والختم المادي HSM</strong></td>
+                                <td class="aegis-col">تصديق متبادل P2P X.509 StrongBox + ترخيص HSM + NFC.</td>
+                                <td>لا يوجد</td>
+                                <td>لا يوجد</td>
+                                <td>لا يوجد</td>
+                                <td>اختياري</td>
+                            </tr>
+                            <tr>
+                                <td><strong>إخفاء الهوية وشبكة Mesh</strong></td>
+                                <td class="aegis-col">Tor + تمويه HTTP/3 MASQUE + جسر ضوئي QR + شبكة BLE</td>
+                                <td>خوادم مركزية (يتطلب SIM)</td>
+                                <td>توجيه بصلي (يتطلب إنترنت)</td>
+                                <td>سحابة مركزية</td>
+                                <td>سحابة AWS مركزية</td>
+                            </tr>
+                            <tr>
+                                <td><strong>مكافحة التحليل الجنائي</strong></td>
+                                <td class="aegis-col">صفر-قرص RAM + تمويه Chaff + بريد مؤقت + Anti-PRNU</td>
+                                <td>قاعدة SQLite محلية على الفلاش</td>
+                                <td>قاعدة SQLite محلية على الفلاش</td>
+                                <td>تخزين سحابي + ملفات محلية</td>
+                                <td>قاعدة بيانات محلية على القرص</td>
+                            </tr>
+                            <tr>
+                                <td><strong>بروتوكول الطوارئ والتمويه</strong></td>
+                                <td class="aegis-col">نعم (رمز تمويه، Kill Switch للذاكرة، تطهير آلي 1 د)</td>
+                                <td>لا</td>
+                                <td>لا</td>
+                                <td>لا</td>
+                                <td>لا</td>
+                            </tr>
+                            <tr>
+                                <td><strong>قابلية التدقيق والبراهين</strong></td>
+                                <td class="aegis-col">بناء متطابق بت-لبت + ختم SLSA + براهين Kani/Miri</td>
+                                <td>مفتوح المصدر</td>
+                                <td>مفتوح المصدر</td>
+                                <td>العميل فقط (الخادم مغلق)</td>
+                                <td>مغلق (بدون براهين رسمية)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>نموذج الهوية</strong></td>
+                                <td class="aegis-col">مفتاح تشفيري مؤقت (صفر شريحة SIM أو بريد)</td>
+                                <td>رقم هاتف SIM</td>
+                                <td>معرف عشوائي</td>
+                                <td>رقم هاتف SIM</td>
+                                <td>بريد إلكتروني / حساب مؤسسي</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="verdict">
+                    <p>الخلاصة التقنية : يُعد AEGIS P2P v3.7 الحل البرمجي التجاري القياسي (COTS) الوحيد الذي يجمع في آنٍ واحد بين أعلى مقاومة للحوسبة الكمومية (ML-KEM-1024)، والتصديق والختم المادي للترخيص عبر شريحة StrongBox (HSM)، ومكافحة التحليل الجنائي ببنية «صفر-قرص» داخل شبكة ند-للند تعمل بدون خوادم وبدون إنترنت (الفئة السيادية الأولى Tier-1).</p>
+                </div>
+            </div>
+
+            <div class="cta-container">
+                <div class="cta-info">
+                    <strong>البوابة الرسمية، الوثائق وتراخيص HSM المختومة (العربية)</strong>
+                    <a href="https://ar.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="link-url" target="_blank" rel="noopener noreferrer">https://ar.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/</a>
+                </div>
+                <a href="https://ar.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" class="btn-cta" target="_blank" rel="noopener noreferrer">اطلب الآن عبر ar.aresmaxima.com ←</a>
+            </div>
+        </div>
+        <footer class="sheet-footer">
+            <span>Copyright © 2026 AresMaxima LLC and its Licensors. All Rights Reserved. • <a href="https://ar.aresmaxima.com/aegis-p2p-messagerie-securisee-anti-forensique/" target="_blank" rel="noopener noreferrer">ar.aresmaxima.com</a></span>
+            <span class="page-num">2 / 2</span>
+        </footer>
+    </div>
+</div>
+
+</body>
+</html>
